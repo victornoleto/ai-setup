@@ -1,0 +1,94 @@
+#!/bin/sh
+# Resolve the portable memory directory for a workspace and check archive hygiene.
+# Usage: agent-memory dir|index|nudge [path] | agent-memory check [id ...] | agent-memory stale [days]
+set -eu
+
+SETUP="${AI_SETUP_ROOT:-$HOME/.ai-setup}"
+MEM="$SETUP/sync/memory"
+REG="$MEM/registry.json"
+MARKERS="$SETUP/local/markers"
+
+workspace_root() {
+	p=$(cd "${1:-$PWD}" && pwd -P)
+	git -C "$p" rev-parse --show-toplevel 2>/dev/null || printf '%s\n' "$p"
+}
+
+# Longest matching root wins, so a nested project beats its parent.
+resolve() {
+	p=$(workspace_root "${1:-$PWD}")
+	d=$(jq -r --arg p "$p" '
+		.projects[] as $e | $e.roots[] as $r
+		| select($p == $r or ($p | startswith($r + "/")))
+		| "\($r | length)\t\($e.memoryDirectory)"' "$REG" | sort -rn | head -1 | cut -f2)
+	[ -n "$d" ] || { echo "agent-memory: no registry entry for $p" >&2; exit 1; }
+	printf '%s/%s\n' "$MEM" "$d"
+}
+
+# Hygiene: every .md reachable from the index, every registry entry wired up,
+# and no leftovers from a Syncthing conflict.
+check() {
+	rc=0
+	for f in "$MEM"/*.sync-conflict-* "$MEM"/*/*.sync-conflict-* "$MEM"/*/*/*.sync-conflict-*; do
+		[ -e "$f" ] || continue
+		echo "sync conflict: ${f#$MEM/}"; rc=1
+	done
+	for id in "$@"; do
+		d="$MEM/projects/$id"
+		[ -d "$d" ] || { echo "missing dir: $id"; rc=1; continue; }
+		case "$(ls -ld "$d")" in drwx------*) ;; *) echo "loose perms: $id"; rc=1 ;; esac
+
+		for f in "$d"/*.md; do
+			b=$(basename "$f")
+			case "$b" in MEMORY.md|ARCHIVE.md) continue ;; esac
+			grep -qF "$b" "$d/MEMORY.md" "$d/ARCHIVE.md" 2>/dev/null || { echo "unindexed: $id/$b"; rc=1; }
+		done
+
+		roots=$(jq -r --arg id "$id" '.projects[] | select(.id == $id) | .roots[]' "$REG")
+		IFS='
+'
+		for r in $roots; do
+			# ponytail: /media and /mnt are mount points. A .claude/ there vanishes when a
+			# disk mounts over it, and an unplugged disk is absent by design — reporting
+			# either would make check noisy, and a noisy check gets ignored.
+			case "$r" in /media/*|/mnt/*) continue ;; esac
+			[ -d "$r" ] || { echo "missing root: $id -> $r"; rc=1; continue; }
+			[ "$(jq -r '.autoMemoryDirectory // ""' "$r/.claude/settings.local.json" 2>/dev/null)" = "$d" ] \
+				|| { echo "claude adapter missing: $id -> $r"; rc=1; }
+		done
+		unset IFS
+	done
+	return $rc
+}
+
+# Session-start reminder. A marker newer than every memory means sessions came
+# and went with nothing written down. The marker lives in local/, never synced:
+# "a session happened here" is true of one machine, not of the archive.
+# Silent when there is nothing to say, and never fails — a hook must not break
+# the start of a session.
+nudge() {
+	d=$(resolve "${1:-$PWD}" 2>/dev/null) || exit 0
+	[ -d "$d" ] || exit 0
+	m="$MARKERS/$(basename "$d")"
+	if [ -f "$m" ] && [ -z "$(find "$d" -maxdepth 1 -name '*.md' -newer "$m" -print -quit)" ]; then
+		printf 'Nenhuma memória de `%s` foi escrita desde a sessão anterior.\n' "$(basename "$d")"
+		printf 'Registre o que esta sessão descobrir que valha para a próxima, conforme o PROTOCOL.md.\n'
+	fi
+	mkdir -p "$MARKERS" 2>/dev/null || :
+	touch "$m" 2>/dev/null || :
+}
+
+# ponytail: mtime proxy — finds memory nobody touched, not memory that went wrong.
+# Next rung would be diffing each memory against the repo it describes.
+stale() {
+	d=$(resolve "$PWD")
+	find "$d" -maxdepth 1 -name '*.md' -mtime "+${1:-180}" -printf '%TY-%Tm-%Td\t%p\n' | sort
+}
+
+case "${1:-}" in
+	dir)   shift; resolve "$@" ;;
+	index) shift; cat "$(resolve "$@")/MEMORY.md" ;;
+	nudge) shift; nudge "$@" ;;
+	stale) shift; stale "$@" ;;
+	check) shift; [ $# -gt 0 ] || set -- $(jq -r '.projects[].memoryDirectory | ltrimstr("projects/")' "$REG"); check "$@" ;;
+	*)     echo "usage: agent-memory dir|index|nudge [path] | agent-memory check [id ...] | agent-memory stale [days]" >&2; exit 2 ;;
+esac

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "$HOME/.ai-setup/sync/memory/GLOBAL.md",
+    "$HOME/.ai-setup/local/machine.md",
+    "$HOME/.ai-setup/sync/memory/PROTOCOL.md"
+  ]
+}
