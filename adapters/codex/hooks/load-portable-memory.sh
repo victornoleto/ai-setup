@@ -1,41 +1,37 @@
 #!/bin/sh
-# Inject the canonical portable-memory context for every Codex session.
+# Injeta a camada A no início de toda sessão do Codex.
+#
+# O Codex não tem `@import` como o Claude Code nem uma lista `instructions` como
+# o OpenCode: a única via para conteúdo que precisa valer em todo turno é este
+# hook. Por isso ele sobrevive à migração para o ai-memory — reduzido a copiar
+# dois arquivos, sem resolvedor, sem registry e sem índice de projeto.
+#
+# O que saiu em 2026-09-16, e por quê:
+#   - PROTOCOL.md         mecânica do acervo antigo; o bloco markered do
+#                         ai-memory no AGENTS.md ocupa o lugar dele
+#   - MEMORY.md resolvido  a memória de projeto agora é do ai-memory, recuperada
+#                         por `memory_query` sob demanda, não despejada no prompt
+#   - agent-memory nudge   os hooks do ai-memory capturam sozinhos
+#
+# Regra que precisa valer todo turno mora no arquivo de instruções, não no
+# acervo: o wiki é servido ao agente como evidência histórica não-confiável.
 set -eu
 
 SETUP="${AI_SETUP_ROOT:-$HOME/.ai-setup}"
-MEMORY_ROOT="$SETUP/sync/memory"
-RESOLVER="$SETUP/bin/agent-memory"
 
-# Codex supplies one JSON object on stdin; tolerate missing or malformed input.
-payload=$(cat || true)
-cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null || true)
-[ -n "$cwd" ] || cwd="$PWD"
-workspace=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || (cd "$cwd" && pwd -P))
+# O Codex manda um objeto JSON no stdin. Não usamos nada dele, mas é preciso
+# drenar o pipe: sair sem ler faz o Codex escrever num pipe fechado.
+cat >/dev/null 2>&1 || true
 
-printf '%s\n' '# Canonical portable-memory context'
-printf '%s\n\n' 'The following files are authoritative local context injected at session start.'
+printf '%s\n' '# Canonical always-on context'
+printf '%s\n\n' 'Authoritative local context injected at session start. Not memory — these are current instructions.'
+
 printf '%s\n' '## GLOBAL.md'
-cat "$MEMORY_ROOT/GLOBAL.md"
+cat "$SETUP/sync/memory/GLOBAL.md"
+
+# machine.md é symlink para machine/<esta máquina>.md e não viaja entre máquinas.
+# Ausente numa máquina recém-instalada: seguir sem ele em vez de falhar a sessão.
 if [ -f "$SETUP/local/machine.md" ]; then
     printf '\n%s\n' '## machine.md'
     cat "$SETUP/local/machine.md"
 fi
-printf '\n%s\n' '## PROTOCOL.md'
-cat "$MEMORY_ROOT/PROTOCOL.md"
-
-if memory_dir=$($RESOLVER dir "$workspace" 2>/dev/null); then
-    printf '\n## Resolved project memory index\n'
-    printf 'Workspace: `%s`\nMemory directory: `%s`\n\n' "$workspace" "$memory_dir"
-    cat "$memory_dir/MEMORY.md"
-    printf '\n\nRead a linked topical memory only when it applies to the task.\n'
-else
-    printf '\n## Resolved project memory index\n'
-    printf 'No registry entry matches `%s`. Do not create or guess a memory entry; ask before creating one.\n' "$workspace"
-fi
-
-if [ -f "$workspace/.ai/README.md" ]; then
-    printf '\nA `.ai/README.md` exists at the workspace root. Read it before working; its project-specific instructions override generic guidance.\n'
-fi
-
-# Reminder when sessions came and went with nothing written down. Silent otherwise.
-"$RESOLVER" nudge "$workspace"

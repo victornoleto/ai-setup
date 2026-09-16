@@ -2,7 +2,13 @@
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
     "$HOME/.ai-setup/sync/memory/GLOBAL.md",
-    "$HOME/.ai-setup/local/machine.md",
-    "$HOME/.ai-setup/sync/memory/PROTOCOL.md"
-  ]
+    "$HOME/.ai-setup/local/machine.md"
+  ],
+  "mcp": {
+    "ai-memory": {
+      "type": "remote",
+      "url": "http://127.0.0.1:49374/mcp",
+      "enabled": true
+    }
+  }
 }
