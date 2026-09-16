@@ -8,12 +8,6 @@ ok()   { printf 'ok    %s\n' "$*"; }
 bad()  { printf 'FALHA %s\n' "$*"; rc=1; }
 note() { printf 'nota  %s\n' "$*"; }
 
-command -v jq >/dev/null && ok "jq instalado" || bad "jq ausente — o resolvedor depende dele"
-
-case ":${PATH}:" in
-	*":$SETUP/bin:"*) ok "bin no PATH" ;;
-	*) note "bin fora do PATH: export PATH=\"\$HOME/.ai-setup/bin:\$PATH\" no rc do shell" ;;
-esac
 
 # --- adaptadores ---
 while IFS='	' read -r mode src dst; do
@@ -21,7 +15,7 @@ while IFS='	' read -r mode src dst; do
 	from="$SETUP/adapters/$src"; to="$HOME/$dst"
 	case "$mode" in
 	link)
-		if [ -L "$to" ] && [ "$(readlink -f "$to")" = "$from" ]; then ok "link  $dst"
+		if [ -L "$to" ] && [ "$(readlink -f "$to")" = "$(readlink -f "$from")" ]; then ok "link  $dst"
 		elif [ ! -e "$to" ]; then bad "link  $dst ausente — rode install.sh"
 		else bad "link  $dst não aponta para adapters/$src — rode install.sh"; fi ;;
 	copy)
@@ -47,16 +41,30 @@ else
 	bad "local/machine.md não resolve — rode install.sh"
 fi
 
-# --- acervo ---
-if out=$("$SETUP/bin/agent-memory" check 2>&1); then ok "acervo íntegro (agent-memory check)"
-else bad "agent-memory check:"; printf '%s\n' "$out" | sed 's/^/      /'; fi
+# --- memória: ai-memory ---
+# A memória de longo prazo saiu deste repositório em 2026-09-16. O que se confere
+# aqui é só se o servidor está de pé e se nenhum harness voltou a escrever num
+# acervo paralelo.
+if command -v ai-memory >/dev/null; then ok "ai-memory no PATH"
+else bad "ai-memory ausente — veja ~/Documents/notas/ia/migrar-ai-setup-para-ai-memory.md"; fi
 
-if sh "$SETUP/tests/agent-memory.test.sh" >/dev/null 2>&1; then ok "suíte do resolvedor passa"
-else bad "suíte do resolvedor falha — rode: sh $SETUP/tests/agent-memory.test.sh"; fi
+estado=$(docker inspect -f '{{.State.Health.Status}}' ai-memory 2>/dev/null || echo ausente)
+[ "$estado" = healthy ] && ok "container ai-memory healthy" \
+	|| bad "container ai-memory: $estado — docker start ai-memory"
+
+# AI_MEMORY_SERVER_URL setada faz o CLI responder "local spool" em vez de erro.
+[ -z "${AI_MEMORY_SERVER_URL:-}" ] || bad "AI_MEMORY_SERVER_URL setada — quebra o wrapper em silêncio; unset"
+
+if jq -e '.autoMemoryEnabled == false' "$HOME/.claude/settings.json" >/dev/null 2>&1; then
+	ok "memória nativa do Claude Code desligada"
+else bad "autoMemoryEnabled não é false em ~/.claude/settings.json — dois acervos vivos"; fi
+
+grep -Eq '^\s*memories\s*=\s*false' "$HOME/.codex/config.toml" 2>/dev/null \
+	&& ok "memória nativa do Codex desligada" \
+	|| bad "[features] memories = false ausente em ~/.codex/config.toml"
 
 # --- pendências que só o usuário resolve ---
 grep -qE "^# copy	codex/config.toml" "$SETUP/adapters/MANIFEST" \
 	&& note "config.toml fora do repositório: tem um GitHub PAT em texto puro. Veja o README."
-note "o versionamento da pasta sync/ no Syncthing não dá para verificar daqui — confira no minipc."
 
 exit $rc

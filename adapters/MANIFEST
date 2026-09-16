@@ -11,10 +11,16 @@ link	codex/AGENTS.md	.codex/AGENTS.md
 link	codex/hooks/load-portable-memory.sh	.codex/hooks/load-portable-memory.sh
 link	opencode/opencode.jsonc	.config/opencode/opencode.jsonc
 link	opencode/AGENTS.md	.config/opencode/AGENTS.md
-link	opencode/plugin/portable-memory.js	.config/opencode/plugin/portable-memory.js
 link	opencode/package.json	.config/opencode/package.json
 copy	claude/settings.json	.claude/settings.json
 # copy	codex/config.toml	.codex/config.toml
 #   PENDENTE: o config.toml tem um GitHub PAT em texto puro em
 #   [mcp_servers.github.http_headers]. Enquanto ele não for revogado e trocado por
 #   bearer_token_env_var, este arquivo não entra no repositório. Veja o README.
+# Antigravity CLI (`agy`): não tem @import nem lista `instructions`, e lê exatamente
+# dois arquivos globais de contexto — GEMINI.md e AGENTS.md (medido em 2026-09-16;
+# `context.fileName` com uma lista maior não surte efeito). Os dois slots vão para a
+# camada A. O bloco gerenciado do ai-memory fica de fora de propósito: as regras de
+# escopo e de dado não-confiável já chegam pelas instruções do próprio servidor MCP.
+link	../sync/memory/GLOBAL.md	.gemini/GEMINI.md
+link	../local/machine.md	.gemini/AGENTS.md
