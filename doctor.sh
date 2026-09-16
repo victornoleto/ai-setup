@@ -64,7 +64,13 @@ grep -Eq '^\s*memories\s*=\s*false' "$HOME/.codex/config.toml" 2>/dev/null \
 	|| bad "[features] memories = false ausente em ~/.codex/config.toml"
 
 # --- pendências que só o usuário resolve ---
-grep -qE "^# copy	codex/config.toml" "$SETUP/adapters/MANIFEST" \
-	&& note "config.toml fora do repositório: tem um GitHub PAT em texto puro. Veja o README."
+# Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
+# lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.
+for f in "$HOME/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.gemini/config/mcp_config.json"; do
+	[ -f "$f" ] || continue
+	if grep -qE 'github_pat_|gh[pousr]_[A-Za-z0-9]{20,}|sk-ant-|sk-or-v1-' "$f"; then bad "token em texto puro em ${f#"$HOME"/}"
+	else ok "sem token em texto puro: ${f#"$HOME"/}"; fi
+done
+gh auth status >/dev/null 2>&1 && ok "gh autenticado" || note "gh sem login: gh auth login"
 
 exit $rc
