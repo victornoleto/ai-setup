@@ -46,7 +46,7 @@ fi
 # aqui é só se o servidor está de pé e se nenhum harness voltou a escrever num
 # acervo paralelo.
 if command -v ai-memory >/dev/null; then ok "ai-memory no PATH"
-else bad "ai-memory ausente — veja ~/Documents/notas/ia/migrar-ai-setup-para-ai-memory.md"; fi
+else bad "ai-memory ausente — veja "Ligar o ai-memory" no README"; fi
 
 estado=$(docker inspect -f '{{.State.Health.Status}}' ai-memory 2>/dev/null || echo ausente)
 [ "$estado" = healthy ] && ok "container ai-memory healthy" \
