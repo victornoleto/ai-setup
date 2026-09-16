@@ -93,8 +93,9 @@ Wrapper do CLI: seguir o *Quick start → Docker* do README do ai-memory (baixa
 #   AI_MEMORY_LLM_PROVIDER=openai-compat
 #   AI_MEMORY_LLM_BASE_URL=https://openrouter.ai/api/v1
 #   AI_MEMORY_LLM_MODEL=z-ai/glm-5.3-flash
-#   AI_MEMORY_LLM_REASONING_EFFORT=none
+#   AI_MEMORY_LLM_REASONING_EFFORT=low
 #   AI_MEMORY_EMBEDDING_PROVIDER=local
+#   AI_MEMORY_RERANKER=llm
 #   LLM_API_KEY=<chave da OpenRouter>
 docker run -d --name ai-memory --restart unless-stopped \
   -p 127.0.0.1:49374:49374 -v ai-memory-data:/data \
@@ -122,11 +123,22 @@ Projeto cujo nome não é o basename da raiz, ou raiz que não é repositório g
 `.ai-memory.toml` com `workspace = "default"` e `project = "<nome>"`. Em repositório de time,
 excluir localmente: `echo .ai-memory.toml >> .git/info/exclude`.
 
+`REASONING_EFFORT` tem que ser `low`, nunca `none`: o `glm-5.3-flash` exige raciocínio e a
+OpenRouter recusa a chamada com 400. O `llm-test` não pega isso, porque não manda o parâmetro — a
+falha só aparece no log do servidor, e o servidor degrada em silêncio (reranker mantém a ordem,
+consolidação cai para o resumo por regra).
+
+O reranker custa uma chamada ao LLM por `memory_query` (mediana 2,4 s). Medido em 30 perguntas
+parafraseadas sobre o acervo: a memória certa em 1º lugar passou de 15 para 26, sem piorar
+nenhuma. Sem ele, o multiplicador de autoridade por `kind` (fixo no código: `rule` +0,15,
+`fact` 0) derruba notas `fact` que casam melhor.
+
 Nunca exporte `AI_MEMORY_SERVER_URL` no shell: o wrapper roda em container com `--network host`,
 e a variável faz o CLI responder `local spool` em vez de erro.
 
-Validar: `ai-memory llm-test --provider openai-compat --model z-ai/glm-5.3-flash --prompt ok`,
-e depois `ai-memory audit-contamination`.
+Validar: `ai-memory audit-contamination` limpo e, depois de qualquer `memory_query`,
+`docker logs ai-memory 2>&1 | grep -iE 'provider error|reranker failed'` vazio. O `llm-test` sozinho
+não serve de prova — ele passou com a configuração quebrada.
 
 ## Pegadinhas
 
