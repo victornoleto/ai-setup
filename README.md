@@ -5,8 +5,8 @@ Quatro ferramentas usam isto: **Claude Code**, **Codex**, **OpenCode** e **Antig
 
 **A memória de longo prazo não mora mais aqui.** Desde 2026-09-16 ela é do
 [ai-memory](https://github.com/akitaonrails/ai-memory), servidor em Docker nesta máquina. O
-procedimento e as decisões da migração estão em
-`~/Documents/notas/ia/migrar-ai-setup-para-ai-memory.md`.
+acervo antigo (136 memórias) foi importado nele; o estado anterior está na tag `pre-ai-memory`
+e em `~/backups-ai-setup/`.
 
 ## Instrução contra memória
 
@@ -80,9 +80,53 @@ container do ai-memory healthy, e que a memória nativa do Claude Code e do Code
 1. Clonar este repositório em `~/.ai-setup` e trazer o `sync/`.
 2. `sh install.sh` — cria os symlinks e o `machine/<hostname>.md` em branco.
 3. Preencher o `machine/<hostname>.md`.
-4. Subir o ai-memory e ligar cada ferramenta — passos em
-   `~/Documents/notas/ia/migrar-ai-setup-para-ai-memory.md`.
+4. Subir o ai-memory e ligar cada ferramenta (ver abaixo).
 5. `sh doctor.sh` até sair sem FALHA.
+
+### Ligar o ai-memory
+
+Wrapper do CLI: seguir o *Quick start → Docker* do README do ai-memory (baixa
+`~/.local/bin/ai-memory` conferindo o sha256). Depois:
+
+```sh
+# Servidor. As chaves ficam em ~/.config/ai-memory/server.env (chmod 600, fora de qualquer repo):
+#   AI_MEMORY_LLM_PROVIDER=openai-compat
+#   AI_MEMORY_LLM_BASE_URL=https://openrouter.ai/api/v1
+#   AI_MEMORY_LLM_MODEL=z-ai/glm-5.3-flash
+#   AI_MEMORY_LLM_REASONING_EFFORT=none
+#   AI_MEMORY_EMBEDDING_PROVIDER=local
+#   LLM_API_KEY=<chave da OpenRouter>
+docker run -d --name ai-memory --restart unless-stopped \
+  -p 127.0.0.1:49374:49374 -v ai-memory-data:/data \
+  --env-file ~/.config/ai-memory/server.env docker.io/akitaonrails/ai-memory:latest
+
+# Hooks e MCP, por ferramenta. Rodar a partir de ~, nunca de dentro de um repositório.
+for a in claude-code codex open-code antigravity-cli; do
+  ai-memory install-hooks --agent $a --project-strategy repo-root --apply
+done
+ai-memory install-mcp --client claude-code --apply
+ai-memory install-mcp --client codex --apply
+ai-memory install-mcp --client open-code --apply --config-file ~/.ai-setup/adapters/opencode/opencode.jsonc
+ai-memory install-mcp --client antigravity-cli --apply
+
+# Bloco de instruções, sempre no arquivo real (nunca no symlink):
+ai-memory install-instructions --compact --skills-scope global --skills-agent claude-code \
+  --target ~/.ai-setup/adapters/claude/CLAUDE.md
+for t in codex opencode; do
+  ai-memory install-instructions --compact --skills-scope global --skills-agent agents \
+    --target ~/.ai-setup/adapters/$t/AGENTS.md
+done
+```
+
+Projeto cujo nome não é o basename da raiz, ou raiz que não é repositório git, precisa de
+`.ai-memory.toml` com `workspace = "default"` e `project = "<nome>"`. Em repositório de time,
+excluir localmente: `echo .ai-memory.toml >> .git/info/exclude`.
+
+Nunca exporte `AI_MEMORY_SERVER_URL` no shell: o wrapper roda em container com `--network host`,
+e a variável faz o CLI responder `local spool` em vez de erro.
+
+Validar: `ai-memory llm-test --provider openai-compat --model z-ai/glm-5.3-flash --prompt ok`,
+e depois `ai-memory audit-contamination`.
 
 ## Pegadinhas
 
