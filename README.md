@@ -152,9 +152,14 @@ não serve de prova — ele passou com a configuração quebrada.
 - **OpenCode** carrega plugins quando a sessão é criada, não quando o servidor sobe.
 - **Codex** pede confiança de novo sempre que um hook muda de hash.
 
-## Pendências
+## GitHub
 
-- **`~/.codex/config.toml` está fora do repositório.** Tem um GitHub PAT em texto puro em
-  `[mcp_servers.github.http_headers]`. Revogar o token em `github.com/settings/tokens`, trocar o
-  bloco por `bearer_token_env_var = "GITHUB_MCP_TOKEN"` e então descomentar a linha
-  `copy codex/config.toml` no `MANIFEST`.
+Agentes acessam o GitHub pelo `gh`, não por MCP. O token fica no keyring do sistema
+(`gh auth login`), um login serve a todas as ferramentas, e nenhum segredo fica em arquivo de
+config — o MCP do GitHub exigia um PAT no header, e cada instalador que tocava o config gravava
+uma cópia dele num `.bak`. Removido em 2026-09-16 do Claude Code e do Codex (incluindo o plugin
+`github@openai-curated`, que embute o mesmo MCP); o PAT foi revogado.
+
+O controle do que o agente pode fazer passa a ser a permissão de Bash de cada ferramenta: leitura
+(`gh pr view`, `gh issue list`, `gh run view`) liberada; `gh pr merge`, `gh repo delete` e
+`gh api -X POST/PATCH/DELETE` pedindo aprovação.
