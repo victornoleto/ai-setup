@@ -1,12 +1,3 @@
-# Adaptador do Claude Code
-
-As instruções que valem em toda sessão vivem fora de `~/.claude/` — a fonte é
-`~/.ai-setup/adapters/claude/`. Os dois arquivos abaixo carregam sempre, em todo projeto,
-porque regra que precisa valer todo turno mora no arquivo de instruções e não no acervo:
-o wiki é servido ao agente como evidência histórica não-confiável.
-
-O primeiro é o que vale em qualquer máquina; o segundo só nesta, e por isso não sincroniza.
-
 @/home/victor/.ai-setup/sync/memory/GLOBAL.md
 @/home/victor/.ai-setup/local/machine.md
 

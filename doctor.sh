@@ -73,4 +73,36 @@ for f in "$HOME/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode
 done
 gh auth status >/dev/null 2>&1 && ok "gh autenticado" || note "gh sem login: gh auth login"
 
+# --- núcleo: skills, plugins, confiança ---
+# ~/.agents/skills guarda a única cópia real; em ~/.claude/skills tudo é link para lá ou para skills/.
+dup=0
+for s in "$HOME/.claude/skills"/*/; do
+	n=$(basename "$s")
+	case "$n" in ai-memory-*|synced) continue ;; esac
+	[ -L "${s%/}" ] || { bad "skill copiada em .claude/skills/$n — troque por link"; dup=1; }
+done
+[ $dup = 0 ] && ok "skills sem cópia duplicada"
+
+jq -e '.entries[]?.path | select(startswith("/"))' "$HOME/.gemini/config/skills.json" >/dev/null 2>&1 \
+	&& ok "agy lê ~/.agents/skills" \
+	|| bad "~/.gemini/config/skills.json ausente ou com caminho relativo (o agy não aceita ~)"
+
+if jq -e '.enabledPlugins | to_entries[] | select(.key|test("^(playwright|superpowers|ponytail)@")) | select(.value)' "$HOME/.claude/settings.json" >/dev/null 2>&1
+then bad "plugin substituído voltou a ligar no Claude (playwright/superpowers/ponytail)"
+else ok "sem MCP do Playwright nem plugins substituídos no Claude"; fi
+
+grep -Eq '^\[projects\."/home(/victor)?"\]' "$HOME/.codex/config.toml" \
+	&& bad "Codex confia em /home ou /home/victor inteiro" || ok "confiança do Codex sem /home"
+
+grep -rqs '\.orca' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" "$HOME/.gemini/config/hooks.json" \
+	&& bad "hook do Orca voltou" || ok "sem hooks do Orca"
+
+g=$(wc -c < "$SETUP/sync/memory/GLOBAL.md")
+[ "$g" -le 4000 ] && ok "GLOBAL.md com $g bytes" || note "GLOBAL.md com $g bytes (> 4000): carrega em todo turno, enxugue"
+
+copiado=$(sed -n 's/^copiado-em: //p' "$SETUP/skills/UPSTREAM.md")
+idade=$(( ( $(date +%s) - $(date -d "$copiado" +%s) ) / 86400 ))
+[ "$idade" -le 90 ] && ok "skills copiadas revisadas há $idade dias" \
+	|| note "AVISO skills copiadas do superpowers sem revisão há $idade dias — veja skills/UPSTREAM.md"
+
 exit $rc

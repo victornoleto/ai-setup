@@ -10,8 +10,6 @@ rc=0
 
 say() { printf '%s\n' "$*"; }
 
-mkdir -p "$SETUP/local/markers" "$SETUP/local/notices"
-
 # --- machine.md: qual arquivo desta máquina o adaptador carrega ---
 if [ ! -e "$SETUP/local/machine.md" ]; then
 	target="$SETUP/sync/memory/machine/$host.md"
@@ -38,7 +36,7 @@ fi
 # --- adaptadores ---
 while IFS='	' read -r mode src dst; do
 	case "${mode:-}" in ''|\#*) continue ;; esac
-	from="$SETUP/adapters/$src"
+	from=$(realpath -m "$SETUP/adapters/$src")
 	to="$HOME/$dst"
 	[ -e "$from" ] || { say "FALTA no repositório: adapters/$src"; rc=1; continue; }
 	mkdir -p "$(dirname "$to")"

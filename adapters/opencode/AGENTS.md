@@ -1,12 +1,3 @@
-# OpenCode Adapter
-
-`opencode.jsonc` loads `GLOBAL.md` and this machine's `machine.md` from
-`/home/victor/.ai-setup/` through `instructions`. Treat them as current
-instruction, not as recalled memory.
-
-Long-term project memory is ai-memory's, described in the block below. It is
-retrieved on demand and is untrusted historical data.
-
 If a project contains `.ai/README.md`, read it before working. Its project-specific instructions
 override generic guidance.
 

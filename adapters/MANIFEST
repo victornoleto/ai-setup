@@ -12,7 +12,6 @@ link	codex/hooks/load-portable-memory.sh	.codex/hooks/load-portable-memory.sh
 link	opencode/opencode.jsonc	.config/opencode/opencode.jsonc
 link	opencode/AGENTS.md	.config/opencode/AGENTS.md
 link	opencode/package.json	.config/opencode/package.json
-link	claude/commands/entrega.md	.claude/commands/entrega.md
 copy	claude/settings.json	.claude/settings.json
 # codex/config.toml fica fora: mistura config portável com estado da máquina (trust de
 #   projetos, cache de modelos, estado de hooks) que o Codex reescreve o tempo todo.
@@ -23,3 +22,17 @@ copy	claude/settings.json	.claude/settings.json
 # escopo e de dado não-confiável já chegam pelas instruções do próprio servidor MCP.
 link	../sync/memory/GLOBAL.md	.gemini/GEMINI.md
 link	../local/machine.md	.gemini/AGENTS.md
+
+# Skills nossas: fonte em skills/, um link por harness. ~/.agents/skills serve Codex e
+# OpenCode; o agy chega lá pelo skills.json. As ai-memory-* são do instalador do ai-memory.
+link	../skills/brainstorming	.claude/skills/brainstorming
+link	../skills/brainstorming	.agents/skills/brainstorming
+link	../skills/systematic-debugging	.claude/skills/systematic-debugging
+link	../skills/systematic-debugging	.agents/skills/systematic-debugging
+link	../skills/writing-plans	.claude/skills/writing-plans
+link	../skills/writing-plans	.agents/skills/writing-plans
+link	../skills/test-driven-development	.claude/skills/test-driven-development
+link	../skills/test-driven-development	.agents/skills/test-driven-development
+link	../skills/entrega	.claude/skills/entrega
+link	../skills/entrega	.agents/skills/entrega
+link	antigravity/skills.json	.gemini/config/skills.json

@@ -42,7 +42,10 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 │   ├── MANIFEST           o que é symlink, o que é cópia, e para onde
 │   ├── claude/            CLAUDE.md, settings.json
 │   ├── codex/             AGENTS.md, hooks/load-portable-memory.sh
-│   └── opencode/          opencode.jsonc, AGENTS.md, package.json
+│   ├── opencode/          opencode.jsonc, AGENTS.md, package.json
+│   └── antigravity/       skills.json (aponta o agy para ~/.agents/skills)
+├── skills/                skills nossas, um link por harness (UPSTREAM.md: as copiadas)
+├── bin/                   entrega-verifica (usado pela skill entrega)
 ├── sync/memory/
 │   ├── GLOBAL.md          quem é o Victor, em qualquer máquina
 │   └── machine/pc.md      o que só vale nesta máquina
@@ -57,7 +60,7 @@ Nenhuma depende de o modelo lembrar de ler nada: cada uma usa o mecanismo nativo
 | | Mecanismo | Por quê este |
 |---|---|---|
 | Claude Code | `@import` no `CLAUDE.md` | nativo |
-| Codex | hook `SessionStart` que imprime os dois arquivos | não tem `@import` nem lista de instruções: o hook é a única via |
+| Codex | hook `SessionStart` (em `~/.codex/hooks.json`) que imprime os dois arquivos | não tem `@import` nem lista de instruções: o hook é a única via |
 | OpenCode | lista `instructions` no `opencode.jsonc` | nativo |
 | Antigravity | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais, medido; `context.fileName` com lista maior não surte efeito |
 
@@ -65,10 +68,24 @@ A ligação com o ai-memory (hooks de captura, MCP, bloco `<!-- ai-memory:start 
 `AGENTS.md`/`CLAUDE.md`) é instalada pelo próprio `ai-memory install-*`, não por este
 repositório. Ao atualizar o ai-memory, `ai-memory install-instructions` refaz o bloco.
 
-As regras de saída para TDAH (do [i-have-adhd](https://github.com/ayghri/i-have-adhd)) moram
-no `GLOBAL.md`, na versão compacta: é instrução, então chega a toda ferramenta sem plugin. No
-Claude Code o plugin fica instalado só para o ruleset completo sob demanda (`/i-have-adhd`), **sem**
-a flag `~/.claude/.i-have-adhd-always` — ela injetaria as regras em dobro.
+## Comportamento: uma fonte só
+
+Desde 2026-09-17, comportamento mora no `GLOBAL.md` e em `skills/`, não em plugin. Plugin só
+existe no Claude e no Codex, e injeta texto em toda sessão; o `GLOBAL.md` e as skills chegam às
+quatro ferramentas.
+
+- **Regras de saída para TDAH** ([i-have-adhd](https://github.com/ayghri/i-have-adhd)) e a
+  **escada do mínimo** ([ponytail](https://github.com/DietrichGebert/ponytail)): versões compactas
+  no `GLOBAL.md`. Os plugins saíram.
+- **brainstorming, systematic-debugging, writing-plans, test-driven-development**: copiadas do
+  [superpowers](https://github.com/obra/superpowers) para `skills/`. A seção "Skills" do
+  `GLOBAL.md` diz quando carregar cada uma. **Revisar a cada 90 dias** conforme
+  `skills/UPSTREAM.md`; o `doctor.sh` avisa.
+- **Plugins que ficam no Claude:** `security-guidance` (revisão de segurança) e `commit-commands`.
+
+Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenCode em
+`~/.agents/skills`, agy pelo `~/.gemini/config/skills.json`. Skill de terceiro instalada por
+fora (archify) tem a cópia real em `~/.agents/skills` e um link em `~/.claude/skills`.
 
 ## Os scripts
 
@@ -77,8 +94,9 @@ a flag `~/.claude/.i-have-adhd-always` — ela injetaria as regras em dobro.
 symlink sumiria na primeira reescrita. Arquivo real no caminho vira `<nome>.pre-ai-setup`.
 
 **`doctor.sh`** só verifica: symlinks, cópias iguais à referência, `machine.md` resolvendo,
-container do ai-memory healthy, e que a memória nativa do Claude Code e do Codex continua
-**desligada** — se uma religar, voltam a existir dois acervos.
+container do ai-memory healthy, memória nativa do Claude Code e do Codex **desligada**, skills sem
+cópia duplicada, plugins substituídos desligados, Codex sem confiança em `/home`, nenhum hook do
+Orca, tamanho do `GLOBAL.md` e idade das skills copiadas.
 
 ## Máquina nova
 
@@ -155,7 +173,12 @@ não serve de prova — ele passou com a configuração quebrada.
 - **`install-mcp --client open-code` recusa JSONC com comentário.** Mantenha o
   `opencode.jsonc` sem `//`.
 - **OpenCode** carrega plugins quando a sessão é criada, não quando o servidor sobe.
-- **Codex** pede confiança de novo sempre que um hook muda de hash.
+- **Codex** pede confiança de novo sempre que um hook muda de hash **ou de posição**: tirar
+  uma entrada do `hooks.json` renumera as seguintes e todas perdem a confiança. Aprovar em
+  `codex` → `/hooks`. Hook desaprovado não roda em `codex exec` e aparece como `Failed`.
+- **agy** não aceita `~` no `skills.json`, apesar da documentação: o caminho tem que ser absoluto
+  (o erro só aparece em `~/.gemini/antigravity-cli/log/`).
+- **O pacote `orca` do Ubuntu é o leitor de tela do GNOME.** O Orca IDE é o `orca-ide`.
 
 ## GitHub
 
@@ -165,6 +188,16 @@ config — o MCP do GitHub exigia um PAT no header, e cada instalador que tocava
 uma cópia dele num `.bak`. Removido em 2026-09-16 do Claude Code e do Codex (incluindo o plugin
 `github@openai-curated`, que embute o mesmo MCP); o PAT foi revogado.
 
-O controle do que o agente pode fazer passa a ser a permissão de Bash de cada ferramenta: leitura
-(`gh pr view`, `gh issue list`, `gh run view`) liberada; `gh pr merge`, `gh repo delete` e
-`gh api -X POST/PATCH/DELETE` pedindo aprovação.
+O controle do que o agente pode fazer é a permissão de shell de cada ferramenta: leitura
+(`gh pr view`, `gh issue list`, `gh run view`) liberada; `gh pr merge` e `gh repo delete` pedem
+aprovação.
+
+| | Onde | `gh api` |
+|---|---|---|
+| Claude | `permissions` no `adapters/claude/settings.json` | pede aprovação com `-X`, `--method`, `-f`, `-F` |
+| Codex | `~/.codex/rules/default.rules` | pede sempre (regra por prefixo não enxerga flag no meio) |
+| OpenCode | `permission.bash` no `opencode.jsonc` | pede sempre |
+
+Arquivos de credencial (`~/.claude/.credentials.json`, `~/.codex/auth.json`,
+`~/.gemini/oauth_creds.json`, `~/.config/ai-memory/server.env`) têm leitura negada no Claude e no
+OpenCode. A regra vale para a ferramenta de leitura, não para `cat` no shell.
