@@ -87,6 +87,35 @@ Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenC
 `~/.agents/skills`, agy pelo `~/.gemini/config/skills.json`. Skill de terceiro instalada por
 fora (archify) tem a cópia real em `~/.agents/skills` e um link em `~/.claude/skills`.
 
+## Quem é dono de quê
+
+Os dois sistemas mexem nos mesmos arquivos de config, então a fronteira é por **trecho**, não por
+arquivo. Regra: quem grava é o dono, e o outro só confere.
+
+| Trecho | Dono | Como muda |
+|---|---|---|
+| Entradas de hook com `ai-memory/hooks/` | ai-memory | `ai-memory install-hooks --apply` |
+| Servidor MCP `ai-memory` nos quatro configs | ai-memory | `ai-memory install-mcp --apply` |
+| Bloco `<!-- ai-memory:start/end -->` nos adaptadores | ai-memory | `ai-memory install-instructions` (arquivo real) |
+| Skills `ai-memory-*` e plugin `opencode/plugins/ai-memory.ts` | ai-memory | `install-instructions`/`install-hooks` |
+| Todo o resto: `GLOBAL.md`, `machine.md`, `skills/`, permissões, plugins, modelo | ai-setup | editar em `~/.ai-setup` e `install.sh` |
+
+Na prática:
+
+1. **Depois de qualquer `ai-memory install-*`**: `sh doctor.sh`. O `settings.json` do Claude vai
+   acusar diferença, porque o instalador grava no vivo. Aceite com `cp ~/.claude/settings.json
+   adapters/claude/settings.json`, revise o diff e faça o commit. No Codex, aprove os hooks em
+   `/hooks`.
+2. **Regra de comportamento nunca vai para o ai-memory.** Memória chega ao agente como evidência
+   não-confiável: regra posta lá é ignorada por desenho. Regra global vai no `GLOBAL.md`, regra
+   de projeto no `AGENTS.md`/`CLAUDE.md` do projeto.
+3. **Fato de projeto nunca vai para o `GLOBAL.md`.** Ele carrega em todo turno de todo projeto.
+   Decisão, pegadinha e histórico vão para o ai-memory (a skill `ai-memory-durable-pages`, quando
+   o Victor pedir para lembrar).
+4. **O `doctor.sh` confere as três pontas do ai-memory em cada ferramenta**: hooks (captura), MCP
+   (consulta) e instrução de uso. O agy não recebe o bloco: as instruções do servidor MCP fazem
+   esse papel.
+
 ## Os scripts
 
 **`install.sh`** lê o `adapters/MANIFEST` e põe cada arquivo onde a ferramenta procura. Modo
@@ -178,6 +207,8 @@ não serve de prova — ele passou com a configuração quebrada.
   `codex` → `/hooks`. Hook desaprovado não roda em `codex exec` e aparece como `Failed`.
 - **agy** não aceita `~` no `skills.json`, apesar da documentação: o caminho tem que ser absoluto
   (o erro só aparece em `~/.gemini/antigravity-cli/log/`).
+- **`agy -p` (modo print) não manda `cwd` no hook**: a sessão cai no projeto `scratch` do
+  ai-memory. Para testar o agy, use o modo interativo, ou apague depois com `ai-memory purge-session`.
 - **O pacote `orca` do Ubuntu é o leitor de tela do GNOME.** O Orca IDE é o `orca-ide`.
 
 ## GitHub

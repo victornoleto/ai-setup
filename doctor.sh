@@ -63,6 +63,34 @@ grep -Eq '^\s*memories\s*=\s*false' "$HOME/.codex/config.toml" 2>/dev/null \
 	&& ok "memória nativa do Codex desligada" \
 	|| bad "[features] memories = false ausente em ~/.codex/config.toml"
 
+# Cada harness precisa das três pontas do ai-memory: hooks (captura), MCP (consulta) e a
+# instrução de uso (bloco markered ou, no agy, as instruções do próprio servidor MCP).
+# Quem grava essas pontas é o `ai-memory install-*`; aqui só se confere que estão lá.
+conta() { grep -c "ai-memory/hooks/$1/" "$2" 2>/dev/null || echo 0; }
+[ "$(conta claude-code "$HOME/.claude/settings.json")" -ge 9 ] && ok "claude: hooks do ai-memory" || bad "claude: hooks do ai-memory incompletos — install-hooks --agent claude-code"
+[ "$(conta codex "$HOME/.codex/hooks.json")" -ge 7 ] && ok "codex: hooks do ai-memory" || bad "codex: hooks do ai-memory incompletos — install-hooks --agent codex"
+grep -q '"ai-memory"' "$HOME/.gemini/config/hooks.json" 2>/dev/null && ok "agy: hooks do ai-memory" || bad "agy: hooks do ai-memory ausentes — install-hooks --agent antigravity-cli"
+[ -f "$HOME/.config/opencode/plugins/ai-memory.ts" ] && ok "opencode: plugin do ai-memory" || bad "opencode: plugin ausente — install-hooks --agent open-code"
+
+jq -e '.mcpServers["ai-memory"]' "$HOME/.claude.json" >/dev/null 2>&1 && ok "claude: MCP ai-memory" || bad "claude: MCP ai-memory ausente"
+grep -q '^\[mcp_servers\.ai-memory\]' "$HOME/.codex/config.toml" && ok "codex: MCP ai-memory" || bad "codex: MCP ai-memory ausente"
+jq -e '.mcp["ai-memory"]' "$SETUP/adapters/opencode/opencode.jsonc" >/dev/null 2>&1 && ok "opencode: MCP ai-memory" || bad "opencode: MCP ai-memory ausente"
+jq -e '.mcpServers["ai-memory"]' "$HOME/.gemini/config/mcp_config.json" >/dev/null 2>&1 && ok "agy: MCP ai-memory" || bad "agy: MCP ai-memory ausente"
+
+for t in claude/CLAUDE.md codex/AGENTS.md opencode/AGENTS.md; do
+	grep -q '<!-- ai-memory:start -->' "$SETUP/adapters/$t" && ok "bloco ai-memory em $t" \
+		|| bad "bloco ai-memory ausente em $t — install-instructions --target (arquivo real)"
+done
+
+# O Codex só roda hook aprovado, e a aprovação vale por posição no hooks.json: mexer no
+# arquivo desaprova tudo em silêncio (em `codex exec` aparece como "Failed").
+hooks_codex=$(jq '[.hooks[][].hooks[]] | length' "$HOME/.codex/hooks.json" 2>/dev/null || echo 0)
+aprovados=$(grep -c '^\[hooks\.state\."/home/victor/\.codex/hooks\.json:' "$HOME/.codex/config.toml")
+[ "$aprovados" -ge "$hooks_codex" ] && ok "codex: $aprovados/$hooks_codex hooks aprovados" \
+	|| bad "codex: só $aprovados/$hooks_codex hooks aprovados — abra codex e aprove em /hooks (sem isso, nem GLOBAL.md nem captura)"
+grep -A2 '^\[hooks\.state\."/home/victor/\.codex/hooks\.json:' "$HOME/.codex/config.toml" | grep -q '^enabled = false' \
+	&& bad "codex: hook desligado (enabled = false) em hooks.state" || true
+
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
 # lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.
