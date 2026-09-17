@@ -65,6 +65,11 @@ A ligação com o ai-memory (hooks de captura, MCP, bloco `<!-- ai-memory:start 
 `AGENTS.md`/`CLAUDE.md`) é instalada pelo próprio `ai-memory install-*`, não por este
 repositório. Ao atualizar o ai-memory, `ai-memory install-instructions` refaz o bloco.
 
+As regras de saída para TDAH (do [i-have-adhd](https://github.com/ayghri/i-have-adhd)) moram
+no `GLOBAL.md`, na versão compacta: é instrução, então chega a toda ferramenta sem plugin. No
+Claude Code o plugin fica instalado só para o ruleset completo sob demanda (`/i-have-adhd`), **sem**
+a flag `~/.claude/.i-have-adhd-always` — ela injetaria as regras em dobro.
+
 ## Os scripts
 
 **`install.sh`** lê o `adapters/MANIFEST` e põe cada arquivo onde a ferramenta procura. Modo

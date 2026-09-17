@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""entrega-verifica <doc.md> [doc.md ...]
+
+Confere que cada bloco de codigo ancorado no documento e identico ao codigo real.
+
+Ancora, na linha que abre o bloco:
+
+    ```php title="app/Actions/Foo.php:23-41 @f18f86d"
+
+O script extrai `git show <sha>:<caminho>`, corta as linhas do intervalo e
+compara byte a byte com o conteudo do bloco. Sai com 1 se algo divergir.
+"""
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+ANCORA = re.compile(
+    r'^```[\w+-]*\s+title="([^":]+):(\d+)-(\d+)\s+@([0-9a-fA-F]{4,40}|HEAD)"\s*$'
+)
+CERCA = re.compile(r"^(```+|~~~+)")
+
+
+def raiz_git(doc: Path) -> str | None:
+    r = subprocess.run(
+        ["git", "-C", str(doc.parent), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+    )
+    return r.stdout.strip() if r.returncode == 0 else None
+
+
+def real(raiz: str, sha: str, caminho: str, ini: int, fim: int):
+    r = subprocess.run(
+        ["git", "-C", raiz, "show", f"{sha}:{caminho}"],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        return None, r.stderr.strip().splitlines()[0] if r.stderr else "git show falhou"
+    linhas = r.stdout.split("\n")
+    if fim > len(linhas):
+        return None, f"arquivo tem {len(linhas)} linhas, ancora pede ate {fim}"
+    return "\n".join(linhas[ini - 1 : fim]), None
+
+
+def blocos(doc: Path):
+    """Devolve (linha_da_cerca, ancora_ou_None, conteudo)."""
+    linhas = doc.read_text(encoding="utf-8").split("\n")
+    i = 0
+    while i < len(linhas):
+        m_cerca = CERCA.match(linhas[i])
+        if not m_cerca:
+            i += 1
+            continue
+        fecha = m_cerca.group(1)[0] * len(m_cerca.group(1))
+        ancora = ANCORA.match(linhas[i])
+        abre = i + 1
+        corpo, i = [], i + 1
+        while i < len(linhas) and not linhas[i].startswith(fecha):
+            corpo.append(linhas[i])
+            i += 1
+        i += 1
+        yield abre, ancora, "\n".join(corpo)
+
+
+def verifica(doc: Path) -> tuple[int, int, int]:
+    raiz = raiz_git(doc)
+    if raiz is None:
+        print(f"{doc}: fora de um repositorio git")
+        return 0, 1, 0
+    ok = ruim = solto = 0
+    for abre, ancora, corpo in blocos(doc):
+        if ancora is None:
+            solto += 1
+            continue
+        caminho, ini, fim, sha = ancora.group(1), int(ancora.group(2)), int(ancora.group(3)), ancora.group(4)
+        esperado, erro = real(raiz, sha, caminho, ini, fim)
+        if erro:
+            print(f"{doc}:{abre}  {caminho}:{ini}-{fim} @{sha}  -> {erro}")
+            ruim += 1
+            continue
+        if corpo.rstrip("\n") == esperado.rstrip("\n"):
+            ok += 1
+            continue
+        ruim += 1
+        print(f"{doc}:{abre}  {caminho}:{ini}-{fim} @{sha}  -> difere do codigo real")
+        reais = esperado.rstrip("\n").split("\n")
+        doc_l = corpo.rstrip("\n").split("\n")
+        for n in range(max(len(reais), len(doc_l))):
+            a = doc_l[n] if n < len(doc_l) else "<bloco acabou>"
+            b = reais[n] if n < len(reais) else "<arquivo acabou>"
+            if a != b:
+                print(f"    linha {ini + n}")
+                print(f"      doc:     {a}")
+                print(f"      arquivo: {b}")
+                break
+    return ok, ruim, solto
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print(__doc__.strip())
+        return 2
+    ok = ruim = solto = 0
+    for arg in sys.argv[1:]:
+        doc = Path(arg)
+        if not doc.is_file():
+            print(f"{doc}: nao existe")
+            ruim += 1
+            continue
+        a, b, c = verifica(doc)
+        ok, ruim, solto = ok + a, ruim + b, solto + c
+    print(f"\n{ok} bloco(s) conferem, {ruim} divergem, {solto} sem ancora.")
+    if solto:
+        print("Bloco sem ancora e permitido so para comando de terminal e saida de log.")
+    return 1 if ruim else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

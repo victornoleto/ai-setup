@@ -12,6 +12,7 @@ link	codex/hooks/load-portable-memory.sh	.codex/hooks/load-portable-memory.sh
 link	opencode/opencode.jsonc	.config/opencode/opencode.jsonc
 link	opencode/AGENTS.md	.config/opencode/AGENTS.md
 link	opencode/package.json	.config/opencode/package.json
+link	claude/commands/entrega.md	.claude/commands/entrega.md
 copy	claude/settings.json	.claude/settings.json
 # codex/config.toml fica fora: mistura config portável com estado da máquina (trust de
 #   projetos, cache de modelos, estado de hooks) que o Codex reescreve o tempo todo.
