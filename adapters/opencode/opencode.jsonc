@@ -10,5 +10,20 @@
       "url": "http://127.0.0.1:49374/mcp",
       "enabled": true
     }
+  },
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "gh pr merge *": "ask",
+      "gh repo delete *": "ask",
+      "gh api *": "ask"
+    },
+    "read": {
+      "*": "allow",
+      "$HOME/.claude/.credentials.json": "deny",
+      "$HOME/.codex/auth.json": "deny",
+      "$HOME/.gemini/oauth_creds.json": "deny",
+      "$HOME/.config/ai-memory/server.env": "deny"
+    }
   }
 }
