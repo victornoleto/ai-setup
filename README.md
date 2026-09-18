@@ -8,6 +8,9 @@ Quatro ferramentas usam isto: **Claude Code**, **Codex**, **OpenCode** e **Antig
 acervo antigo (136 memórias) foi importado nele; o estado anterior está na tag `pre-ai-memory`
 e em `~/backups-ai-setup/`.
 
+Para montar isto do zero em outra máquina — ou para passar a colegas — leia o
+[TUTORIAL.md](TUTORIAL.md).
+
 ## Instrução contra memória
 
 A regra que separa o que fica aqui do que foi para o ai-memory:
