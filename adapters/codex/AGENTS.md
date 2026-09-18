@@ -1,8 +1,5 @@
 O hook SessionStart injeta `GLOBAL.md` e `machine.md`: é instrução atual, não memória.
 
-If the workspace root has a `.ai/README.md`, read it before working; its
-project-specific instructions override generic guidance.
-
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
 
