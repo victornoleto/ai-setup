@@ -146,19 +146,10 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "superpowers@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
-    "commit-commands@claude-plugins-official": true,
-    "ponytail@ponytail": true
+    "commit-commands@claude-plugins-official": true
   },
-  "extraKnownMarketplaces": {
-    "ponytail": {
-      "source": {
-        "source": "github",
-        "repo": "DietrichGebert/ponytail"
-      }
-    }
-  },
+  "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
   "effortLevel": "medium",
   "modelSettings": {

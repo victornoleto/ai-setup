@@ -1,6 +1,3 @@
-If a project contains `.ai/README.md`, read it before working. Its project-specific instructions
-override generic guidance.
-
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
 
