@@ -91,6 +91,14 @@ aprovados=$(grep -c '^\[hooks\.state\."/home/victor/\.codex/hooks\.json:' "$HOME
 grep -A2 '^\[hooks\.state\."/home/victor/\.codex/hooks\.json:' "$HOME/.codex/config.toml" | grep -q '^enabled = false' \
 	&& bad "codex: hook desligado (enabled = false) em hooks.state" || true
 
+# O sandbox do Codex usa bubblewrap, que precisa de user namespace. O Ubuntu 24.04 bloqueia isso
+# por AppArmor; o perfil em adapters/codex/apparmor/ libera só os dois bwrap.
+if bwrap --ro-bind / / --unshare-user true 2>/dev/null; then ok "bwrap cria user namespace (sandbox do Codex)"
+else bad "bwrap sem user namespace — o Codex roda sem sandbox: sudo install -m 644 $SETUP/adapters/codex/apparmor/codex-bwrap /etc/apparmor.d/codex-bwrap && sudo apparmor_parser -r /etc/apparmor.d/codex-bwrap"; fi
+if [ -f /etc/apparmor.d/codex-bwrap ] && ! cmp -s /etc/apparmor.d/codex-bwrap "$SETUP/adapters/codex/apparmor/codex-bwrap"; then
+	note "/etc/apparmor.d/codex-bwrap difere da referência do repositório"
+fi
+
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
 # lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.

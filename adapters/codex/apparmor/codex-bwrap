@@ -1,0 +1,14 @@
+# Ubuntu 24.04 bloqueia user namespace sem privilégio (kernel.apparmor_restrict_unprivileged_userns=1).
+# O sandbox do Codex usa bubblewrap, que precisa disso. Libera só os dois binários bwrap.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile codex-bwrap-system /usr/bin/bwrap flags=(unconfined) {
+  userns,
+  include if exists <local/codex-bwrap-system>
+}
+
+profile codex-bwrap-vendored /home/*/.local/lib/node_modules/@openai/codex/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/bwrap flags=(unconfined) {
+  userns,
+  include if exists <local/codex-bwrap-vendored>
+}

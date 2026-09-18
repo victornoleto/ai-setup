@@ -207,6 +207,9 @@ não serve de prova — ele passou com a configuração quebrada.
   `codex` → `/hooks`. Hook desaprovado não roda em `codex exec` e aparece como `Failed`.
 - **agy** não aceita `~` no `skills.json`, apesar da documentação: o caminho tem que ser absoluto
   (o erro só aparece em `~/.gemini/antigravity-cli/log/`).
+- **O sandbox do Codex fica inerte no Ubuntu 24.04** sem o perfil AppArmor: o `bwrap` não cria
+  user namespace e o aviso aparece em toda abertura. O perfil está em
+  `adapters/codex/apparmor/codex-bwrap` (instalação no `doctor.sh`, precisa de `sudo`).
 - **`agy -p` (modo print) não manda `cwd` no hook**: a sessão cai no projeto `scratch` do
   ai-memory. Para testar o agy, use o modo interativo, ou apague depois com `ai-memory purge-session`.
 - **O pacote `orca` do Ubuntu é o leitor de tela do GNOME.** O Orca IDE é o `orca-ide`.
