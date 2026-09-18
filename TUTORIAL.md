@@ -4,6 +4,10 @@ Como montar, numa máquina nova, o mesmo arranjo que roda aqui: **um acervo de m
 atravessa ferramentas** (ai-memory) e **uma fonte única de instrução e comportamento** para
 Claude Code, Codex, OpenCode e Antigravity CLI (`agy`).
 
+Versão em página, para compartilhar com quem não tem acesso a este repositório:
+<https://claude.ai/artifact/QbnTHv9wRfH21xP8n7u9P8> (o fonte dela é `docs/tutorial.html`; ao
+editar este arquivo, atualize os dois).
+
 Os dois pedaços são independentes. O ai-memory funciona sem este repositório, e este repositório
 funciona sem o ai-memory. Juntos, a conta fecha assim:
 

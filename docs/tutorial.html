@@ -1,0 +1,500 @@
+<title>Memória Persistente para Agentes</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --paper: #f4f5f6;
+    --surface: #ffffff;
+    --ink: #15181c;
+    --ink-soft: #545c66;
+    --rule: #dde1e5;
+    --accent: #1b6b59;
+    --accent-soft: #e4efeb;
+    --warn: #8a5312;
+    --warn-soft: #f6ecdf;
+    --code-bg: #eceef0;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101317;
+      --surface: #171b21;
+      --ink: #e7eaec;
+      --ink-soft: #9aa4ae;
+      --rule: #272d35;
+      --accent: #58b79c;
+      --accent-soft: #16302a;
+      --warn: #d69a52;
+      --warn-soft: #2e2318;
+      --code-bg: #1c2128;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #101317;
+    --surface: #171b21;
+    --ink: #e7eaec;
+    --ink-soft: #9aa4ae;
+    --rule: #272d35;
+    --accent: #58b79c;
+    --accent-soft: #16302a;
+    --warn: #d69a52;
+    --warn-soft: #2e2318;
+    --code-bg: #1c2128;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 0;
+  }
+  .wrap {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: 0 4rem;
+  }
+  header.top {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 5;
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+  }
+  .top-inner {
+    max-width: 47rem;
+    margin: 0 auto;
+    padding-inline: 20px;
+    padding-block: .6rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.1rem;
+    align-items: baseline;
+  }
+  .top-name {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: .9rem;
+    letter-spacing: .01em;
+  }
+  .top-inner nav {
+    display: flex;
+    gap: 1rem;
+    font-family: var(--sans);
+    font-size: .8rem;
+  }
+  .top-inner nav a { color: var(--ink-soft); text-decoration: none; }
+  .top-inner nav a:hover { color: var(--accent); }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: clamp(1.9rem, 5vw, 2.6rem);
+    line-height: 1.15;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin: 2.6rem 0 .8rem;
+  }
+  .standfirst {
+    font-size: 1.12rem;
+    color: var(--ink-soft);
+    margin: 0 0 2rem;
+    text-wrap: pretty;
+  }
+  h2 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.5rem;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+    margin: 3.2rem 0 .4rem;
+    padding-top: 1.4rem;
+    border-top: 2px solid var(--ink);
+  }
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.08rem;
+    text-wrap: balance;
+    margin: 2.2rem 0 .5rem;
+    display: flex;
+    gap: .6rem;
+    align-items: baseline;
+  }
+  h3 .num {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .part-label {
+    font-family: var(--sans);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    color: var(--accent);
+    margin-bottom: .2rem;
+  }
+  p { margin: 0 0 1rem; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+  li { margin-bottom: .45rem; }
+  a { color: var(--accent); }
+  strong { font-weight: 600; }
+  code {
+    font-family: var(--mono);
+    font-size: .85em;
+    background: var(--code-bg);
+    padding: .1em .3em;
+    border-radius: 3px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: .85rem 1rem;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+  }
+  pre code { background: none; padding: 0; font-size: .82rem; line-height: 1.55; }
+
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: .85rem 1rem;
+    margin: 0 0 1.2rem;
+    font-size: .95rem;
+  }
+  .warn {
+    border-left: 3px solid var(--warn);
+    background: var(--warn-soft);
+    padding: .85rem 1rem;
+    margin: 0 0 1.2rem;
+    font-size: .95rem;
+  }
+  .note .tag, .warn .tag {
+    display: block;
+    font-family: var(--sans);
+    font-size: .7rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: .3rem;
+  }
+  .note .tag { color: var(--accent); }
+  .warn .tag { color: var(--warn); }
+  .note p:last-child, .warn p:last-child { margin-bottom: 0; }
+
+  .table-scroll { overflow-x: auto; margin: 0 0 1.4rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: .88rem;
+    background: var(--surface);
+  }
+  th, td {
+    text-align: left;
+    padding: .55rem .7rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  th {
+    font-weight: 600;
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--ink-soft);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1px;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+    margin: 0 0 1.6rem;
+  }
+  .facts div { background: var(--surface); padding: .8rem .9rem; }
+  .facts dt {
+    font-family: var(--sans);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--ink-soft);
+  }
+  .facts dd {
+    margin: .25rem 0 0;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.15rem;
+    font-variant-numeric: tabular-nums;
+  }
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--sans);
+    font-size: .82rem;
+    color: var(--ink-soft);
+  }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <span class="top-name">Memória persistente para agentes</span>
+    <nav>
+      <a href="#parte1">1. ai-memory</a>
+      <a href="#parte2">2. ai-setup</a>
+      <a href="#resultado">Resultado</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+  <h1>Um acervo só, quatro ferramentas</h1>
+  <p class="standfirst">Como montar, numa máquina nova, memória que atravessa ferramentas (ai-memory, em Docker) e uma fonte única de instrução e comportamento para Claude Code, Codex, OpenCode e Antigravity CLI (<code>agy</code>).</p>
+
+  <p>Os dois pedaços são independentes: o ai-memory funciona sem a configuração, e a configuração funciona sem ele. Juntos, a conta fecha assim:</p>
+
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Peça</th><th>Papel</th><th>O que guarda</th></tr></thead>
+      <tbody>
+        <tr><td><strong>ai-memory</strong></td><td>acervo</td><td>o que já aconteceu: decisões, pegadinhas, handoffs. Buscado sob demanda e tratado como <strong>evidência não-confiável</strong></td></tr>
+        <tr><td><strong>ai-setup</strong></td><td>configuração</td><td>o que vale sempre: instrução, skills, permissões, plugins, modelo</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>A regra que decide onde cada coisa mora: <strong>regra vai para instrução, história vai para memória.</strong> Regra escrita no acervo é ignorada por desenho — o agente recebe memória como dado, nunca como ordem. Fato de projeto escrito na instrução custa contexto em toda sessão de todo projeto.</p>
+
+  <dl class="facts">
+    <div><dt>Parte 1</dt><dd>~40 min</dd></div>
+    <div><dt>Parte 2</dt><dd>~30 min</dd></div>
+    <div><dt>Ferramentas cobertas</dt><dd>4</dd></div>
+  </dl>
+
+  <p class="part-label" id="parte1">Parte 1</p>
+  <h2>ai-memory: o acervo</h2>
+  <p>Servidor em Docker na própria máquina, um acervo só, quatro ferramentas escrevendo e lendo nele.</p>
+
+  <h3><span class="num">1.1</span> Antes de começar</h3>
+  <ul>
+    <li>Docker, <code>jq</code> e <code>git</code>.</li>
+    <li>Pelo menos um harness instalado.</li>
+    <li>Uma chave de LLM. Aqui é OpenRouter com <code>z-ai/glm-5.3-flash</code>: o servidor usa o LLM para consolidar sessões e para reordenar resultados de busca.</li>
+  </ul>
+
+  <h3><span class="num">1.2</span> O CLI</h3>
+  <p>Siga o <em>Quick start → Docker</em> do <a href="https://github.com/akitaonrails/ai-memory">README do ai-memory</a>: ele baixa o wrapper para <code>~/.local/bin/ai-memory</code> conferindo o sha256. O wrapper fala com o servidor em container.</p>
+  <div class="warn">
+    <span class="tag">Armadilha</span>
+    <p>Nunca exporte <code>AI_MEMORY_SERVER_URL</code> no shell. O wrapper roda o container com <code>--network host</code>; com a variável setada, o CLI responde <code>local spool</code> em vez de erro, e você demora a perceber que estava escrevendo num lugar que ninguém lê.</p>
+  </div>
+
+  <h3><span class="num">1.3</span> O servidor</h3>
+  <p>As chaves ficam fora de qualquer repositório, em <code>~/.config/ai-memory/server.env</code>, com <code>chmod 600</code>:</p>
+<pre><code>AI_MEMORY_LLM_PROVIDER=openai-compat
+AI_MEMORY_LLM_BASE_URL=https://openrouter.ai/api/v1
+AI_MEMORY_LLM_MODEL=z-ai/glm-5.3-flash
+AI_MEMORY_LLM_REASONING_EFFORT=low
+AI_MEMORY_EMBEDDING_PROVIDER=local
+AI_MEMORY_RERANKER=llm
+LLM_API_KEY=&lt;sua chave&gt;</code></pre>
+<pre><code>docker run -d --name ai-memory --restart unless-stopped \
+  -p 127.0.0.1:49374:49374 -v ai-memory-data:/data \
+  --env-file ~/.config/ai-memory/server.env \
+  docker.io/akitaonrails/ai-memory:latest</code></pre>
+  <p>Duas escolhas que custaram caro para descobrir:</p>
+  <div class="warn">
+    <span class="tag">Armadilha</span>
+    <p><code>REASONING_EFFORT=low</code>, nunca <code>none</code>. O <code>glm-5.3-flash</code> exige raciocínio e a OpenRouter recusa com 400. Pior: <strong>o servidor degrada em silêncio</strong> — o reranker mantém a ordem original e a consolidação cai para um resumo por regra. O <code>llm-test</code> passa mesmo assim, porque não manda esse parâmetro. A falha só aparece em <code>docker logs</code>.</p>
+  </div>
+  <div class="note">
+    <span class="tag">Medido</span>
+    <p><code>AI_MEMORY_RERANKER=llm</code> vale a pena. Em 30 perguntas parafraseadas sobre um acervo de 136 notas, a memória certa em 1º lugar passou de 15 para 26, sem piorar nenhuma. Custa uma chamada por busca (mediana 2,4 s). Sem ele, o multiplicador de autoridade por tipo (<code>rule</code> +0,15, <code>fact</code> 0, fixo no código) enterra notas <code>fact</code> que casam melhor com a pergunta.</p>
+  </div>
+
+  <h3><span class="num">1.4</span> Ligar cada ferramenta</h3>
+  <p>São três pontas por ferramenta: <strong>hooks</strong> (captura), <strong>MCP</strong> (consulta) e <strong>instrução de uso</strong>. Rode a partir de <code>~</code>, nunca de dentro de um repositório:</p>
+<pre><code>for a in claude-code codex open-code antigravity-cli; do
+  ai-memory install-hooks --agent $a --project-strategy repo-root --apply
+done
+
+ai-memory install-mcp --client claude-code --apply
+ai-memory install-mcp --client codex --apply
+ai-memory install-mcp --client open-code --apply \
+  --config-file ~/.config/opencode/opencode.jsonc
+ai-memory install-mcp --client antigravity-cli --apply
+
+ai-memory install-instructions --compact --skills-scope global \
+  --skills-agent claude-code --target ~/.claude/CLAUDE.md
+ai-memory install-instructions --compact --skills-scope global \
+  --skills-agent agents --target ~/.codex/AGENTS.md
+ai-memory install-instructions --compact --skills-scope global \
+  --skills-agent agents --target ~/.config/opencode/AGENTS.md</code></pre>
+  <p>Quatro pegadinhas dos instaladores:</p>
+  <ol>
+    <li><strong><code>--skills-scope global</code> sempre.</strong> Sem isso, as Agent Skills caem em <code>$PWD/.claude/skills</code> — dentro do repositório onde você estiver.</li>
+    <li><strong><code>install-instructions</code> nunca aponta para symlink.</strong> Ele grava com arquivo temporário + rename, e o rename troca o link por arquivo comum. Se você versiona os arquivos de instrução (parte 2), aponte para o arquivo real.</li>
+    <li><strong><code>install-mcp --client open-code</code> recusa JSONC com comentário.</strong> Deixe o <code>opencode.jsonc</code> sem <code>//</code>.</li>
+    <li><strong>O agy não recebe o bloco de instruções.</strong> Ele lê exatamente dois arquivos globais (<code>~/.gemini/GEMINI.md</code> e <code>~/.gemini/AGENTS.md</code>), e as instruções do próprio servidor MCP já cobrem escopo e dado não-confiável.</li>
+  </ol>
+
+  <h3><span class="num">1.5</span> Desligar a memória nativa dos harnesses</h3>
+  <p>Senão você fica com dois acervos, e o que a outra ferramenta não enxerga some do mapa.</p>
+  <ul>
+    <li><strong>Claude Code</strong>, em <code>~/.claude/settings.json</code>: <code>"autoMemoryEnabled": false</code>.</li>
+    <li><strong>Codex</strong>, em <code>~/.codex/config.toml</code>: <code>[features]</code> com <code>memories = false</code>.</li>
+  </ul>
+
+  <h3><span class="num">1.6</span> Dizer a que projeto cada diretório pertence</h3>
+  <p>O projeto é o nome da raiz do repositório. Quando o nome não serve, ou a raiz não é um repositório git, ponha um marcador <code>.ai-memory.toml</code> na raiz:</p>
+<pre><code>workspace = "default"
+project = "nome-do-projeto"</code></pre>
+  <p>A busca do marcador sobe até <code>$HOME</code>. Em repositório de time, exclua localmente com <code>echo .ai-memory.toml &gt;&gt; .git/info/exclude</code>.</p>
+
+  <h3><span class="num">1.7</span> Validar (não pule)</h3>
+<pre><code>ai-memory status                 # container de pé, páginas e sessões
+ai-memory audit-contamination    # nenhuma sessão no projeto errado
+docker logs ai-memory 2>&amp;1 | grep -iE 'provider error|reranker failed'</code></pre>
+  <p>Depois, o teste que realmente prova o arranjo: <strong>abra uma ferramenta, peça um handoff, abra outra e veja se ela recebe.</strong> Handoff é consumido uma vez só; encadear A → B → C funciona se cada sessão escrever o seu.</p>
+
+  <h3><span class="num">1.8</span> Pegadinhas que só aparecem com o tempo</h3>
+  <ul>
+    <li><strong>Codex só roda hook aprovado, e a aprovação é por posição.</strong> Mexer no <code>hooks.json</code> renumera as entradas e derruba a confiança de todas, em silêncio; em <code>codex exec</code> elas viram <code>Failed</code>. Reaprovar em <code>codex</code> → <code>/hooks</code>. Aqui isso manteve o Codex sem captura e sem as instruções globais por dias.</li>
+    <li><strong>Mantenha os hooks num arquivo só.</strong> O Codex aceita <code>hooks.json</code> e <code>config.toml</code>, e avisa quando você usa os dois.</li>
+    <li><strong><code>agy -p</code> (modo print) não manda o diretório</strong>, e a sessão cai num projeto <code>scratch</code>. Para testar o agy, use o modo interativo.</li>
+    <li><strong>OpenCode carrega plugin quando a sessão é criada</strong>, não quando o servidor sobe.</li>
+    <li>Sessão de teste suja o acervo: <code>ai-memory purge-session --session-id &lt;uuid&gt; --confirm</code>.</li>
+  </ul>
+
+  <p class="part-label" id="parte2">Parte 2</p>
+  <h2>ai-setup: a configuração</h2>
+  <p>O que sobra depois que a memória sai: instrução, skills, permissões, plugins, modelo. A ideia é que <strong>cada coisa tenha um dono só</strong> e que um script diga quando algo saiu do lugar.</p>
+
+  <h3><span class="num">2.1</span> As três gavetas</h3>
+<pre><code>~/.ai-setup/
+├── install.sh          põe cada arquivo onde a ferramenta procura (idempotente)
+├── doctor.sh           confere tudo, não conserta nada
+├── adapters/MANIFEST   o que é symlink, o que é cópia, e para onde
+├── adapters/           claude/, codex/, opencode/, antigravity/
+├── skills/             skills nossas: uma fonte, um link por harness
+├── sync/memory/        GLOBAL.md + machine/&lt;host&gt;.md   (fora do git)
+└── local/machine.md    symlink para o machine/&lt;esta máquina&gt;.md</code></pre>
+  <p>O teste da gaveta: se copiar para outra máquina e virar <strong>mentira lá</strong>, é <code>local/</code>. É o que impede a máquina do trabalho de afirmar que tem a GPU da máquina de casa.</p>
+
+  <h3><span class="num">2.2</span> Como a instrução chega em cada ferramenta</h3>
+  <p>Nenhuma depende de o modelo lembrar de ler algo: cada uma usa o mecanismo nativo que tem.</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Ferramenta</th><th>Mecanismo</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code</td><td><code>@import</code> no <code>CLAUDE.md</code></td></tr>
+        <tr><td>Codex</td><td>hook <code>SessionStart</code> que imprime os dois arquivos (não tem import nem lista)</td></tr>
+        <tr><td>OpenCode</td><td>lista <code>instructions</code> no <code>opencode.jsonc</code></td></tr>
+        <tr><td>agy</td><td><code>~/.gemini/GEMINI.md</code> e <code>~/.gemini/AGENTS.md</code>, que ele lê sempre</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>O <code>MANIFEST</code> tem uma linha por arquivo, com o modo:</p>
+<pre><code>link    claude/CLAUDE.md        .claude/CLAUDE.md
+copy    claude/settings.json    .claude/settings.json</code></pre>
+  <p><strong><code>link</code></strong> quando só você edita o arquivo. <strong><code>copy</code></strong> quando a ferramenta reescreve sozinha (<code>/config</code>, aprovação de hook, instalação de plugin): um symlink sumiria na primeira reescrita, e aí a cópia no repositório vira referência — o <code>doctor.sh</code> acusa a diferença e você decide qual lado vale.</p>
+
+  <h3><span class="num">2.3</span> Instalar numa máquina nova</h3>
+<pre><code>git clone &lt;seu-fork&gt; ~/.ai-setup
+# traga o sync/ (fora do git: GLOBAL.md e um arquivo por máquina)
+sh ~/.ai-setup/install.sh    # cria os links e um machine/&lt;hostname&gt;.md em branco
+$EDITOR ~/.ai-setup/sync/memory/machine/$(hostname).md
+sh ~/.ai-setup/doctor.sh     # até sair sem FALHA</code></pre>
+
+  <h3><span class="num">2.4</span> O que escrever no GLOBAL.md</h3>
+  <p>Ele carrega em <strong>todo turno de toda sessão de toda ferramenta</strong>, então cada linha paga aluguel. Aqui ele tem 3,9 KB e cinco seções:</p>
+  <ol>
+    <li><strong>Como trabalhar com você.</strong> Aqui: daltonismo (verificação nunca depende de cor) e as regras de saída para TDAH, na versão compacta do <a href="https://github.com/ayghri/i-have-adhd">i-have-adhd</a>.</li>
+    <li><strong>Código.</strong> A “escada do mínimo” do <a href="https://github.com/DietrichGebert/ponytail">ponytail</a> em seis linhas: precisa existir? a stdlib faz? a plataforma já tem? uma dependência já instalada resolve? Só então escreva.</li>
+    <li><strong>Skills.</strong> Quatro linhas de roteamento: feature → <code>brainstorming</code>, bug → <code>systematic-debugging</code>, trabalho em vários passos → <code>writing-plans</code>, implementação com teste → <code>test-driven-development</code>.</li>
+    <li><strong>Ferramentas.</strong> Decisões que valem em qualquer projeto: browser pelo <code>playwright-cli</code> e não por MCP, GitHub pelo <code>gh</code> e não por MCP, limite de subagents em paralelo.</li>
+    <li>O resto é do <code>machine.md</code>: como o root funciona nesta máquina, onde mora a documentação dela.</li>
+  </ol>
+
+  <h3><span class="num">2.5</span> Comportamento: skill em vez de plugin</h3>
+  <p>Plugin bom existe só em parte das ferramentas e injeta texto em toda sessão. Skill vale nas quatro e só entra no contexto quando o modelo decide carregar.</p>
+  <ol>
+    <li><strong>Meça o uso antes de decidir.</strong> No Claude, as skills invocadas nos últimos 45 dias:
+<pre><code>find ~/.claude/projects -name '*.jsonl' -mtime -45 \
+  | xargs grep -ohE '"skill":"[^"]+"' \
+  | sort | uniq -c | sort -rn | head -20</code></pre>
+    </li>
+    <li><strong>Copie as skills que você realmente usa</strong> (respeitando a licença) para <code>skills/</code> e desinstale o plugin. Aqui foram quatro do <a href="https://github.com/obra/superpowers">superpowers</a>, que valiam só no Claude e no Codex e passaram a valer nas quatro ferramentas.</li>
+    <li><strong>Compense o que a injeção do plugin fazia</strong> com as quatro linhas de roteamento do <code>GLOBAL.md</code>: ~300 B em vez de 3 KB. Teste pedindo “quero adicionar o recurso X” e confira no transcript que a primeira chamada de ferramenta foi a skill.</li>
+    <li><strong>Anote a dívida.</strong> <code>skills/UPSTREAM.md</code> guarda origem, versão, data e as edições locais (referências cruzadas a skills que você não copiou precisam virar texto). O <code>doctor.sh</code> avisa quando a cópia passa de 90 dias.</li>
+  </ol>
+  <div class="warn">
+    <span class="tag">Armadilha</span>
+    <p>Onde cada ferramenta procura skill: Claude em <code>~/.claude/skills</code>, Codex e OpenCode em <code>~/.agents/skills</code>, agy pelo <code>~/.gemini/config/skills.json</code> — que <strong>não aceita <code>~</code></strong>, apesar de a documentação dizer que sim; use caminho absoluto. Uma fonte, um link por diretório.</p>
+  </div>
+
+  <h3><span class="num">2.6</span> Permissões</h3>
+  <p>Depois de tirar o MCP do GitHub (o token ficava em texto puro no header, e cada instalador que tocava o config gravava uma cópia num <code>.bak</code>), o controle virou permissão de shell:</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Ferramenta</th><th>Onde</th><th>Leitura do <code>gh</code></th><th>Escrita do <code>gh</code></th></tr></thead>
+      <tbody>
+        <tr><td>Claude</td><td><code>permissions</code> no <code>settings.json</code></td><td><code>allow</code></td><td><code>ask</code> em <code>pr merge</code>, <code>repo delete</code>, <code>api</code> com <code>-X</code>/<code>--method</code></td></tr>
+        <tr><td>Codex</td><td><code>~/.codex/rules/default.rules</code></td><td><code>prefix_rule … allow</code></td><td><code>prompt</code> — regra por prefixo não enxerga flag no meio, então <code>gh api</code> pede sempre</td></tr>
+        <tr><td>OpenCode</td><td><code>permission.bash</code> no <code>opencode.jsonc</code></td><td><code>allow</code></td><td><code>ask</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Negue também a leitura dos arquivos de credencial (<code>~/.claude/.credentials.json</code>, <code>~/.codex/auth.json</code>, <code>~/.gemini/oauth_creds.json</code>, o <code>server.env</code> do ai-memory). A regra vale para a ferramenta de leitura do agente, não para um <code>cat</code> no shell — não é sandbox, é rede de proteção contra o acidente comum.</p>
+  <p>E revise a confiança do Codex: <code>trust_level = "trusted"</code> em <code>/home</code> faz todo diretório da máquina herdar confiança.</p>
+
+  <h3><span class="num">2.7</span> O <code>doctor.sh</code></h3>
+  <p>É o que segura o arranjo ao longo do tempo. As 47 verificações de hoje, por tema:</p>
+  <ul>
+    <li><strong>Fiação:</strong> cada symlink aponta para o repositório; cada <code>copy</code> bate com a referência; <code>machine.md</code> resolve.</li>
+    <li><strong>ai-memory:</strong> container healthy; as três pontas (hooks, MCP, instrução) presentes nas quatro ferramentas; memória nativa do Claude e do Codex desligada; <code>AI_MEMORY_SERVER_URL</code> não setada.</li>
+    <li><strong>Núcleo:</strong> nenhuma skill duplicada; plugins substituídos continuam desligados; Codex sem confiança em <code>/home</code>; quantos hooks do Codex estão aprovados; tamanho do <code>GLOBAL.md</code>; idade das skills copiadas.</li>
+    <li><strong>Segurança:</strong> nenhum token em texto puro nos configs; <code>gh</code> autenticado; <code>bwrap</code> conseguindo criar user namespace — sem isso o sandbox do Codex fica inerte, e no Ubuntu 24.04 é preciso um perfil AppArmor.</li>
+  </ul>
+  <div class="note">
+    <span class="tag">Rotina</span>
+    <p>Rode depois de <strong>qualquer</strong> <code>ai-memory install-*</code>: o instalador grava no arquivo vivo e o <code>doctor.sh</code> aponta a diferença para você aceitar no repositório com um <code>cp</code> e um commit.</p>
+  </div>
+
+  <h3><span class="num">2.8</span> A fronteira entre os dois</h3>
+  <p>Os dois sistemas mexem nos mesmos arquivos, então a divisão é por <strong>trecho</strong>, não por arquivo:</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Trecho</th><th>Dono</th></tr></thead>
+      <tbody>
+        <tr><td>Entradas de hook com <code>ai-memory/hooks/</code>, servidor MCP <code>ai-memory</code>, bloco <code>&lt;!-- ai-memory:start --&gt;</code>, skills <code>ai-memory-*</code></td><td>ai-memory</td></tr>
+        <tr><td>Todo o resto: instrução, skills próprias, permissões, plugins, modelo</td><td>ai-setup</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Na dúvida sobre onde escrever algo:</p>
+  <ul>
+    <li>Vale todo turno, em qualquer projeto → <code>GLOBAL.md</code>.</li>
+    <li>Vale todo turno, só nesta máquina → <code>machine.md</code>.</li>
+    <li>Vale só neste projeto → <code>AGENTS.md</code>/<code>CLAUDE.md</code> do projeto.</li>
+    <li>Aconteceu e pode ser útil lembrar → ai-memory.</li>
+  </ul>
+
+  <h2 id="resultado">Resultado</h2>
+  <ul>
+    <li>Uma memória só, que as quatro ferramentas escrevem e leem, com busca reordenada por LLM.</li>
+    <li>Uma fonte só de comportamento, que chega às quatro do mesmo jeito.</li>
+    <li>Contexto fixo por sessão do Claude caiu de ~18 KB para ~9 KB ao trocar plugin por skill.</li>
+    <li>Um comando (<code>doctor.sh</code>) que diz se algo saiu do lugar, incluindo o que o instalador do ai-memory reescreveu por baixo.</li>
+  </ul>
+
+  <footer>Escrito a partir de uma migração real, em setembro de 2026. Os números vêm dessa máquina: 136 notas importadas, 30 perguntas de avaliação do reranker, 47 verificações no <code>doctor.sh</code>.</footer>
+</div>
