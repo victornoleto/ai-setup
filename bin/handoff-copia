@@ -1,0 +1,39 @@
+#!/bin/sh
+# handoff-copia — lê o handoff no stdin, salva em local/handoffs/ e copia para a
+# área de transferência (clipboard e PRIMARY). Imprime uma linha com o resultado.
+# Uso: handoff-copia <<'EOF' ... EOF
+set -eu
+
+SETUP=$(cd "$(dirname "$0")/.." && pwd -P)
+dir="$SETUP/local/handoffs"
+mkdir -p "$dir"
+arq="$dir/$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$PWD").md"
+
+cat > "$arq"
+[ -s "$arq" ] || { rm -f "$arq"; echo "handoff-copia: stdin vazio, nada salvo" >&2; exit 1; }
+
+linhas=$(wc -l < "$arq")
+bytes=$(wc -c < "$arq")
+
+# xclip daemoniza para servir a seleção; sem redirecionar, prenderia quem o chamou.
+if command -v xclip >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
+	xclip -selection clipboard -i < "$arq" >/dev/null 2>&1
+	xclip -selection primary -i < "$arq" >/dev/null 2>&1
+	lido=$(xclip -selection clipboard -o 2>/dev/null | wc -c)
+elif command -v wl-copy >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
+	wl-copy < "$arq" >/dev/null 2>&1
+	lido=$(wl-paste 2>/dev/null | wc -c)
+elif command -v pbcopy >/dev/null 2>&1; then
+	pbcopy < "$arq"
+	lido=$(pbpaste | wc -c)
+else
+	echo "handoff-copia: sem xclip/wl-copy/pbcopy utilizável — não copiou | arquivo: $arq" >&2
+	exit 2
+fi
+
+if [ "$lido" = "$bytes" ]; then
+	echo "copiado: $linhas linhas, $bytes bytes, clipboard confere | arquivo: $arq"
+else
+	echo "handoff-copia: clipboard tem $lido bytes, esperado $bytes | arquivo: $arq" >&2
+	exit 3
+fi

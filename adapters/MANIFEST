@@ -35,4 +35,6 @@ link	../skills/test-driven-development	.claude/skills/test-driven-development
 link	../skills/test-driven-development	.agents/skills/test-driven-development
 link	../skills/entrega	.claude/skills/entrega
 link	../skills/entrega	.agents/skills/entrega
+link	../skills/handoff	.claude/skills/handoff
+link	../skills/handoff	.agents/skills/handoff
 link	antigravity/skills.json	.gemini/config/skills.json
