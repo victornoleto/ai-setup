@@ -48,7 +48,7 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 │   ├── opencode/          opencode.jsonc, AGENTS.md, package.json
 │   └── antigravity/       skills.json (aponta o agy para ~/.agents/skills)
 ├── skills/                skills nossas, um link por harness (UPSTREAM.md: as copiadas)
-├── bin/                   entrega-verifica (usado pela skill entrega)
+├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff)
 ├── sync/memory/
 │   ├── GLOBAL.md          quem é o Victor, em qualquer máquina
 │   └── machine/pc.md      o que só vale nesta máquina
@@ -85,6 +85,9 @@ quatro ferramentas.
   `GLOBAL.md` diz quando carregar cada uma. **Revisar a cada 90 dias** conforme
   `skills/UPSTREAM.md`; o `doctor.sh` avisa.
 - **Plugins que ficam no Claude:** `security-guidance` (revisão de segurança) e `commit-commands`.
+- **Skills próprias:** `entrega` (relatório do que uma branch entregou) e `handoff` (`/handoff`:
+  gera o handoff detalhado da sessão, imprime, copia para o clipboard e salva em
+  `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%).
 
 Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenCode em
 `~/.agents/skills`, agy pelo `~/.gemini/config/skills.json`. Skill de terceiro instalada por

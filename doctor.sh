@@ -119,6 +119,11 @@ for s in "$HOME/.claude/skills"/*/; do
 done
 [ $dup = 0 ] && ok "skills sem cópia duplicada"
 
+# A skill handoff copia para a área de transferência por uma destas ferramentas.
+if command -v xclip >/dev/null || command -v wl-copy >/dev/null || command -v pbcopy >/dev/null
+then ok "clipboard: ferramenta para /handoff presente"
+else bad "sem xclip/wl-copy/pbcopy — a skill handoff não consegue copiar"; fi
+
 jq -e '.entries[]?.path | select(startswith("/"))' "$HOME/.gemini/config/skills.json" >/dev/null 2>&1 \
 	&& ok "agy lê ~/.agents/skills" \
 	|| bad "~/.gemini/config/skills.json ausente ou com caminho relativo (o agy não aceita ~)"
