@@ -8,7 +8,6 @@
     "sessionUrl": false
   },
   "permissions": {
-    "defaultMode": "auto",
     "allow": [
       "Bash(gh pr view *)",
       "Bash(gh pr list *)",
@@ -20,6 +19,13 @@
       "Bash(gh run list *)",
       "Bash(gh auth status)"
     ],
+    "deny": [
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.codex/auth.json)",
+      "Read(~/.gemini/oauth_creds.json)",
+      "Read(~/.config/ai-memory/server.env)",
+      "Edit(~/.config/ai-memory/server.env)"
+    ],
     "ask": [
       "Bash(gh pr merge *)",
       "Bash(gh repo delete *)",
@@ -30,13 +36,7 @@
       "Bash(gh api * -f *)",
       "Bash(gh api * -F *)"
     ],
-    "deny": [
-      "Read(~/.claude/.credentials.json)",
-      "Read(~/.codex/auth.json)",
-      "Read(~/.gemini/oauth_creds.json)",
-      "Read(~/.config/ai-memory/server.env)",
-      "Edit(~/.config/ai-memory/server.env)"
-    ]
+    "defaultMode": "auto"
   },
   "model": "opus[1m]",
   "hooks": {
@@ -146,7 +146,7 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "security-guidance@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": false,
     "commit-commands@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {},

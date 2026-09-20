@@ -84,7 +84,13 @@ quatro ferramentas.
   [superpowers](https://github.com/obra/superpowers) para `skills/`. A seção "Skills" do
   `GLOBAL.md` diz quando carregar cada uma. **Revisar a cada 90 dias** conforme
   `skills/UPSTREAM.md`; o `doctor.sh` avisa.
-- **Plugins que ficam no Claude:** `security-guidance` (revisão de segurança) e `commit-commands`.
+- **security-audit**: copiada do
+  [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
+  Mesmo regime de revisão. Por padrão é *guidance mode* — responde pergunta de segurança sem
+  escrever arquivo; a auditoria completa só roda quando você pede auditoria ou pen test, e as
+  três edições locais estão em `skills/UPSTREAM.md`.
+- **Plugins que ficam no Claude:** só `commit-commands`. O `security-guidance` foi desligado em
+  2026-09-20: só existia no Claude, e a `security-audit` cobre o mesmo nas quatro ferramentas.
 - **Skills próprias:** `entrega` (relatório do que uma branch entregou) e `handoff` (`/handoff`:
   gera o handoff detalhado da sessão, imprime, copia para o clipboard e salva em
   `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%).

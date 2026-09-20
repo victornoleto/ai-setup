@@ -33,6 +33,8 @@ link	../skills/writing-plans	.claude/skills/writing-plans
 link	../skills/writing-plans	.agents/skills/writing-plans
 link	../skills/test-driven-development	.claude/skills/test-driven-development
 link	../skills/test-driven-development	.agents/skills/test-driven-development
+link	../skills/security-audit	.claude/skills/security-audit
+link	../skills/security-audit	.agents/skills/security-audit
 link	../skills/entrega	.claude/skills/entrega
 link	../skills/entrega	.agents/skills/entrega
 link	../skills/handoff	.claude/skills/handoff
