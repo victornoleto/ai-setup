@@ -9,6 +9,7 @@ a data abaixo passa disso.
 | systematic-debugging | idem | 6.3.0 | 2026-09-17 |
 | writing-plans | idem | 6.3.0 | 2026-09-17 |
 | test-driven-development | idem | 6.3.0 | 2026-09-17 |
+| security-audit | github.com/cloudflare/security-audit-skill (MIT, `LICENSE.cloudflare-security-audit`) | c1c8a8c | 2026-09-20 |
 
 copiado-em: 2026-09-17
 
@@ -30,6 +31,13 @@ skill antes de qualquer resposta. A cópia chega aos quatro harnesses, e quem ro
    - O cabeçalho "REQUIRED SUB-SKILL" vira "execute tarefa por tarefa".
    - A seção **Execution Handoff** é trocada por execução nesta mesma sessão (sem
      `subagent-driven-development` nem `executing-plans`, que não foram copiadas).
+4. `security-audit/SKILL.md` (as três levam a marca `(ai-setup)`, para o diff achar):
+   - O diretório de saída padrão sai de `~/security-audit-skill/` para
+     `/var/www/victor/security-audits/`, com a proibição de cair direto em `$HOME`.
+   - Em **Universal execution safety**, o parágrafo *Local sandbox reality*: sem root por tool
+     call, análise só de fonte é o caminho normal, e o resto vira `needs_validation`.
+   - Em **Cost budget**, o parágrafo *Local cap*: 2 subagents em paralelo, salvo pedido
+     explícito de auditoria completa com o `budget` registrado.
 
 ## Como atualizar
 
@@ -38,6 +46,9 @@ d=$(mktemp -d) && git clone --depth 1 https://github.com/obra/superpowers "$d"
 for s in brainstorming systematic-debugging writing-plans test-driven-development; do
   diff -ru "$d/skills/$s" ~/.ai-setup/skills/$s
 done
+
+c=$(mktemp -d) && git clone --depth 1 https://github.com/cloudflare/security-audit-skill "$c"
+diff -ru "$c/skills/security-audit" ~/.ai-setup/skills/security-audit
 ```
 
 1. Leia o diff. O que não estiver na lista de edições locais é novidade do upstream: traga.
