@@ -11,3 +11,11 @@ def _clean_env(monkeypatch):
     for k in list(os.environ):
         if k.startswith("ORQ_") and k != "ORQ_HOME":
             monkeypatch.delenv(k)
+
+
+@pytest.fixture(autouse=True)
+def _sem_ntfy_real(tmp_path, monkeypatch):
+    """Nenhum teste lê o ~/.config/orq/notify.toml de verdade (nem manda notificação)."""
+    from orq import notify
+    monkeypatch.setattr(notify, "CONFIG", tmp_path / "sem-notify.toml")
+    monkeypatch.setattr(notify, "desktop", lambda msg: None)

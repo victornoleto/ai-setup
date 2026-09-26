@@ -25,6 +25,7 @@ Uso:
   orq status <run-dir>
   orq send <run-dir> "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
   orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
+  orq notify setup | test         ntfy no celular: cria o tópico (~/.config/orq/notify.toml) / manda um teste
   orq selftest
 
 Sem --headless (e num terminal), o motor roda em segundo plano e o painel abre por cima.
@@ -232,6 +233,22 @@ def cmd_check(args) -> int:
     return wizard.check(Path(args.path))
 
 
+def cmd_notify(args) -> int:
+    from . import notify
+    if args.action == "setup":
+        cfg = notify.setup()
+        print(f"tópico: {cfg['topic']} (servidor {cfg['server']})\n"
+              "No app ntfy: + Subscribe to topic → cole o tópico (no Android, ligue Instant delivery).\n"
+              f"Configuração em {notify.CONFIG}. Uma notificação de teste foi enviada.")
+        return 0
+    cfg = notify.load()
+    if not cfg:
+        die(f"sem {notify.CONFIG}: rode `orq notify setup`")
+    ok = notify.publish(cfg, "orq · teste", "Notificação de teste do orq.")
+    print("enviada" if ok else "falhou (confira a rede)")
+    return 0 if ok else 1
+
+
 def cmd_selftest(args) -> int:
     import subprocess
     return subprocess.call([sys.executable, "-m", "pytest", "-q", str(config.ORQ_HOME / "tests")])
@@ -273,9 +290,11 @@ def main(argv: list[str] | None = None) -> int:
     nw.add_argument("--repo")
     ck = sub.add_parser("check")
     ck.add_argument("path")
+    nt = sub.add_parser("notify")
+    nt.add_argument("action", choices=["setup", "test"])
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check,
+    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")
