@@ -1,4 +1,4 @@
-O executor não chegou à aprovação em {{MAX_CYCLES}} ciclos. A última revisão:
+O executor não chegou à aprovação em {{MAX_CYCLES}} ciclos. A última reprovação (revisão ou verificação automática):
 
 {{REVIEW}}
 
