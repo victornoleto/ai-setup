@@ -101,3 +101,39 @@ async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) 
         choice, label = (opt["id"], opt["label"]) if opt else ("victor", text)
         close(eng, ask, choice=choice, answer=text)
         return council_mod.record_victor(eng.s, t.id, dec, choice, label, "Escolhida pelo Victor.")
+
+
+def fallback_ask(task: str, p) -> dict:
+    what = "bloqueada" if p.result == "blocked" else "falhou"
+    return new_ask(task, p.result, p.phase, f"{task} {what}: {notify.clip(p.reason, 150)} O que fazer?",
+                   "O operador não montou a pergunta; estas são as opções padrão.",
+                   [{"id": "1", "label": f"Tentar de novo (fase {p.phase})", "detail": "", "action": "retry", "note": ""},
+                    {"id": "2", "label": "Pular a tarefa", "detail": "", "action": "skip", "note": ""},
+                    {"id": "3", "label": "Parar a fila", "detail": "", "action": "stop", "note": ""}], "1")
+
+
+async def build_failure_ask(eng: "Engine", t: "Task", p) -> dict:
+    """O operador (só leitura) lê o report e o log e monta a pergunta; sem resposta útil, as opções padrão."""
+    from .engine import hms, prompt
+    out, _ = await eng.call(t, "operator", f"intervene-{hms()}", "ask", prompt(
+        "intervene", REPO=eng.cfg.repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=p.result, PHASE=p.phase,
+        REASON=p.reason), gate=False)
+    opts = [o for o in (out or {}).get("options") or [] if o.get("action") in ACTIONS][:4]
+    if len(opts) < 2:
+        ask = fallback_ask(t.id, p)
+    else:
+        rec = out["recommended"] if any(o["id"] == out["recommended"] for o in opts) else opts[0]["id"]
+        ask = new_ask(t.id, p.result, p.phase, out["question"], out["diagnosis"], opts, rec)
+    ask["reason"] = p.reason
+    return ask
+
+
+async def failure(eng: "Engine", t: "Task", p, ask: dict | None = None) -> tuple[str, str]:
+    """Bloqueio ou falha: pergunta ao Victor e espera o tempo que for. → (ação, nota)."""
+    ask = ask or await build_failure_ask(eng, t, p)
+    while True:
+        text = await wait(eng, ask)
+        opt = match_option(ask, text)
+        action, note = (opt["action"], opt["note"]) if opt else ("retry", text)
+        close(eng, ask, action=action, note=note, answer=text)
+        return action, note

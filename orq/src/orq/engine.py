@@ -86,6 +86,14 @@ class Task:
     base_prompt: str = ""
 
 
+class Problem(Exception):
+    """A tarefa não consegue seguir sozinha. Com [intervene], vira pergunta ao Victor; sem, encerra a tarefa."""
+
+    def __init__(self, result: str, reason: str, phase: str):
+        super().__init__(reason)
+        self.result, self.reason, self.phase = result, reason, phase
+
+
 class TaskEnded(Exception):
     """A tarefa terminou (resultado já gravado); o laço volta para a fila."""
 
@@ -331,123 +339,152 @@ class Engine:
         if phase == "done":
             return
         while True:
-            t.base_prompt = self.base_prompt(t)  # refeito a cada fase: o PROGRESS muda com a fila
-            s.set(t.id, "phase", phase)
-            cycle = s.get(t.id, "cycle", 1)
-            psid = s.get(t.id, "planner_sid")
+            open_ = s.top("open_ask") or {}
+            if open_.get("task") == t.id and open_.get("kind") in ("failed", "blocked"):  # resume: mesma pergunta
+                phase = await self.problem(t, Problem(open_["kind"], open_.get("reason", ""), open_["phase"]), ask=open_)
+            try:
+                t.base_prompt = self.base_prompt(t)  # refeito a cada fase: o PROGRESS muda com a fila
+                s.set(t.id, "phase", phase)
+                cycle = s.get(t.id, "cycle", 1)
+                psid = s.get(t.id, "planner_sid")
 
-            if phase == "start":
-                dirty = git(repo, "status", "--porcelain")
-                if dirty:
+                if phase == "start":
+                    dirty = git(repo, "status", "--porcelain")
+                    if dirty:
+                        s.set(t.id, "started", int(time.time()))
+                        raise Problem("blocked", "Árvore de trabalho suja antes de começar: " + " ".join(dirty.splitlines()[:5]), "start")
+                    base = git(repo, "rev-parse", "HEAD") or "none"
+                    s.set(t.id, "base", base)
                     s.set(t.id, "started", int(time.time()))
-                    self.end(t, "blocked", "Árvore de trabalho suja antes de começar: " + " ".join(dirty.splitlines()[:5]))
-                base = git(repo, "rev-parse", "HEAD") or "none"
-                s.set(t.id, "base", base)
-                s.set(t.id, "started", int(time.time()))
-                s.set(t.id, "cycle", 1)
-                s.event("task_start", {"task": t.id, "base": base, "task_file": str(t.file)})
-                phase = "plan"
+                    s.set(t.id, "cycle", 1)
+                    s.event("task_start", {"task": t.id, "base": base, "task_file": str(t.file)})
+                    phase = "plan"
 
-            elif phase == "plan":
-                out, sid = await self.call(t, "planner", "plan", "plan",
-                                           prompt("plan", BASE=t.base_prompt, PLAN_FILE=t.plan_file))
-                if out is None:
-                    self.end(t, "failed", "O planejamento falhou (ver orq.log).")
-                s.set(t.id, "planner_sid", sid)
-                (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))
-                s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md"})
-                phase = "plan_questions"
-
-            elif phase == "plan_questions":
-                out = json.loads((t.dir / "plan.out.json").read_text())
-                rc, answers = await self.resolve_questions(t, "planejador", out)
-                if rc == 1:
-                    phase = "exec"
-                elif rc == 2:
-                    self.end(t, "failed", "O conselho não decidiu uma dúvida do plano.")
-                else:
-                    out, _ = await self.call(t, "planner", f"plan-update-{hms()}", "plan",
-                                             prompt("plan_update", ANSWERS=answers, PLAN_FILE=t.plan_file), psid, resume=True)
+                elif phase == "plan":
+                    out, sid = await self.call(t, "planner", "plan", "plan",
+                                               prompt("plan", BASE=t.base_prompt, PLAN_FILE=t.plan_file))
                     if out is None:
-                        self.end(t, "failed", "A atualização do plano falhou.")
-                    (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))  # volta a conferir perguntas
+                        raise Problem("failed", "O planejamento falhou (ver orq.log).", "plan")
+                    s.set(t.id, "planner_sid", sid)
+                    (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md"})
+                    phase = "plan_questions"
 
-            elif phase == "exec":
-                esid = s.get(t.id, "exec_sid")
-                if not s.get(t.id, "next_exec_prompt"):
-                    p = t.dir / "exec.prompt.md"
-                    p.write_text(prompt("execute", BASE=t.base_prompt, PLAN_FILE=t.plan_file, DECISIONS_FILE=t.decisions_file))
+                elif phase == "plan_questions":
+                    out = json.loads((t.dir / "plan.out.json").read_text())
+                    rc, answers = await self.resolve_questions(t, "planejador", out)
+                    if rc == 1:
+                        phase = "exec"
+                    elif rc == 2:
+                        raise Problem("failed", "O conselho não decidiu uma dúvida do plano.", "plan_questions")
+                    else:
+                        out, _ = await self.call(t, "planner", f"plan-update-{hms()}", "plan",
+                                                 prompt("plan_update", ANSWERS=answers, PLAN_FILE=t.plan_file), psid, resume=True)
+                        if out is None:
+                            raise Problem("failed", "A atualização do plano falhou.", "plan_questions")
+                        (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))  # volta a conferir perguntas
+
+                elif phase == "exec":
+                    esid = s.get(t.id, "exec_sid")
+                    if not s.get(t.id, "next_exec_prompt"):
+                        p = t.dir / "exec.prompt.md"
+                        p.write_text(prompt("execute", BASE=t.base_prompt, PLAN_FILE=t.plan_file, DECISIONS_FILE=t.decisions_file))
+                        s.set(t.id, "next_exec_prompt", str(p))
+                        s.set(t.id, "exec_mode", "new")
+                    resume = s.get(t.id, "exec_mode", "new") == "resume"
+                    out, sid = await self.call(t, "executor", f"exec-{cycle}-{hms()}", "execute",
+                                               Path(s.get(t.id, "next_exec_prompt")).read_text(), esid, resume=resume)
+                    if out is None:
+                        raise Problem("failed", f"A execução (ciclo {cycle}) falhou.", "exec")
+                    s.set(t.id, "exec_sid", sid)
+                    s.set(t.id, "exec_mode", "resume")
+                    (t.dir / f"exec-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    self.exec_event(t, out, cycle, f"executor, {self.cfg.roles['executor'].label()}")
+                    phase = await self.after_exec(t, out, "exec_answers", "clean")
+
+                elif phase == "exec_answers":
+                    p = t.dir / f"exec_answers-{hms()}.prompt.md"
+                    p.write_text(prompt("exec_answers", ANSWERS=(t.dir / "answers.last").read_text(),
+                                        DECISIONS_FILE=t.decisions_file))
                     s.set(t.id, "next_exec_prompt", str(p))
-                    s.set(t.id, "exec_mode", "new")
-                resume = s.get(t.id, "exec_mode", "new") == "resume"
-                out, sid = await self.call(t, "executor", f"exec-{cycle}-{hms()}", "execute",
-                                           Path(s.get(t.id, "next_exec_prompt")).read_text(), esid, resume=resume)
-                if out is None:
-                    self.end(t, "failed", f"A execução (ciclo {cycle}) falhou.")
-                s.set(t.id, "exec_sid", sid)
-                s.set(t.id, "exec_mode", "resume")
-                (t.dir / f"exec-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
-                self.exec_event(t, out, cycle, f"executor, {self.cfg.roles['executor'].label()}")
-                phase = await self.after_exec(t, out, "exec_answers", "clean")
+                    phase = "exec"
 
-            elif phase == "exec_answers":
-                p = t.dir / f"exec_answers-{hms()}.prompt.md"
-                p.write_text(prompt("exec_answers", ANSWERS=(t.dir / "answers.last").read_text(),
-                                    DECISIONS_FILE=t.decisions_file))
-                s.set(t.id, "next_exec_prompt", str(p))
-                phase = "exec"
+                elif phase == "clean":
+                    await self.clean(t, cycle, "executor", s.get(t.id, "exec_sid"))
+                    phase = "verify"
 
-            elif phase == "clean":
-                await self.clean(t, cycle, "executor", s.get(t.id, "exec_sid"))
-                phase = "verify"
+                elif phase == "verify":
+                    ok, verify_md = await self.verify(t, cycle)
+                    phase = "review" if ok else self.reject(t, cycle, verify_md)
 
-            elif phase == "verify":
-                ok, verify_md = await self.verify(t, cycle)
-                phase = "review" if ok else self.reject(t, cycle, verify_md)
+                elif phase == "review":
+                    report = _read(t.dir / f"exec-{cycle}.out.json", "{}")
+                    verdict, review_md = await self.review(t, "planner", psid, True, report, "executor", cycle)
+                    if verdict == "approved":
+                        self.end(t, "ok", f"Aprovada pelo revisor no ciclo {cycle}.")
+                    phase = self.reject(t, cycle, review_md)
 
-            elif phase == "review":
-                report = _read(t.dir / f"exec-{cycle}.out.json", "{}")
-                verdict, review_md = await self.review(t, "planner", psid, True, report, "executor", cycle)
-                if verdict == "approved":
-                    self.end(t, "ok", f"Aprovada pelo revisor no ciclo {cycle}.")
-                phase = self.reject(t, cycle, review_md)
+                elif phase == "takeover":
+                    out, _ = await self.call(t, "planner", f"takeover-{hms()}", "execute",
+                                             (t.dir / "takeover.prompt.md").read_text(), psid, resume=True)
+                    if out is None:
+                        raise Problem("failed", "O takeover do planejador falhou.", "takeover")
+                    (t.dir / "takeover.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    self.exec_event(t, out, cycle + 1, f"planejador assumiu, {self.cfg.roles['planner'].label()}")
+                    phase = await self.after_exec(t, out, "takeover_answers", "final_clean")
 
-            elif phase == "takeover":
-                out, _ = await self.call(t, "planner", f"takeover-{hms()}", "execute",
-                                         (t.dir / "takeover.prompt.md").read_text(), psid, resume=True)
-                if out is None:
-                    self.end(t, "failed", "O takeover do planejador falhou.")
-                (t.dir / "takeover.out.json").write_text(json.dumps(out, ensure_ascii=False))
-                self.exec_event(t, out, cycle + 1, f"planejador assumiu, {self.cfg.roles['planner'].label()}")
-                phase = await self.after_exec(t, out, "takeover_answers", "final_clean")
+                elif phase == "takeover_answers":
+                    (t.dir / "takeover.prompt.md").write_text(prompt(
+                        "exec_answers", ANSWERS=(t.dir / "answers.last").read_text(), DECISIONS_FILE=t.decisions_file))
+                    phase = "takeover"
 
-            elif phase == "takeover_answers":
-                (t.dir / "takeover.prompt.md").write_text(prompt(
-                    "exec_answers", ANSWERS=(t.dir / "answers.last").read_text(), DECISIONS_FILE=t.decisions_file))
-                phase = "takeover"
+                elif phase == "final_clean":
+                    await self.clean(t, cycle + 1, "planner", psid)
+                    phase = "final_verify"
 
-            elif phase == "final_clean":
-                await self.clean(t, cycle + 1, "planner", psid)
-                phase = "final_verify"
+                elif phase == "final_verify":
+                    ok, _ = await self.verify(t, cycle + 1)
+                    if not ok:
+                        raise Problem("failed", "A verificação automática falhou depois de o planejador assumir "
+                                                f"(ver {t.id}/verify-{cycle + 1}.log).", "takeover")
+                    phase = "final_review"
 
-            elif phase == "final_verify":
-                ok, _ = await self.verify(t, cycle + 1)
-                if not ok:
-                    self.end(t, "failed", "A verificação automática falhou depois de o planejador assumir "
-                                          f"(ver {t.id}/verify-{cycle + 1}.log).")
-                phase = "final_review"
+                elif phase == "final_review":
+                    rsid = s.get(t.id, "final_review_sid")
+                    report = _read(t.dir / "takeover.out.json", "{}")
+                    verdict, _ = await self.review(t, "reviewer", rsid, bool(rsid), report,
+                                                   "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
+                    if verdict == "approved":
+                        self.end(t, "ok_takeover", f"O executor não passou em {self.cfg.max_cycles} ciclos; "
+                                                   "o planejador assumiu e um revisor novo aprovou.")
+                    raise Problem("failed", "Nem o takeover do planejador passou na revisão independente.", "takeover")
+                else:
+                    raise RuntimeError(f"fase desconhecida: {phase}")
+            except Problem as p:
+                phase = await self.problem(t, p)
 
-            elif phase == "final_review":
-                rsid = s.get(t.id, "final_review_sid")
-                report = _read(t.dir / "takeover.out.json", "{}")
-                verdict, _ = await self.review(t, "reviewer", rsid, bool(rsid), report,
-                                               "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
-                if verdict == "approved":
-                    self.end(t, "ok_takeover", f"O executor não passou em {self.cfg.max_cycles} ciclos; "
-                                               "o planejador assumiu e um revisor novo aprovou.")
-                self.end(t, "failed", "Nem o takeover do planejador passou na revisão independente.")
-            else:
-                raise RuntimeError(f"fase desconhecida: {phase}")
+    async def problem(self, t: Task, p: Problem, ask: dict | None = None) -> str:
+        """Sem intervenção: encerra a tarefa como antes. Com: pergunta ao Victor e aplica a ação escolhida.
+        → a fase seguinte."""
+        if not self.cfg.intervene:
+            self.end(t, p.result, p.reason)
+        action, note = await intervene.failure(self, t, p, ask)
+        if note:
+            self.s.event("note", {"text": note, "for_task": t.id})
+        if action == "retry":
+            self.s.set(t.id, "decision_rounds", 0)
+            return p.phase
+        if action == "replan":
+            for k in ("exec_sid", "next_exec_prompt", "exec_mode", "final_review_sid"):
+                self.s.set(t.id, k, None)
+            self.s.set(t.id, "cycle", 1)
+            self.s.set(t.id, "decision_rounds", 0)
+            return "plan"
+        if action == "accept":
+            self.end(t, "ok_victor", f"Aceita pelo Victor. {p.reason}")
+        if action == "skip":
+            self.end(t, "skipped", f"Pulada pelo Victor. {p.reason}")
+        raise StopRun
 
     def reject(self, t: Task, cycle: int, why_md: str) -> str:
         """Entrega reprovada (revisão ou verificação): próximo ciclo do executor ou, no último, o takeover."""
@@ -465,15 +502,17 @@ class Engine:
         dirty = git(self.cfg.repo, "status", "--porcelain")
         if not dirty:
             return
+        again = "clean" if role == "executor" else "final_clean"
         self.s.notice("dirty_tree", "Arquivos sem commit depois da execução: " + " ".join(dirty.splitlines()[:10]), t.id)
         out, _ = await self.call(t, role, f"clean-{hms()}", "execute", prompt("clean", FILES=dirty), sid, resume=True)
         if out is None:
-            self.end(t, "failed", "A arrumação da árvore depois da execução falhou.")
+            raise Problem("failed", "A arrumação da árvore depois da execução falhou.", again)
         who = "executor" if role == "executor" else "planejador"
         self.exec_event(t, out, cycle, f"{who}, {self.cfg.roles[role].label()}, arrumando a árvore")
         dirty = git(self.cfg.repo, "status", "--porcelain")
         if dirty:
-            self.end(t, "blocked", "A árvore continuou suja depois da arrumação: " + " ".join(dirty.splitlines()[:5]))
+            raise Problem("blocked", "A árvore continuou suja depois da arrumação: " + " ".join(dirty.splitlines()[:5]),
+                          again)
 
     async def verify(self, t: Task, cycle: int) -> tuple[bool, str]:
         """Roda o `[verify] command` na raiz do repo. → (passou?, texto para o prompt). Sem comando: passa calado."""
@@ -502,15 +541,16 @@ class Engine:
 
     async def after_exec(self, t: Task, out: dict, answers_phase: str, nxt: str) -> str:
         status = out.get("status")
+        again = "exec" if answers_phase == "exec_answers" else "takeover"
         if status == "blocked":
-            self.end(t, "blocked", out.get("summary", ""))
+            raise Problem("blocked", out.get("summary", ""), again)
         if status == "needs_decision":
             rc, answers = await self.resolve_questions(t, "executor", out)
             if rc == 0:
                 (t.dir / "answers.last").write_text(answers)
                 return answers_phase
             if rc == 2:
-                self.end(t, "failed", "O conselho não decidiu uma dúvida do executor.")
+                raise Problem("failed", "O conselho não decidiu uma dúvida do executor.", again)
         return nxt
 
     async def review(self, t: Task, role: str, sid: str | None, resume: bool, report: str, actor: str, cycle: int,
@@ -520,7 +560,7 @@ class Engine:
             BASE_SHA=self.s.get(t.id, "base"), ACTOR=actor, CYCLE=cycle, EXEC_REPORT=report,
             VERIFY=_read(t.dir / f"verify-{cycle}.md", "Nenhuma verificação automática configurada.")), sid, resume=resume)
         if out is None:
-            self.end(t, "failed", f"A revisão (ciclo {cycle}) falhou.")
+            raise Problem("failed", f"A revisão (ciclo {cycle}) falhou.", "review" if role == "planner" else "final_review")
         if sid_key:
             self.s.set(t.id, sid_key, new_sid)
         if self.cfg.get("test", "force_changes") and role == "planner":
@@ -534,7 +574,8 @@ class Engine:
             k: out.get(k) for k in ("verdict", "summary", "highlights", "issues")}})
         rc, answers = await self.resolve_questions(t, "revisor", out)
         if rc == 2:
-            self.end(t, "failed", "O conselho não decidiu uma dúvida do revisor.")
+            raise Problem("failed", "O conselho não decidiu uma dúvida do revisor.",
+                          "review" if role == "planner" else "final_review")
         md = f"Resumo: {out.get('summary', '')}\n\nProblemas:\n" + "\n".join(
             f"- [{i['severity']}] {i['where']}: {i['what']} → {i['fix']}" for i in out.get("issues") or [])
         if rc == 0:

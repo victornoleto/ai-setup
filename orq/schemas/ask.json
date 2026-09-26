@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["diagnosis", "question", "options", "recommended"],
+  "properties": {
+    "diagnosis": {"type": "string", "description": "o que aconteceu, em até 3 frases, sem código nem caminhos"},
+    "question": {"type": "string", "description": "a pergunta ao Victor, até 200 caracteres, sem código nem caminhos"},
+    "options": {"type": "array", "minItems": 3, "maxItems": 4, "items": {
+      "type": "object", "additionalProperties": false, "required": ["id", "label", "detail", "action", "note"],
+      "properties": {
+        "id": {"type": "string"},
+        "label": {"type": "string", "description": "até 60 caracteres, sem detalhe do cliente"},
+        "detail": {"type": "string"},
+        "action": {"type": "string", "enum": ["retry", "replan", "accept", "skip", "stop"]},
+        "note": {"type": "string", "description": "instrução que entra no próximo prompt (retry/replan); vazio nas outras"}}}},
+    "recommended": {"type": "string", "description": "id da opção recomendada"}
+  }
+}

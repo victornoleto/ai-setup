@@ -90,3 +90,72 @@ async def test_conselho_unanime_nao_pergunta(tmp_path):
     e = engine(tmp_path, make_queue(tmp_path, script, intervene="enabled = true"))
     assert await asyncio.wait_for(e.run(), 10)
     assert "ask" not in [x["type"] for x in e.s.events()]
+
+
+# --- bloqueio e falha ---------------------------------------------------------------------------------------------------
+import pytest  # noqa: E402
+
+ASK_OUT = {"question": "O executor travou. E agora?", "diagnosis": "Faltou a lib X.",
+           "options": [{"id": "1", "label": "Tentar de novo usando a lib Y", "detail": "", "action": "retry",
+                        "note": "use a lib Y"},
+                       {"id": "2", "label": "Pular", "detail": "", "action": "skip", "note": ""},
+                       {"id": "3", "label": "Parar a fila", "detail": "", "action": "stop", "note": ""}],
+           "recommended": "1"}
+BLOCKED = {**EXEC_OK, "_sh": "true", "status": "blocked", "commits": [], "summary": "Sem a lib X."}
+
+
+async def answer_when_open(e, text):
+    await until(lambda: e.s.top("open_ask"))
+    e.s.send(f"/answer {e.s.top('open_ask')['id']} {text}")
+
+
+async def test_bloqueio_retry_com_nota(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED, EXEC_OK], "review": [APPROVED],
+                                "ask": [ASK_OUT]}, intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await answer_when_open(e, "1")
+    assert await job and e.s.get("01-a", "result") == "ok"
+    execs = [c for c in e.harness("fake").calls if c.name.startswith("exec-")]
+    assert "use a lib Y" in execs[-1].prompt
+    assert [x["action"] for x in e.s.events() if x["type"] == "ask_answer"] == ["retry"]
+
+
+async def test_operador_falhou_usa_opcoes_padrao(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED], "review": [APPROVED],
+                                "ask": [{"_error": "fatal"}]}, intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await until(lambda: e.s.top("open_ask"))
+    assert [o["action"] for o in e.s.top("open_ask")["options"]] == ["retry", "skip", "stop"]
+    await answer_when_open(e, "2")
+    assert await job and e.s.get("01-a", "result") == "skipped"
+
+
+async def test_accept_fecha_como_ok_victor(tmp_path):
+    out = {**ASK_OUT, "options": [*ASK_OUT["options"][:2], {"id": "3", "label": "Aceitar", "detail": "",
+                                                              "action": "accept", "note": ""}]}
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED], "review": [APPROVED], "ask": [out]},
+                     intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await answer_when_open(e, "3")
+    assert await job and e.s.get("01-a", "result") == "ok_victor"
+
+
+async def test_resume_com_pergunta_aberta_nao_chama_o_operador(tmp_path):
+    from orq.engine import Engine
+    from orq.store import RunStore
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED, EXEC_OK], "review": [APPROVED],
+                                "ask": [ASK_OUT]}, intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await until(lambda: e.s.top("open_ask"))
+    job.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await job
+    e2 = Engine(cfg, RunStore(e.s.dir))
+    job2 = asyncio.create_task(e2.run())
+    await answer_when_open(e2, "1")
+    assert await job2 and e2.s.get("01-a", "result") == "ok"
+    assert not [c for c in e2.harness("fake").calls if c.name.startswith("intervene-")]
