@@ -20,7 +20,7 @@ from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
 from .store import RunStore
 
-OK_RESULTS = ("ok", "ok_takeover", "skipped")
+OK_RESULTS = ("ok", "ok_takeover", "ok_victor", "skipped")
 
 
 def render(template: str, **kv) -> str:
@@ -303,7 +303,7 @@ class Engine:
         base = self.s.get(t.id, "base")
         delivery = {"commits": git(self.cfg.repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
                     "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD")} if base and base != "none" else {}
-        if result in ("ok", "ok_takeover") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
+        if result in ("ok", "ok_takeover", "ok_victor") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.set(t.id, "phase", "done")
         self.s.set(t.id, "result", result)

@@ -57,6 +57,11 @@ on_fail = "stop"           # stop | continue
 command = ""               # ex. "make test": roda na raiz do repo depois de cada execução; falhou = reprovada (gasta ciclo)
 timeout = "30m"
 
+[intervene]
+enabled = true             # a fila pausa e pergunta ao Victor (painel + ntfy) em vez de falhar/bloquear
+decision_timeout = "1h"    # decisão sem unanimidade: segue com a escolha do conselho depois disso
+reminder = "2h"            # lembrete no ntfy enquanto a pergunta estiver aberta
+
 [report]
 llm_summary = true         # no fim, o planejador (só leitura) escreve o resumo da entrega no journal
 

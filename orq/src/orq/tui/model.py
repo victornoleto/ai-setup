@@ -14,7 +14,7 @@ PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "c
                "exec": "executando", "exec_answers": "executando", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
                "takeover": "planejador assumiu", "takeover_answers": "planejador assumiu",
                "final_clean": "arrumando a árvore", "final_verify": "verificação final", "final_review": "revisão final"}
-RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "failed": ("✗", "FALHOU"),
+RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "ok_victor": ("✓", "ok, aceita pelo Victor"), "failed": ("✗", "FALHOU"),
           "blocked": ("✗", "BLOQUEADA"), "skipped": ("⊘", "pulada")}
 
 

@@ -99,3 +99,14 @@ def test_store_evento_estado_inbox(tmp_path):
     s.add_cost(1.5); s.add_cost(0.25)
     assert s.top("cost") == 1.75
     assert "01-a começou" in (s.dir / "orq.log").read_text()
+
+
+def test_intervencao_padrao(tmp_path):
+    (tmp_path / "orq.toml").write_text("")
+    c = config.load(tmp_path)
+    assert c.intervene is True
+    assert c.intervene_seconds("decision_timeout") == 3600 and c.intervene_seconds("reminder") == 7200
+    (tmp_path / "orq.toml").write_text('[intervene]\nenabled = false\ndecision_timeout = "5s"\n')
+    c = config.load(tmp_path)
+    assert c.intervene is False and c.intervene_seconds("decision_timeout") == 5
+    assert journal.RESULT_LABEL["ok_victor"] == "**ok (aceita pelo Victor)**"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 RESULT_LABEL = {"ok": "ok", "ok_takeover": "**ok (assumida pelo planejador)**", "failed": "**FALHOU**",
-                "blocked": "**BLOQUEADA**", "skipped": "pulada"}
+                "blocked": "**BLOQUEADA**", "skipped": "pulada", "ok_victor": "**ok (aceita pelo Victor)**"}
 VERDICT_LABEL = {"approved": "aprovada", "changes": "**reprovada**"}
 STATUS_LABEL = {"done": "concluída", "needs_decision": "parou com dúvida", "blocked": "**bloqueada**"}
 NOTICE_LABEL = {"limit_wait": "LIMITE DE USO", "limit_giveup": "LIMITE DE USO", "account_switch": "TROCA DE CONTA",
@@ -234,7 +234,7 @@ def event_line(e: dict) -> str | None:
     if t == "task_start":
         return f"▶ {task} começou"
     if t == "task_end":
-        glyph = {"ok": "✓", "ok_takeover": "✓", "skipped": "⊘"}.get(e["result"], "✗")
+        glyph = {"ok": "✓", "ok_takeover": "✓", "ok_victor": "✓", "skipped": "⊘"}.get(e["result"], "✗")
         return f"{glyph} {task} terminou: {RESULT_LABEL.get(e['result'], e['result']).replace('**', '')} " \
                f"({dur(e.get('duration_s'))}, {e.get('cycles', 1)} ciclo(s)) — {_clip(e.get('reason', ''), 160)}"
     if t == "plan":
