@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from .engine import Engine
 
 HELP = ("/add <texto> [--after NN] · /skip NN · /unskip NN · /note <texto> [--task NN] · "
-        "/decision <qid> <opção ou texto> · /pause · /resume · /stop · /ask <texto> (operador)")
+        "/decision <qid> <opção ou texto> · /pause · /resume · /stop · /ask <texto> (operador) · "
+        "/answer <id> <nº ou texto> (responde a pergunta aberta)")
 
 
 class StopRun(Exception):
@@ -71,6 +72,7 @@ class Control:
         self.stop = False
         self.resumed = asyncio.Event()
         self.background: set[asyncio.Task] = set()
+        self.answers: dict[str, str] = {}  # id da pergunta aberta → resposta do Victor (intervene.wait consome)
 
     @property
     def s(self):
@@ -153,6 +155,15 @@ class Control:
                 task = f.stem
             self.s.event("note", {"text": rest, "for_task": task})
             return True, f"nota para {task or 'todas as tarefas'}: entra no próximo prompt"
+        if cmd == "answer":
+            m = re.match(r"(\S+)\s+(.+)$", rest, re.S)
+            if not m:
+                return False, "uso: /answer <id da pergunta> <nº da opção ou texto>"
+            if (self.s.top("open_ask") or {}).get("id") != m.group(1):
+                return False, f"a pergunta {m.group(1)} não está aberta"
+            self.answers[m.group(1)] = m.group(2).strip()
+            self.resumed.set()
+            return True, "resposta recebida"
         if cmd == "decision":
             return self.decision(rest)
         if cmd == "pause":
