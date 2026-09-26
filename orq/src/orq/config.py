@@ -175,9 +175,10 @@ def parse_queue_conf(text: str) -> dict[str, str]:
 
 
 def resolve_queue_dir(path: str | Path) -> Path:
-    """Aceita a pasta da atividade (com orq/ dentro) ou a própria pasta da fila."""
+    """Aceita a pasta da atividade (com orq/ dentro) ou a própria pasta da fila. `orq/orq.toml` (o `orq new` sempre
+    cria) decide mesmo que a atividade tenha documentos numerados."""
     p = Path(path).resolve()
-    if (p / "orq").is_dir() and not any(p.glob("[0-9]*.md")):
+    if (p / "orq" / "orq.toml").is_file() or ((p / "orq").is_dir() and not any(p.glob("[0-9]*.md"))):
         return p / "orq"
     return p
 

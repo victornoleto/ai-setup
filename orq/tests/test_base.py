@@ -66,6 +66,16 @@ def test_camadas_toml_env_flag(tmp_path, monkeypatch):
     assert c.roles["planner"].account == "1"
 
 
+def test_atividade_com_documentos_numerados_usa_a_fila_orq(tmp_path):
+    act = tmp_path / "atividade"
+    (act / "orq").mkdir(parents=True)
+    (act / "00-contexto.md").write_text("doc da atividade, não é tarefa")
+    (act / "orq" / "orq.toml").write_text("")
+    (act / "orq" / "01-tarefa.md").write_text("tarefa")
+    assert config.resolve_queue_dir(act) == act / "orq"
+    assert config.resolve_queue_dir(act / "orq") == act / "orq"
+
+
 def test_harness_invalido(tmp_path):
     (tmp_path / "orq.toml").write_text('[roles.voter]\nharness = "gpt"\n')
     with pytest.raises(config.ConfigError):
