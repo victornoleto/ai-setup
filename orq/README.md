@@ -52,6 +52,7 @@ orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
 orq send <run-dir> "/comando …"
 orq status <run-dir>
 orq decide "Pergunta?" --option a="Rótulo: detalhe" --option b="…" [--context "…"]
+orq notify setup | test
 orq selftest
 ```
 
@@ -90,12 +91,46 @@ TIMELINE  (enter: detalhe)               │   [exec-2-1131] ✗ Exit code 1 …
 | `/skip NN` · `/unskip NN` | pula ou devolve uma tarefa pendente |
 | `/edit NN` | abre a tarefa pendente no `$EDITOR` |
 | `/note <texto> [--task NN]` | instrução para o próximo prompt da tarefa em curso (ou da NN) e das seguintes |
+| `/answer <id> <nº ou texto>` | responde a pergunta aberta (no painel, basta digitar sem barra) |
 | `/decision <qid> <opção ou texto>` | troca uma decisão do conselho; se a tarefa já terminou, cria a tarefa de ajuste |
 | `/cost [NN]` | custo estimado por papel (planejador, executor, revisor final, conselho, operador), total e por tarefa |
 | `/pause` · `/resume` · `/stop` | pausa ou para no próximo ponto seguro (entre duas chamadas); `orq resume` continua |
 | texto sem barra | vai ao **operador** (LLM, só leitura), que responde e propõe comandos; `y` aplica, `n` descarta |
 
 Os mesmos comandos funcionam sem painel: `orq send <run-dir> "/skip 03"`.
+
+## Quando a fila precisa de você
+
+Com `[intervene] enabled = true` (padrão), a fila **pausa e pergunta** em vez de falhar ou bloquear:
+
+| Gatilho | Opções | Sem resposta |
+|---|---|---|
+| Decisão do conselho com 2 ou 2,5 pts | as do conselho; recomendada = a escolhida | depois de `decision_timeout` (1 h), segue com a escolha: **[DECISÃO SEM VICTOR]** |
+| Tarefa bloqueada (árvore suja, executor travado) ou que falhou (chamada, revisão final, verificação depois do takeover, laço de dúvidas) | 3 ou 4, montadas pelo operador (só leitura), uma recomendada | espera; lembrete no ntfy a cada `reminder` (2 h) |
+
+Cada opção de bloqueio/falha é uma ação: `retry` (refaz a fase com uma nota), `replan` (volta ao plano), `accept`
+(fecha como **ok, aceita pelo Victor**), `skip` (pula) ou `stop` (para; `orq resume` volta à mesma pergunta).
+
+A pergunta aparece num bloco destacado acima do chat (`[PRECISA DE VOCÊ]`, a recomendada com `★ RECOMENDADA`) e no
+celular (ntfy). Responda com o **número** da opção (no painel ou no botão da notificação) ou com **texto livre** no
+painel: o operador avalia se basta; se não, faz a próxima pergunta. Depois de 3 rodadas, só número.
+
+### ntfy no celular
+
+1. Instale o app **ntfy** (Play Store ou F-Droid no Android; App Store no iPhone). No PC não há nada para instalar.
+2. Rode `orq notify setup`: gera um tópico aleatório em `~/.config/orq/notify.toml` (fora do repositório: o nome do
+   tópico funciona como senha), mostra o nome e manda uma notificação de teste.
+3. No app: **+ Subscribe to topic**, cole o tópico, servidor `ntfy.sh`. No Android, ligue **Instant delivery** nessa
+   assinatura.
+4. `orq notify test` manda outra notificação quando quiser conferir.
+
+Os botões de resposta funcionam no Android e no web app (`https://ntfy.sh/app`); no iPhone, o ntfy não mostra
+botões — a notificação avisa e você responde pelo painel (ou pelo web app no navegador do celular). O ntfy mostra
+no máximo 3 botões: a recomendada e as duas seguintes. A notificação leva só a fila, a tarefa, a pergunta e os
+rótulos das opções: **nunca** código, caminhos, diffs ou saída de teste. Sem `notify.toml`, fica só o `notify-send`.
+
+Também notificam: lembrete de pergunta aberta, decisão que seguiu sem você, espera por limite de uso acima de 30 min
+e o fim da fila.
 
 ## Configuração
 
@@ -114,6 +149,11 @@ timeout = "30m"
 
 [report]
 llm_summary = true               # no fim, o planejador (só leitura) escreve "O que foi entregue" no journal
+
+[intervene]
+enabled = true                   # false: falha/bloqueio encerram a tarefa, como antes
+decision_timeout = "1h"
+reminder = "2h"
 
 [accounts.claude]
 default = "2"                    # 1 = ~/.claude (xclaude) · 2 = ~/.claude2 (xclaude2); por papel: account = "1"
@@ -144,7 +184,7 @@ pelo planejador no fim, só leitura) e uma linha por tarefa com link para o repo
 | `NN-tarefa/verify-<ciclo>.log` | a saída completa da verificação automática |
 | `NN-tarefa/calls/*` | prompt, stream cru e resposta de cada chamada |
 
-Etiquetas do journal e da timeline: **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
+Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**, **[DECISÃO SEM VICTOR]**, **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
 **[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDENTE]**,
 **[DESTAQUE]**, **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
 **[AJUSTE]**, **[OPERADOR]**, **[ÁRVORE SUJA]**, **[SEM COMMIT]** (terminou ok sem commit: confira).

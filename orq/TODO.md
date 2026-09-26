@@ -4,14 +4,14 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
 
 ## Painel (TUI)
 
-- [ ] **Lista de tarefas com estado visual.** Tarefa concluída fica apagada (dim/cinza); tarefa em
+- [x] **Lista de tarefas com estado visual.** Tarefa concluída fica apagada (dim/cinza); tarefa em
   execução ganha cor de destaque (amarelo/dourado) e negrito; pendente fica no estilo normal.
   - Onde: `TaskRow.text()` em `src/orq/tui/model.py` devolve `str`; passar a devolver `rich.Text`
     com estilo por estado, e `refresh_data()` em `src/orq/tui/app.py` junta os `Text`.
   - Cor não pode ser o único canal: manter o glifo (`▶`, `·`, glifo do resultado) e usar
     intensidade (dim × bold) além da cor.
 
-- [ ] **Timeline (lado esquerdo) com cor por tipo de mensagem.** Estilos distintos para: plano,
+- [x] **Timeline (lado esquerdo) com cor por tipo de mensagem.** Estilos distintos para: plano,
   execução, revisão, início/fim de tarefa, avisos (pausa, retomada, erro) e mensagens do operador.
   - Onde: `timeline_line()` / `event_line()` em `src/orq/tui/model.py`; hoje vira `Text(text)`
     sem estilo em `refresh_data()`.
@@ -37,12 +37,12 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
 
 ## Intervenção do Victor
 
-- [ ] **Notificação por ntfy.** Tópico e servidor no `orq.toml` (ex. `[notify] ntfy = "https://ntfy.sh/<tópico>"`).
+- [x] **Notificação por ntfy.** Tópico e servidor no `orq.toml` (ex. `[notify] ntfy = "https://ntfy.sh/<tópico>"`).
   Hoje só existe `notify-send` no fim da fila (`notify()` em `src/orq/engine.py`).
   - Disparar em: intervenção necessária (abaixo), fim da fila, limite de uso/espera longa.
   - Mensagem curta: fila, tarefa, o que aconteceu, e a pergunta quando houver.
 
-- [ ] **Pausa com pergunta quando a execução precisar do Victor.** Em vez de só falhar/bloquear, o
+- [x] **Pausa com pergunta quando a execução precisar do Victor.** Em vez de só falhar/bloquear, o
   motor pausa, notifica e espera a resposta no input do painel (ou `orq send`).
   - Quando: tarefa bloqueada, falha sem saída automática, laço de dúvidas do conselho, verificação
     falhando depois do último ciclo, e decisão do conselho sem unanimidade (2 e 2,5 pts). Nesse
