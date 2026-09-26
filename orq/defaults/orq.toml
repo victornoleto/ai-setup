@@ -1,0 +1,20 @@
+# orq — configuração desta fila. Só o que difere do global (~/.ai-setup/orq/orq.toml); o resto vem de lá.
+# Precedência: global → este arquivo → variáveis ORQ_* → flags (--account, --repo).
+
+[run]
+rules_file = "regras.md"
+# repo = ""                # vazio: o toplevel git desta pasta
+
+# [accounts.claude]
+# default = "2"            # 1 = ~/.claude (xclaude) · 2 = ~/.claude2 (xclaude2)
+# fallback = "1"           # no limite de uso, troca para esta conta em vez de esperar
+
+# Harness e modelo por papel: claude | codex | opencode (OpenRouter: harness = "opencode", model = "openrouter/…").
+# [roles.executor]
+# harness = "codex"
+# model = "gpt-5.6-sol"
+# effort = "high"
+
+# [loop]
+# max_cycles = 3
+# on_fail = "stop"         # stop | continue

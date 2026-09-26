@@ -39,4 +39,6 @@ link	../skills/entrega	.claude/skills/entrega
 link	../skills/entrega	.agents/skills/entrega
 link	../skills/handoff	.claude/skills/handoff
 link	../skills/handoff	.agents/skills/handoff
+link	../skills/orq-setup	.claude/skills/orq-setup
+link	../skills/orq-setup	.agents/skills/orq-setup
 link	antigravity/skills.json	.gemini/config/skills.json

@@ -17,6 +17,8 @@ from .store import RunStore
 
 USAGE = """\
 Uso:
+  orq new <pasta> [--repo DIR]   cria <pasta>/orq/ e abre o wizard (sessão interativa com a skill orq-setup)
+  orq check <pasta>              confere a fila antes de rodar
   orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
   orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
   orq attach <run-dir>          reabre o painel (q desanexa; a execução continua)
@@ -215,6 +217,21 @@ def cmd_decide(args) -> int:
     return 0 if ans else 1
 
 
+def cmd_new(args) -> int:
+    from . import wizard
+    try:
+        return wizard.new(Path(args.activity), args.repo)
+    except config.ConfigError as e:
+        die(str(e))
+
+
+def cmd_check(args) -> int:
+    from . import wizard
+    if not Path(args.path).is_dir():
+        die(f"pasta não existe: {args.path}")
+    return wizard.check(Path(args.path))
+
+
 def cmd_selftest(args) -> int:
     import subprocess
     return subprocess.call([sys.executable, "-m", "pytest", "-q", str(config.ORQ_HOME / "tests")])
@@ -251,9 +268,14 @@ def main(argv: list[str] | None = None) -> int:
     se = sub.add_parser("send")
     se.add_argument("run_dir")
     se.add_argument("text")
+    nw = sub.add_parser("new")
+    nw.add_argument("activity")
+    nw.add_argument("--repo")
+    ck = sub.add_parser("check")
+    ck.add_argument("path")
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide,
+    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")
