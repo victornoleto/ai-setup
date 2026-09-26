@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import context, council, harness as harness_mod
+from . import context, council, harness as harness_mod, notify
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
@@ -103,6 +103,7 @@ class Engine:
         self.thinking = bool(cfg.get("ui", "thinking", default=False))
         self.handled: set[str] = set()   # tarefas por que o laço já passou nesta execução
         self.control = Control(self)
+        self.notifier = notify.load()  # None: sem ~/.config/orq/notify.toml, só o notify-send
 
     # --- infraestrutura -----------------------------------------------------------------------------
     def harness(self, name: str) -> Harness:
@@ -202,6 +203,8 @@ class Engine:
                                   f"{self.cfg.get('time', 'limit_max_wait')}. Chamada abandonada.", tid)
                     return None, sid
                 self.s.notice("limit_wait", f"Limite de uso em {name} ({role.harness}); esperando {wait_s // 60} min.", tid)
+                if wait_s >= 1800:
+                    self.notify(f"orq {self.queue_name()} · limite de uso", f"{name}: esperando {wait_s // 60} min.")
                 await asyncio.sleep(wait_s)
                 waited += wait_s
                 if not resume and res.session_id:
@@ -222,10 +225,19 @@ class Engine:
             return None, sid
 
     # --- fila ---------------------------------------------------------------------------------------
+    def queue_name(self) -> str:
+        return self.cfg.queue_dir.parent.name if self.cfg.queue_dir.name == "orq" else self.cfg.queue_dir.name
+
+    def notify(self, title: str, message: str, priority: int = 3, actions=()) -> None:
+        """notify-send no desktop e, com notify.toml, ntfy no celular. Falha de rede só vai para o log."""
+        notify.desktop(f"{title}: {message}")
+        if self.notifier and not notify.publish(self.notifier, title, message, priority, actions=actions):
+            self.s.log("aviso: o ntfy não respondeu (a execução segue)")
+
     def start_event(self) -> None:
         r = self.cfg.roles
         self.s.event("run_start", {
-            "queue": self.cfg.queue_dir.parent.name if self.cfg.queue_dir.name == "orq" else self.cfg.queue_dir.name,
+            "queue": self.queue_name(),
             "repo": str(self.cfg.repo), "account": str(self.cfg.get("accounts", "claude", "default")),
             "planner": r["planner"].label(), "executor": r["executor"].label(), "voter": r["voter"].label(),
             "tiebreak": r["tiebreak"].label(), "voters": self.cfg.voters, "max_cycles": self.cfg.max_cycles})
@@ -277,7 +289,7 @@ class Engine:
                 by_role[r] = round(by_role.get(r, 0) + v, 4)
         self.s.event("run_end", {"result": summary, "cost": cost, "cost_by_role": by_role})
         self.s.log(f"fim: {summary} · journal: {self.s.journal_path}")
-        notify(f"Fila terminou: {summary}")
+        self.notify(f"orq {self.queue_name()} terminou", summary)
         return failed == 0
 
     async def summarize(self) -> None:
@@ -554,9 +566,3 @@ def hms() -> str:
 
 def _read(p: Path, default: str) -> str:
     return p.read_text() if p.exists() else default
-
-
-def notify(msg: str) -> None:
-    if (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and subprocess.run(
-            ["sh", "-c", "command -v notify-send"], capture_output=True).returncode == 0:
-        subprocess.run(["notify-send", "orq", msg], capture_output=True)
