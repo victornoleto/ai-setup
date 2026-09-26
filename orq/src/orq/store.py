@@ -152,10 +152,18 @@ class RunStore:
             return float((self.dir / "cost").read_text() or 0)
         return float(st.get("cost", 0) or 0)
 
-    def add_cost(self, usd: float) -> None:
+    def cost_by(self) -> dict[str, dict[str, float]]:
+        """Custo estimado por tarefa e por papel ("" = fora de tarefa, como o operador)."""
+        return self.state().get("cost_by", {})
+
+    def add_cost(self, usd: float, task: str = "", role: str = "") -> None:
         with locked(self.lock_path):
             st = self.state()
-            st["cost"] = round(float(st.get("cost", 0)) + float(usd or 0), 4)
+            usd = float(usd or 0)
+            st["cost"] = round(float(st.get("cost", 0)) + usd, 4)
+            if role:
+                by = st.setdefault("cost_by", {}).setdefault(task, {})
+                by[role] = round(by.get(role, 0) + usd, 4)
             self._save(st)
 
     # --- inbox ------------------------------------------------------------------------------------

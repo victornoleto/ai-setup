@@ -62,10 +62,10 @@ na primeira tarefa que falha.
 ## Painel
 
 ```
-orq · public-links · 1/3 tarefas · motor rodando · US$ 3,10
+orq · public-links · 1/3 tarefas · motor rodando · 00:27:41 · termina ~12:05 · US$ 3.10 estimado
 TAREFAS                                  │ STREAM
-✓ 01-seeder  ok · 12 min                 │   [plan] › $ git branch --show-current
-▶ 02-command  executando c2 · 4 min      │   [plan] › Read api/app/Core/Support/UrlHelper.php
+✓ 01-seeder  ok · 00:12:08 · US$ 1.20    │   [plan] › $ git branch --show-current
+▶ 02-command  executando c2 · 00:04:11   │   [plan] › Read api/app/Core/Support/UrlHelper.php
 · 03-coordenadas  pendente               │   [exec-2-1131] › Edit api/app/…
 TIMELINE  (enter: detalhe)               │   [exec-2-1131] ✗ Exit code 1 …
 11:18 ▶ 01-seeder começou                │
@@ -91,6 +91,7 @@ TIMELINE  (enter: detalhe)               │   [exec-2-1131] ✗ Exit code 1 …
 | `/edit NN` | abre a tarefa pendente no `$EDITOR` |
 | `/note <texto> [--task NN]` | instrução para o próximo prompt da tarefa em curso (ou da NN) e das seguintes |
 | `/decision <qid> <opção ou texto>` | troca uma decisão do conselho; se a tarefa já terminou, cria a tarefa de ajuste |
+| `/cost [NN]` | custo estimado por papel (planejador, executor, revisor final, conselho, operador), total e por tarefa |
 | `/pause` · `/resume` · `/stop` | pausa ou para no próximo ponto seguro (entre duas chamadas); `orq resume` continua |
 | texto sem barra | vai ao **operador** (LLM, só leitura), que responde e propõe comandos; `y` aplica, `n` descarta |
 

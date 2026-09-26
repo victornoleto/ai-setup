@@ -57,7 +57,7 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
 
 ## Custo e tempo
 
-- [ ] **Custo total e por parte.** Hoje `add_cost()` em `src/orq/store.py` só soma um total.
+- [x] **Custo total e por parte.** Hoje `add_cost()` em `src/orq/store.py` só soma um total.
   - Guardar por papel (planejador, executor, revisor, conselho, desempate, operador, verificação) e
     por tarefa; `call()` em `src/orq/engine.py` já sabe o papel e a tarefa.
   - Painel: total no cabeçalho; custo de cada tarefa na lista; detalhamento por papel no journal e
@@ -65,7 +65,7 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
   - Deixar claro que é estimativa (via CLI o custo não é o real faturado).
   - Opcional: `max_cost` que pausa a fila (e notifica) ao passar do teto.
 
-- [ ] **Relógio `HH:MM:SS` ao vivo.** Tempo total da execução no cabeçalho e tempo da tarefa em curso
+- [x] **Relógio `HH:MM:SS` ao vivo.** Tempo total da execução no cabeçalho e tempo da tarefa em curso
   na lista, atualizando a cada segundo. O painel já faz `set_interval(0.5, refresh_data)` em
   `src/orq/tui/app.py`; só baixar para 5–10 s se pesar.
   - Duração final de cada tarefa concluída também em `HH:MM:SS` (hoje `fmt_dur()` arredonda para min).

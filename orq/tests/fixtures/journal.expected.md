@@ -2,7 +2,7 @@
 
 Repositório `/tmp/repo` · conta 2 · planejador/revisor claude-opus-5-5 high · executor claude-sonnet-5 high · conselho 3× claude-opus-5-5 high, desempate claude-opus-5-5 max · até 3 ciclos
 
-**Fim:** 2026-09-27 03:00 — parada na tarefa que falhou (1 com problema). Custo estimado: US$ 12.3400.
+**Fim:** 2026-09-27 03:00 — parada na tarefa que falhou (1 com problema). Custo estimado: US$ 12.34.
 
 ## Leia primeiro
 
@@ -15,10 +15,10 @@ Repositório `/tmp/repo` · conta 2 · planejador/revisor claude-opus-5-5 high �
 
 ## Resumo
 
-| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração |
-|---|---|---|---|---|---|---|
-| 1 | [01-hello](#t-01-hello) | ok | 2 | 0 / 0 / 1 | 2 | 16 min |
-| 2 | [02-dificil](#t-02-dificil) | **FALHOU** | 0 | 0 / 1 / 0 | 0 | 102 min |
+| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração | Custo |
+|---|---|---|---|---|---|---|---|
+| 1 | [01-hello](#t-01-hello) | ok | 2 | 0 / 0 / 1 | 2 | 16 min | — |
+| 2 | [02-dificil](#t-02-dificil) | **FALHOU** | 0 | 0 / 1 / 0 | 0 | 102 min | — |
 
 <a id="t-01-hello"></a>
 
