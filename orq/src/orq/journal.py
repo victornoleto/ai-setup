@@ -43,6 +43,16 @@ def link(t: str) -> str:
     return f"[{t}](#{anchor(t)})"
 
 
+COST_PARTS = (("planejador", ("planner",)), ("executor", ("executor",)), ("revisor final", ("reviewer",)),
+              ("conselho", ("voter", "tiebreak")), ("operador", ("operator",)))
+
+
+def cost_parts(by_role: dict) -> str:
+    """{"planner": 0.4, "voter": 0.1, …} → "planejador US$ 0.40 · conselho US$ 0.10" (estimativa)."""
+    parts = [(label, sum(by_role.get(r, 0) for r in roles)) for label, roles in COST_PARTS]
+    return " · ".join(f"{label} US$ {v:.2f}" for label, v in parts if v)
+
+
 def dur(s) -> str:
     if s is None:
         return "—"
@@ -114,7 +124,9 @@ def _section(e: dict) -> str | None:
     if t == "notice":
         return f"> **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** {esc(e['text'])}\n"
     if t == "task_end":
-        return f"### Resultado: {result_label(e['result'])}\n\n{e.get('reason') or ''}\n"
+        cost = f"\n\nCusto estimado: US$ {sum((e.get('cost') or {}).values()):.2f} ({cost_parts(e['cost'])})" \
+            if e.get("cost") else ""
+        return f"### Resultado: {result_label(e['result'])}\n\n{e.get('reason') or ''}{cost}\n"
     return None
 
 
@@ -148,7 +160,8 @@ def render(ev: list[dict]) -> str:
         f"executor {rs.get('executor')} · conselho {rs.get('voters')}× {rs.get('voter')}, desempate {rs.get('tiebreak')} · "
         f"até {rs.get('max_cycles')} ciclos",
         "",
-        (f"**Fim:** {_hm(re_['ts'])} — {esc(re_['result'])}. Custo estimado: US$ {re_['cost']}." if re_
+        (f"**Fim:** {_hm(re_['ts'])} — {esc(re_['result'])}. Custo estimado: US$ {float(re_['cost']):.2f}"
+         + (f" ({cost_parts(re_['cost_by_role'])})." if re_.get("cost_by_role") else ".") if re_
          else f"**Em andamento.** Última atualização: {_hm(ev[-1]['ts'])}."),
         "",
         "## Leia primeiro",
@@ -157,8 +170,8 @@ def render(ev: list[dict]) -> str:
         "",
         "## Resumo",
         "",
-        "| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração |",
-        "|---|---|---|---|---|---|---|",
+        "| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração | Custo |",
+        "|---|---|---|---|---|---|---|---|",
     ]
     for i, s in enumerate(ts):
         t = s["task"]
@@ -167,7 +180,8 @@ def render(ev: list[dict]) -> str:
         d = [e.get("points") for e in ev if e["type"] == "decision" and e.get("task") == t]
         nc = len({c["hash"] for e in ev if e["type"] == "exec" and e.get("task") == t for c in e.get("commits") or []})
         lines.append(f"| {i + 1} | {link(t)} | {result_label(end.get('result'))} | {cycles} | "
-                     f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} |")
+                     f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} | "
+                     + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
     for i, s in enumerate(ts):
         t = s["task"]

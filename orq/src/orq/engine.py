@@ -182,7 +182,7 @@ class Engine:
             res = await h.call(req, self.on_line_for(role_name, name))
             self.mark_session(res.session_id or sid, seen)
             if res.error is None:
-                self.s.add_cost(res.cost)
+                self.s.add_cost(res.cost, tid, role_name)
                 return res.output, res.session_id or sid
             if res.error == "timeout":
                 self.s.notice("timeout", f"{name} passou de {self.cfg.get('time', 'call_timeout')} e foi encerrada.", tid)
@@ -269,7 +269,11 @@ class Engine:
         else:
             summary = f"todas as {n} tarefas ok"
         cost = f"{self.s.cost():.4f}"
-        self.s.event("run_end", {"result": summary, "cost": cost})
+        by_role: dict[str, float] = {}
+        for roles in self.s.cost_by().values():
+            for r, v in roles.items():
+                by_role[r] = round(by_role.get(r, 0) + v, 4)
+        self.s.event("run_end", {"result": summary, "cost": cost, "cost_by_role": by_role})
         self.s.log(f"fim: {summary} · journal: {self.s.journal_path}")
         notify(f"Fila terminou: {summary}")
         return failed == 0
@@ -289,7 +293,8 @@ class Engine:
         self.s.set(t.id, "phase", "done")
         self.s.set(t.id, "result", result)
         self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
-                                  "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1)})
+                                  "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1),
+                                  "cost": self.s.cost_by().get(t.id, {})})
         raise TaskEnded
 
     async def _run_task(self, t: Task) -> None:

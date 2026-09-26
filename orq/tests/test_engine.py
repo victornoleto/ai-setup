@@ -318,3 +318,20 @@ async def test_retomada_na_fase_de_arrumacao(tmp_path):
     assert await e2.run()
     assert e2.s.get("01-a", "result") == "ok"
     assert [x["cycle"] for x in e2.s.events() if x["type"] == "exec"] == [1, 1]  # execução + arrumação retomada
+
+
+# --- custo por tarefa e por papel -----------------------------------------------------------------------------------
+async def test_custo_por_tarefa_e_por_papel(tmp_path):
+    plan_q = {"summary": "s", "questions": [Q]}
+    cfg = make_queue(tmp_path, {"plan": [plan_q, PLAN], "execute": [EXEC_OK], "review": [APPROVED],
+                                "voter:vote": [vote("a")]})
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    # o fake custa US$ 0,01 por chamada: plano + atualização do plano + revisão; 3 votos unânimes; 1 execução
+    by = e.s.cost_by()["01-a"]
+    assert by == {"planner": 0.03, "voter": 0.03, "executor": 0.01}
+    assert e.s.cost() == 0.07
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert end["cost"] == by
+    md = e.s.journal_path.read_text()
+    assert "planejador US$ 0.03" in md and "conselho US$ 0.03" in md and "executor US$ 0.01" in md

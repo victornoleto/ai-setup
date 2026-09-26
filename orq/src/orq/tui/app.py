@@ -21,6 +21,7 @@ from . import model
 
 HELP_LINES = [
     "Comandos: " + control.HELP,
+    "/cost [NN] mostra o custo estimado por papel (total e por tarefa). "
     "/edit NN abre a tarefa pendente no $EDITOR. Texto sem barra vai ao operador (LLM), que propõe comandos.",
     "Teclas fora do chat: q desanexa · p pausa/continua · f segue o stream · ctrl+t troca tarefas ⇄ stream (tela estreita) · "
     "enter na timeline abre o detalhe · esc sai do chat.",
@@ -194,6 +195,10 @@ class OrqApp(App):
             return
         if text in ("/help", "/?", "/ajuda"):
             for line in HELP_LINES:
+                self.local(line)
+            return
+        if text.split()[0] == "/cost":
+            for line in model.cost_lines(self.store, text[5:].strip()):
                 self.local(line)
             return
         if text.startswith("/edit"):

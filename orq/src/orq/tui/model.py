@@ -3,10 +3,11 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from ..context import title
-from ..journal import event_line
+from ..journal import cost_parts, event_line
 from ..store import RunStore
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
@@ -22,6 +23,17 @@ def fmt_dur(s: float | int | None) -> str:
         return ""
     s = int(s)
     return f"{s} s" if s < 60 else f"{s // 60} min" if s < 3600 else f"{s // 3600} h {s % 3600 // 60:02d}"
+
+
+def fmt_hms(s: float | int | None) -> str:
+    if s is None:
+        return ""
+    s = max(0, int(s))
+    return f"{s // 3600:02d}:{s % 3600 // 60:02d}:{s % 60:02d}"
+
+
+def _epoch(ts: str) -> float:
+    return datetime.fromisoformat(ts).timestamp()
 
 
 @dataclass
@@ -53,22 +65,26 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None) -> 
     ends = {e["task"]: e for e in events if e["type"] == "task_end"}
     is_paused = paused(events)
     now = now or time.time()
+    cost_by = store.cost_by()
     rows = []
     for f in sorted(queue.glob("[0-9]*.md")):
         t = st["tasks"].get(f.stem, {})
         res, phase = t.get("result"), t.get("phase")
         if res in RESULT:
             glyph, status = RESULT[res]
-            extra = fmt_dur(ends[f.stem]["duration_s"]) if f.stem in ends else ""
+            extra = fmt_hms(ends[f.stem]["duration_s"]) if f.stem in ends else ""
         elif phase and phase != "done":
             glyph = "⏸" if is_paused else "▶"
             status = PHASE_LABEL.get(phase, phase)
             cycle = t.get("cycle", 1)
             if phase in ("exec", "exec_answers", "verify", "review") and cycle:
                 status += f" c{cycle}"
-            extra = fmt_dur(now - t["started"]) if t.get("started") else ""
+            extra = fmt_hms(now - t["started"]) if t.get("started") else ""
         else:
             glyph, status, extra = "·", "pendente", ""
+        cost = sum(cost_by.get(f.stem, {}).values())
+        if cost:
+            extra += (" · " if extra else "") + f"US$ {cost:.2f}"
         rows.append(TaskRow(f.stem, glyph, status, extra, title(f)))
     return rows
 
@@ -78,14 +94,48 @@ def timeline_line(e: dict) -> str | None:
     return f"{e['ts'][11:16]} {line}" if line else None
 
 
-def header(store: RunStore, events: list[dict], rows: list[TaskRow]) -> str:
+def eta(events: list[dict], rows: list[TaskRow], now: float) -> float | None:
+    """Horário previsto de término: média das tarefas terminadas × o que falta (a em curso conta o que sobra)."""
+    durs = [e["duration_s"] for e in events if e["type"] == "task_end" and e["result"] != "skipped"]
+    pending = sum(1 for r in rows if r.glyph == "·")
+    running = [e for e in events if e["type"] == "task_start" and not any(
+        x["type"] == "task_end" and x["task"] == e["task"] for x in events)]
+    if not durs or not (pending or running):
+        return None
+    avg = sum(durs) / len(durs)
+    left = avg * pending + sum(max(0.0, avg - (now - _epoch(e["ts"]))) for e in running[-1:])
+    return now + left
+
+
+def header(store: RunStore, events: list[dict], rows: list[TaskRow], now: float | None = None) -> str:
+    now = now or time.time()
     rs = next((e for e in events if e["type"] == "run_start"), {})
+    re_ = next((e for e in events if e["type"] == "run_end"), None)
     done = sum(1 for r in rows if r.glyph in "✓⊘")
-    ended = any(e["type"] == "run_end" for e in events)
     alive = store.engine_alive()
-    motor = "terminou" if ended else ("⏸ pausado" if paused(events) and alive else "rodando" if alive else "parado")
-    cost = store.cost()
-    return f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · US$ {cost:.2f}"
+    motor = "terminou" if re_ else ("⏸ pausado" if paused(events) and alive else "rodando" if alive else "parado")
+    clock = fmt_hms((_epoch(re_["ts"]) if re_ else now) - _epoch(rs["ts"])) if rs else ""
+    end = eta(events, rows, now) if not re_ else None
+    return (f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · {clock}"
+            + (f" · termina ~{datetime.fromtimestamp(end):%H:%M}" if end else "")
+            + f" · US$ {store.cost():.2f} estimado")
+
+
+def cost_lines(store: RunStore, ref: str = "") -> list[str]:
+    """Linhas do /cost: total por papel e cada tarefa (ou só as que começam com `ref`)."""
+    by = store.cost_by()
+    tasks = sorted(k for k in by if k and k.startswith(ref))
+    lines = []
+    if not ref:
+        total: dict[str, float] = {}
+        for roles in by.values():
+            for r, v in roles.items():
+                total[r] = total.get(r, 0) + v
+        lines.append(f"custo estimado · total US$ {store.cost():.2f}: {cost_parts(total) or '—'}")
+        if by.get(""):
+            lines.append(f"  fora de tarefa: {cost_parts(by[''])}")
+    lines += [f"  {k}: US$ {sum(by[k].values()):.2f} · {cost_parts(by[k])}" for k in tasks]
+    return lines or [f"✗ /cost: nenhuma tarefa '{ref}' com custo"]
 
 
 class Tail:

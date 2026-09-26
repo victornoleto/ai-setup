@@ -1,3 +1,6 @@
+import re
+import time
+
 from textual.widgets import Input, OptionList, RichLog, Static
 
 from orq.tui import model
@@ -76,3 +79,35 @@ async def test_confirmacao_do_operador(tmp_path):
         await pilot.press("y")
         await pilot.pause()
         assert '"/note y"' in e.s.inbox_path.read_text()
+
+
+def test_hms():
+    assert model.fmt_hms(0) == "00:00:00"
+    assert model.fmt_hms(3725) == "01:02:05"
+    assert model.fmt_hms(None) == ""
+
+
+async def test_relogio_custo_e_previsao(tmp_path):
+    e = await finished_run(tmp_path)
+    ev = [x for x in e.s.events() if x["type"] != "run_end"]  # como se ainda rodasse
+    e.s.set("03-c", "result", None)
+    e.s.set("03-c", "phase", None)
+    rows = model.task_rows(e.s, ev)
+    assert rows[0].extra.count(":") == 2 and "US$ 0.0" in rows[0].extra  # HH:MM:SS · US$
+    h = model.header(e.s, ev, rows, now=time.time())
+    assert "estimado" in h and "termina ~" in h
+    assert re.search(r"\b\d\d:\d\d:\d\d\b", h)
+
+
+async def test_comando_cost_no_painel(tmp_path):
+    e = await finished_run(tmp_path)
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        await pilot.pause()
+        chat = app.query_one("#chat", Input)
+        chat.value = "/cost"
+        await pilot.press("enter")
+        tl = app.query_one("#timeline", OptionList)
+        texts = [str(tl.get_option_at_index(i).prompt) for i in range(tl.option_count)]
+        assert any("planejador" in t and "US$" in t for t in texts)
+        assert "/cost" not in e.s.inbox_path.read_text() if e.s.inbox_path.exists() else True
