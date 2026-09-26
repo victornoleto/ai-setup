@@ -88,6 +88,7 @@ class OrqApp(App):
     #tasks { height: auto; max-height: 45%; padding: 0 1; }
     #timeline { height: 1fr; border: none; }
     #chat { dock: bottom; }
+    #ask { height: auto; max-height: 60%; border: heavy $warning; padding: 0 1; display: none; }
     #stream { height: 1fr; }
     Screen.narrow #right { display: none; }
     Screen.narrow.show-right #left { display: none; }
@@ -123,6 +124,7 @@ class OrqApp(App):
                 yield Static(id="tasks")
                 yield Static("TIMELINE  (enter: detalhe)", classes="title")
                 yield OptionList(id="timeline")
+                yield Static(id="ask")
                 yield Input(placeholder="/help · /add · /skip NN · /note · /decision qid opção · texto livre → operador",
                             id="chat")
             with Vertical(id="right"):
@@ -154,13 +156,21 @@ class OrqApp(App):
             self.handle_operator(ev)
             text = model.timeline_line(ev)
             if text:
-                tl.add_option(Option(Text(text), id=str(idx)))
+                if ev["type"] == "task_start" and tl.option_count:
+                    tl.add_option(None)  # separador entre tarefas
+                tl.add_option(Option(Text(text, style=model.line_style(ev)), id=str(idx)))
                 added = True
         if added and at_bottom:
             tl.highlighted = tl.option_count - 1
         rows = model.task_rows(self.store, self.events)
         width = self.query_one("#tasks").size.width or 60
-        self.query_one("#tasks", Static).update(Text("\n".join(r.text(width) for r in rows) or "(fila vazia)"))
+        self.query_one("#tasks", Static).update(Text("\n").join(r.styled(width) for r in rows) if rows
+                                                else Text("(fila vazia)"))
+        ask = self.store.top("open_ask")
+        box = self.query_one("#ask", Static)
+        box.display = bool(ask)
+        if ask:
+            box.update(model.ask_text(ask))
         self.query_one("#header", Static).update(Text(model.header(self.store, self.events, rows)))
         log = self.query_one("#stream", RichLog)
         for line in self.stream_tail.read():
@@ -203,6 +213,11 @@ class OrqApp(App):
             return
         if text.startswith("/edit"):
             self.edit_task(text[5:].strip())
+            return
+        ask = self.store.top("open_ask")
+        if ask and not text.startswith("/"):  # com pergunta aberta, texto sem barra é a resposta
+            self.store.send(f"/answer {ask['id']} {text}")
+            self.local(f"› resposta: {text}")
             return
         if not self.store.engine_alive():
             self.local("✗ motor parado: o comando fica na caixa de entrada e vale no próximo orq resume")

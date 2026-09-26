@@ -111,3 +111,41 @@ async def test_comando_cost_no_painel(tmp_path):
         texts = [str(tl.get_option_at_index(i).prompt) for i in range(tl.option_count)]
         assert any("planejador" in t and "US$" in t for t in texts)
         assert "/cost" not in e.s.inbox_path.read_text() if e.s.inbox_path.exists() else True
+
+
+async def test_estilos_da_lista_e_timeline(tmp_path):
+    e = await finished_run(tmp_path)
+    e.s.set("03-c", "result", None)
+    e.s.set("03-c", "phase", "exec")
+    rows = model.task_rows(e.s, e.s.events())
+    styles = [str(r.styled(60).style) for r in rows]
+    assert "dim" in styles[0] and "bold" in styles[2]
+    assert model.line_style({"type": "task_start"}).startswith("bold")
+    assert "reverse" in model.line_style({"type": "ask"})
+    assert "italic" in model.line_style({"type": "operator"})
+
+
+async def test_bloco_da_pergunta_e_resposta(tmp_path):
+    from orq import intervene
+    e = await finished_run(tmp_path)
+    ask = intervene.new_ask("03-c", "blocked", "exec", "E agora?", "diag",
+                            [{"id": "1", "label": "Tentar", "detail": "", "action": "retry", "note": ""},
+                             {"id": "2", "label": "Pular", "detail": "", "action": "skip", "note": ""},
+                             {"id": "3", "label": "Parar", "detail": "", "action": "stop", "note": ""}], "1")
+    e.s.set_top("open_ask", ask)
+    txt = model.ask_text(ask).plain
+    assert "★ RECOMENDADA" in txt and "[PRECISA DE VOCÊ]" in txt and "responda 1–3" in txt
+    ev = [x for x in e.s.events() if x["type"] != "run_end"]
+    assert "esperando você" in model.header(e.s, ev, model.task_rows(e.s, ev))
+    assert model.task_rows(e.s, ev)[2].status == "esperando você"
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        await pilot.pause(0.6)
+        assert app.query_one("#ask").display
+        chat = app.query_one("#chat", Input)
+        chat.value = "1"
+        await pilot.press("enter")
+        assert f'"/answer {ask["id"]} 1"' in e.s.inbox_path.read_text()
+        e.s.set_top("open_ask", None)
+        await pilot.pause(0.6)
+        assert not app.query_one("#ask").display
