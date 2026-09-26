@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from .engine import Engine, Task
 
 POLL_S = 15
+MAX_ROUNDS = 3  # rodadas de texto livre antes de pedir o número de uma opção
 ACTIONS = ("retry", "replan", "accept", "skip", "stop")
 
 
@@ -48,7 +49,7 @@ async def wait(eng: "Engine", ask: dict) -> str | None:
     """Espera a resposta (painel, `orq send` ou ntfy). → o texto, ou None se o prazo venceu."""
     open_(eng, ask)
     ctl = eng.control
-    since, next_poll, last_remind = str(int(ask["opened"])), 0.0, time.time()
+    next_poll, last_remind = 0.0, time.time()
     while True:
         ctl.drain()
         if ctl.stop:
@@ -59,7 +60,9 @@ async def wait(eng: "Engine", ask: dict) -> str | None:
         if ask.get("deadline") and now >= ask["deadline"]:
             return None
         if eng.notifier and now >= next_poll:
-            msgs, since = await asyncio.to_thread(notify.poll, eng.notifier, since)
+            # o ponto de leitura mora na pergunta: continuar a mesma pergunta não reentrega respostas velhas
+            msgs, ask["since"] = await asyncio.to_thread(notify.poll, eng.notifier,
+                                                         ask.get("since") or str(int(ask["opened"])))
             for m in msgs:
                 eng.s.send(f"/answer {m}", source="ntfy")
             next_poll = now + POLL_S
@@ -98,7 +101,15 @@ async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) 
             return (f"- **{dec['question']}** → `{dec['choice']}` — {dec['label']} (conselho, "
                     f"{points_label(dec['points'])} pontos; o Victor não respondeu no prazo).")
         opt = match_option(ask, text)
-        choice, label = (opt["id"], opt["label"]) if opt else ("victor", text)
+        if opt:
+            choice, label = opt["id"], opt["label"]
+        else:
+            out = await interpret(eng, t, ask, text)
+            if isinstance(out, dict):  # pergunta continua aberta (com a resposta do operador)
+                ask = out
+                continue
+            opt = next((o for o in ask["options"] if o["id"] == out[1]["option_id"]), None)
+            choice, label = (opt["id"], opt["label"]) if opt else ("victor", out[1]["note"] or text)
         close(eng, ask, choice=choice, answer=text)
         return council_mod.record_victor(eng.s, t.id, dec, choice, label, "Escolhida pelo Victor.")
 
@@ -134,6 +145,56 @@ async def failure(eng: "Engine", t: "Task", p, ask: dict | None = None) -> tuple
     while True:
         text = await wait(eng, ask)
         opt = match_option(ask, text)
-        action, note = (opt["action"], opt["note"]) if opt else ("retry", text)
+        if opt:
+            action, note = opt["action"], opt["note"]
+        else:
+            out = await interpret(eng, t, ask, text)
+            if isinstance(out, dict):
+                ask = out
+                continue
+            action, note = out[1]["action"] or "retry", out[1]["note"] or text
         close(eng, ask, action=action, note=note, answer=text)
         return action, note
+
+
+async def resolve(eng: "Engine", t: "Task", ask: dict, text: str) -> dict | None:
+    """O operador lê a resposta em texto livre e diz se basta (e o que fazer) ou o que falta."""
+    from .engine import hms, prompt
+    opts = "\n".join(f"{i}) `{o['id']}` {o['label']}" + (f" — ação {o['action']}" if o.get("action") else "")
+                     for i, o in enumerate(ask["options"], 1))
+    out, _ = await eng.call(t, "operator", f"resolve-{hms()}", "resolve", prompt(
+        "resolve", REPO=eng.cfg.repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=ask["kind"], QUESTION=ask["question"],
+        DIAGNOSIS=ask["diagnosis"], OPTIONS=opts, ANSWER=text), gate=False)
+    return out
+
+
+def reask(eng: "Engine", ask: dict, reply: str, follow: dict | None = None) -> dict:
+    """A pergunta continua aberta com a resposta do operador; com `follow`, a pergunta nova entra no lugar."""
+    new = {**ask, "rounds": ask["rounds"] + 1, "reply": reply}
+    if follow and new["rounds"] < MAX_ROUNDS:
+        opts = [o for o in follow.get("options") or [] if o.get("action") in ACTIONS][:4]
+        if len(opts) >= 2:
+            rec = follow["recommended"] if any(o["id"] == follow["recommended"] for o in opts) else opts[0]["id"]
+            new.update(question=follow["question"], diagnosis=follow["diagnosis"], options=opts, recommended=rec,
+                       id=f"{time.time_ns():x}"[-8:], opened=time.time())
+    if new["rounds"] >= MAX_ROUNDS:
+        new["reply"] = (reply + " " if reply else "") + "Responda com o número de uma opção."
+    eng.s.event("ask_reply", {"id": ask["id"], "task": ask["task"], "text": new["reply"]})
+    if new["id"] != ask["id"]:
+        eng.s.set_top("open_ask", None)
+        open_(eng, new)  # pergunta nova: evento e aviso de novo
+    else:
+        eng.s.set_top("open_ask", new)
+    return new
+
+
+async def interpret(eng: "Engine", t: "Task", ask: dict, text: str) -> dict | tuple[str, dict]:
+    """Texto livre → ("ok", saída do operador) quando basta; senão, a pergunta (atualizada) que continua aberta."""
+    if ask["rounds"] >= MAX_ROUNDS:
+        return reask(eng, ask, "")
+    out = await resolve(eng, t, ask, text)
+    if out is None:
+        return reask(eng, ask, "Não entendi — responda com o número de uma opção.")
+    if not out.get("sufficient"):
+        return reask(eng, ask, out.get("reply", ""), out.get("follow_up") if ask["kind"] != "council" else None)
+    return "ok", out

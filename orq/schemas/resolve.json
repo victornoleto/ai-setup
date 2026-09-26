@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sufficient", "reply", "option_id", "action", "note", "follow_up"],
+  "properties": {
+    "sufficient": {"type": "boolean"},
+    "reply": {"type": "string", "description": "uma frase ao Victor: o que vai acontecer, ou o que falta saber"},
+    "option_id": {"type": "string", "description": "decisão do conselho: id da opção escolhida, ou vazio"},
+    "action": {"type": "string", "enum": ["", "retry", "replan", "accept", "skip", "stop"]},
+    "note": {"type": "string", "description": "instrução para o próximo prompt (retry/replan) ou a decisão livre"},
+    "follow_up": {"type": ["object", "null"], "additionalProperties": false,
+                  "required": ["diagnosis", "question", "options", "recommended"],
+                  "properties": {
+                    "diagnosis": {"type": "string"}, "question": {"type": "string"}, "recommended": {"type": "string"},
+                    "options": {"type": "array", "minItems": 2, "maxItems": 4, "items": {
+                      "type": "object", "additionalProperties": false,
+                      "required": ["id", "label", "detail", "action", "note"],
+                      "properties": {"id": {"type": "string"}, "label": {"type": "string"},
+                                     "detail": {"type": "string"}, "note": {"type": "string"},
+                                     "action": {"type": "string", "enum": ["retry", "replan", "accept", "skip", "stop"]}}}}}}
+  }
+}

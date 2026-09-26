@@ -18,7 +18,7 @@ from pathlib import Path
 from ..config import Role
 from .base import CallRequest, CallResult, Harness, OnLine
 
-SCHEMA_KEYS = {"summary": "plan", "status": "execute", "verdict": "review", "option_id": "vote", "reply": "operator", "narrative": "summary", "diagnosis": "ask"}
+SCHEMA_KEYS = {"summary": "plan", "status": "execute", "verdict": "review", "option_id": "vote", "reply": "operator", "narrative": "summary", "diagnosis": "ask", "sufficient": "resolve"}
 
 
 def schema_key(schema: dict) -> str:
