@@ -110,3 +110,19 @@ def test_intervencao_padrao(tmp_path):
     c = config.load(tmp_path)
     assert c.intervene is False and c.intervene_seconds("decision_timeout") == 5
     assert journal.RESULT_LABEL["ok_victor"] == "**ok (aceita pelo Victor)**"
+
+
+def test_linhas_da_intervencao():
+    ask = {"type": "ask", "ts": "2026-09-26T10:00:00-03:00", "id": "q1", "task": "04-x", "kind": "blocked",
+           "question": "E agora?", "diagnosis": "d", "options": [{"id": "1", "label": "Tentar"}], "recommended": "1"}
+    ans = {"type": "ask_answer", "ts": "2026-09-26T10:05:00-03:00", "id": "q1", "task": "04-x", "kind": "blocked",
+           "question": "E agora?", "action": "retry", "note": "use Y", "answer": "1"}
+    rep = {"type": "ask_reply", "ts": "2026-09-26T10:03:00-03:00", "id": "q1", "task": "04-x", "text": "Falta X."}
+    assert journal.event_line(ask) == "[PRECISA DE VOCÊ] 04-x: E agora?"
+    assert journal.event_line(ans) == "[INTERVENÇÃO] 04-x: retry — use Y"
+    assert journal.event_line(rep) == "[OPERADOR] 04-x: Falta X."
+    assert journal.event_line({**ans, "kind": "council"}) is None  # o evento decision já conta
+    md = journal.render([{"type": "run_start", "ts": ask["ts"]}, ask, ans])
+    assert "- **[INTERVENÇÃO]** [04-x](04-x/report.md) — E agora? → retry: use Y" in md
+    task = journal.render_task([ask, rep, ans], "04-x")
+    assert "### Pergunta ao Victor" in task and "**← recomendada**" in task and "**Resposta do Victor:** 1" in task

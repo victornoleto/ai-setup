@@ -114,6 +114,15 @@ def _section(e: dict) -> str | None:
         if e.get("highlights"):
             out += "\n**Destaques:**\n" + "\n".join(f"- {esc(h)}" for h in e["highlights"]) + "\n"
         return out
+    if t == "ask":
+        opts = "\n".join(f"{i}. `{o['id']}` {esc(o['label'])}" + (" **← recomendada**" if o["id"] == e["recommended"] else "")
+                         for i, o in enumerate(e.get("options") or [], 1))
+        return f"### Pergunta ao Victor ({e['kind']})\n\n{esc(e['question'])}\n\n{esc(e.get('diagnosis', ''))}\n\n{opts}\n"
+    if t == "ask_reply":
+        return f"*Operador:* {esc(e.get('text', ''))}\n"
+    if t == "ask_answer" and e.get("kind") != "council":
+        return (f"**Resposta do Victor:** {esc(e.get('answer', ''))} → `{e.get('action')}`"
+                + (f": {esc(e['note'])}" if e.get("note") else "") + "\n")
     if t == "verify":
         return (f"### Ciclo {e['cycle']} — verificação automática: {verify_label(e)}\n\n"
                 f"`{esc(e['command'])}` em {dur(e.get('duration_s'))}. Saída: [{e['log_rel']}]({e['log_rel']})\n")
@@ -145,6 +154,9 @@ def render(ev: list[dict]) -> str:
            for e in ev if e["type"] == "decision" and e.get("source") == "victor"]
         + [f"- **[PENDENTE]** {link(e['task'])} — {esc(p)}" for e in last_exec for p in e.get("pending") or []]
         + [f"- **[DESTAQUE]** {link(e['task'])} — {esc(h)}" for e in last_review for h in e.get("highlights") or []]
+        + [f"- **[INTERVENÇÃO]** {link(e['task'])} — {esc(e['question'])} → {e.get('action')}"
+           + (f": {esc(e['note'])}" if e.get("note") else "")
+           for e in ev if e["type"] == "ask_answer" and e.get("kind") != "council"]
         + [f"- **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** " + (f"{link(e['task'])} — " if e.get("task") else "") + esc(e["text"])
            for e in ev if e["type"] == "notice"]
     )
@@ -258,6 +270,14 @@ def event_line(e: dict) -> str | None:
     if t == "operator":
         n = len(e.get("commands") or [])
         return f"[OPERADOR] {_clip(e.get('reply', ''), 400)}" + (f" ({n} comando(s) propostos)" if n else "")
+    if t == "ask":
+        return f"[PRECISA DE VOCÊ] {task}: {_clip(e['question'], 200)}"
+    if t == "ask_reply":
+        return f"[OPERADOR] {task}: {_clip(e.get('text', ''), 300)}"
+    if t == "ask_answer":
+        if e.get("kind") == "council":
+            return None  # o evento decision já conta
+        return f"[INTERVENÇÃO] {task}: {e.get('action')}" + (f" — {_clip(e['note'], 200)}" if e.get("note") else "")
     if t == "run_summary":
         return f"[RESUMO] {_clip(e.get('text', ''), 300)}"
     if t == "control_ack":
