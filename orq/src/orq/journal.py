@@ -11,7 +11,8 @@ STATUS_LABEL = {"done": "concluída", "needs_decision": "parou com dúvida", "bl
 NOTICE_LABEL = {"limit_wait": "LIMITE DE USO", "limit_giveup": "LIMITE DE USO", "account_switch": "TROCA DE CONTA",
                 "timeout": "TIMEOUT", "error": "ERRO", "interrupted": "INTERROMPIDO", "resumed": "RETOMADA",
                 "retry": "REFEITA", "paused": "PAUSA", "stopped": "PARADA", "control": "AJUSTE",
-                "note": "NOTA", "operator": "OPERADOR"}
+                "note": "NOTA", "operator": "OPERADOR",
+                "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT"}
 
 
 def esc(v) -> str:

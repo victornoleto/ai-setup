@@ -10,9 +10,9 @@ from ..journal import event_line
 from ..store import RunStore
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
-               "exec": "executando", "exec_answers": "executando", "verify": "verificando", "review": "revisando",
+               "exec": "executando", "exec_answers": "executando", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
                "takeover": "planejador assumiu", "takeover_answers": "planejador assumiu",
-               "final_verify": "verificação final", "final_review": "revisão final"}
+               "final_clean": "arrumando a árvore", "final_verify": "verificação final", "final_review": "revisão final"}
 RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "failed": ("✗", "FALHOU"),
           "blocked": ("✗", "BLOQUEADA"), "skipped": ("⊘", "pulada")}
 

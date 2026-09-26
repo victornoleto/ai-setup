@@ -284,6 +284,8 @@ class Engine:
 
     def end(self, t: Task, result: str, reason: str):
         started = self.s.get(t.id, "started", int(time.time()))
+        if result in ("ok", "ok_takeover") and git(self.cfg.repo, "rev-parse", "HEAD") == self.s.get(t.id, "base"):
+            self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.set(t.id, "phase", "done")
         self.s.set(t.id, "result", result)
         self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
@@ -354,7 +356,7 @@ class Engine:
                 s.set(t.id, "exec_mode", "resume")
                 (t.dir / f"exec-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
                 self.exec_event(t, out, cycle, f"executor, {self.cfg.roles['executor'].label()}")
-                phase = await self.after_exec(t, out, "exec_answers", "verify")
+                phase = await self.after_exec(t, out, "exec_answers", "clean")
 
             elif phase == "exec_answers":
                 p = t.dir / f"exec_answers-{hms()}.prompt.md"
@@ -362,6 +364,10 @@ class Engine:
                                     DECISIONS_FILE=t.decisions_file))
                 s.set(t.id, "next_exec_prompt", str(p))
                 phase = "exec"
+
+            elif phase == "clean":
+                await self.clean(t, cycle, "executor", s.get(t.id, "exec_sid"))
+                phase = "verify"
 
             elif phase == "verify":
                 ok, verify_md = await self.verify(t, cycle)
@@ -381,12 +387,16 @@ class Engine:
                     self.end(t, "failed", "O takeover do planejador falhou.")
                 (t.dir / "takeover.out.json").write_text(json.dumps(out, ensure_ascii=False))
                 self.exec_event(t, out, cycle + 1, f"planejador assumiu, {self.cfg.roles['planner'].label()}")
-                phase = await self.after_exec(t, out, "takeover_answers", "final_verify")
+                phase = await self.after_exec(t, out, "takeover_answers", "final_clean")
 
             elif phase == "takeover_answers":
                 (t.dir / "takeover.prompt.md").write_text(prompt(
                     "exec_answers", ANSWERS=(t.dir / "answers.last").read_text(), DECISIONS_FILE=t.decisions_file))
                 phase = "takeover"
+
+            elif phase == "final_clean":
+                await self.clean(t, cycle + 1, "planner", psid)
+                phase = "final_verify"
 
             elif phase == "final_verify":
                 ok, _ = await self.verify(t, cycle + 1)
@@ -417,6 +427,21 @@ class Engine:
             return "exec"
         (t.dir / "takeover.prompt.md").write_text(prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
         return "takeover"
+
+    async def clean(self, t: Task, cycle: int, role: str, sid: str | None) -> None:
+        """Árvore suja depois da execução: quem executou tem uma chance de arrumar (sem gastar ciclo); senão, bloqueia."""
+        dirty = git(self.cfg.repo, "status", "--porcelain")
+        if not dirty:
+            return
+        self.s.notice("dirty_tree", "Arquivos sem commit depois da execução: " + " ".join(dirty.splitlines()[:10]), t.id)
+        out, _ = await self.call(t, role, f"clean-{hms()}", "execute", prompt("clean", FILES=dirty), sid, resume=True)
+        if out is None:
+            self.end(t, "failed", "A arrumação da árvore depois da execução falhou.")
+        who = "executor" if role == "executor" else "planejador"
+        self.exec_event(t, out, cycle, f"{who}, {self.cfg.roles[role].label()}, arrumando a árvore")
+        dirty = git(self.cfg.repo, "status", "--porcelain")
+        if dirty:
+            self.end(t, "blocked", "A árvore continuou suja depois da arrumação: " + " ".join(dirty.splitlines()[:5]))
 
     async def verify(self, t: Task, cycle: int) -> tuple[bool, str]:
         """Roda o `[verify] command` na raiz do repo. → (passou?, texto para o prompt). Sem comando: passa calado."""

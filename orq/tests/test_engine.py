@@ -256,3 +256,65 @@ async def test_retomada_na_fase_de_verificacao(tmp_path):
     assert e2.s.get("01-a", "result") == "ok"
     assert types(e2).count("exec") == 1  # a execução não foi refeita
     assert [v["ok"] for v in verifies(e2)] == [True]
+
+
+# --- árvore limpa no fim da execução --------------------------------------------------------------------------------
+EXEC_DIRTY = {**EXEC_OK, "_sh": EXEC_OK["_sh"] + " && echo x > lixo.txt"}
+CLEANUP = {**EXEC_OK, "_sh": "rm -f lixo.txt", "commits": [], "summary": "Lixo apagado."}
+
+
+def notices(e: Engine, kind: str) -> list[dict]:
+    return [x for x in e.s.events() if x["type"] == "notice" and x["kind"] == kind]
+
+
+async def test_arvore_suja_depois_da_execucao_e_arrumada_pelo_executor(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_DIRTY, CLEANUP], "review": [APPROVED]},
+                     tasks=("01-a", "02-b"))
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert e.s.get("01-a", "result") == "ok" and e.s.get("02-b", "result") == "ok"
+    assert "lixo.txt" in notices(e, "dirty_tree")[0]["text"]
+    clean = next((e.s.dir / "01-a" / "calls").glob("clean-*.prompt.md")).read_text()
+    assert "lixo.txt" in clean
+    assert e.s.get("01-a", "cycle") == 1  # arrumar não gasta ciclo
+    assert "[ÁRVORE SUJA]" in e.s.journal_path.read_text()
+
+
+async def test_arvore_continua_suja_bloqueia(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_DIRTY, {**CLEANUP, "_sh": "true"}],
+                                "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    assert e.s.get("01-a", "result") == "blocked"
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert "lixo.txt" in end["reason"]
+    assert "review" not in types(e)
+
+
+async def test_tarefa_ok_sem_commit_gera_aviso(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [{**EXEC_OK, "_sh": "true", "commits": []}],
+                                "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert e.s.get("01-a", "result") == "ok"
+    assert len(notices(e, "no_commits")) == 1
+    assert "[SEM COMMIT]" in e.s.journal_path.read_text()
+
+
+async def test_retomada_na_fase_de_arrumacao(tmp_path):
+    slow_clean = {**CLEANUP, "_sleep": 30}
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_DIRTY, slow_clean, CLEANUP], "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    task = asyncio.create_task(e.run())
+    for _ in range(200):
+        await asyncio.sleep(0.02)
+        if e.s.get("01-a", "phase") == "clean" and list((e.s.dir / "01-a" / "calls").glob("clean-*.prompt.md")):
+            break
+    assert e.s.get("01-a", "phase") == "clean"
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    e2 = Engine(cfg, RunStore(e.s.dir))
+    assert await e2.run()
+    assert e2.s.get("01-a", "result") == "ok"
+    assert [x["cycle"] for x in e2.s.events() if x["type"] == "exec"] == [1, 1]  # execução + arrumação retomada
