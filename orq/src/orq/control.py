@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .engine import Engine
 
 HELP = ("/add <texto> [--after NN] · /skip NN · /unskip NN · /note <texto> [--task NN] · "
-        "/decision <qid> <opção ou texto> · /pause · /resume · /stop")
+        "/decision <qid> <opção ou texto> · /pause · /resume · /stop · /ask <texto> (operador)")
 
 
 class StopRun(Exception):
@@ -70,6 +70,7 @@ class Control:
         self.paused = False
         self.stop = False
         self.resumed = asyncio.Event()
+        self.background: set[asyncio.Task] = set()
 
     @property
     def s(self):
@@ -83,7 +84,7 @@ class Control:
     def drain(self) -> None:
         for cmd in self.s.take_inbox():
             try:
-                ok, result = self.apply(cmd["text"])
+                ok, result = self.apply(cmd["text"], cmd["id"])
             except Exception as exc:  # comando ruim nunca derruba o motor
                 ok, result = False, f"erro: {exc}"
             self.s.event("control_ack", {"id": cmd["id"], "command": cmd["text"], "ok": ok, "result": result,
@@ -106,9 +107,16 @@ class Control:
             self.s.notice("resumed", "Execução retomada pelo painel.")
 
     # --- comandos ---------------------------------------------------------------------------------
-    def apply(self, text: str) -> tuple[bool, str]:
+    def apply(self, text: str, cmd_id: str = "") -> tuple[bool, str]:
         cmd, opts, rest = parse(text)
         files = self.eng.task_files()
+        if cmd == "ask":
+            if not rest:
+                return False, "uso: /ask <mensagem>"
+            job = asyncio.get_running_loop().create_task(self.ask(cmd_id, rest))
+            self.background.add(job)
+            job.add_done_callback(self.background.discard)
+            return True, "operador consultado; a resposta aparece aqui"
         if cmd == "add":
             if not rest:
                 return False, "uso: /add <texto da tarefa> [--after NN]"
@@ -195,3 +203,25 @@ class Control:
         name = new_task_name(files, f"ajuste decisao {qid}", after)
         (self.eng.cfg.queue_dir / name).write_text(text)
         return True, f"{task} já terminou: criada a tarefa {Path(name).stem} para aplicar a decisão"
+
+    async def ask(self, cmd_id: str, message: str) -> None:
+        """Texto livre → papel operator (só leitura, sessão nova) → resposta + comandos propostos. O painel só
+        aplica os comandos com a confirmação do Victor."""
+        from .engine import prompt
+        from .tui.model import task_rows, timeline_line
+
+        events = self.s.events()
+        tasks = "\n".join(f"- {r.glyph} `{r.id}` {r.status}{' · ' + r.extra if r.extra else ''} — {r.title}"
+                           for r in task_rows(self.s, events))
+        decisions = "\n".join(
+            f"- qid `{e['qid']}` ({e['task']}): {e['question']} → `{e['choice']}` {e['label']}; opções: "
+            + ", ".join(f"`{o['id']}` {o['label']}" for o in e.get("options", []))
+            for e in events if e["type"] == "decision") or "(nenhuma)"
+        timeline = "\n".join(line for e in events[-40:] if (line := timeline_line(e)))
+        out, _ = await self.eng.call(None, "operator", f"operator-{cmd_id}", "operator", prompt(
+            "operator", REPO=self.eng.cfg.repo, RUN_DIR=self.s.dir, TASKS=tasks, DECISIONS=decisions,
+            TIMELINE=timeline, RULES=self.eng.rules.rstrip("\n"), MESSAGE=message), gate=False)
+        if out is None:
+            out = {"reply": "O operador não respondeu (ver orq.log).", "commands": []}
+        cmds = [c.strip() for c in out.get("commands") or [] if c.strip().startswith("/") and not c.startswith("/ask")]
+        self.s.event("operator", {"id": cmd_id, "text": message, "reply": out.get("reply", ""), "commands": cmds})

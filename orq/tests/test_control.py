@@ -86,3 +86,24 @@ async def test_decisao_trocada(tmp_path):
     assert e.s.get("01a-ajuste-decisao-nome", "result") == "ok"  # tarefa de ajuste criada e rodada
     assert "[DECISÃO DO VICTOR]" in e.s.journal_path.read_text()
     assert c.apply("/decision nada x")[0] is False
+
+
+async def test_operador_propoe_sem_aplicar(tmp_path):
+    op = {"reply": "Pulo a 02.", "commands": ["/skip 02", "não é comando", "/ask loop"]}
+    e, c = ctl(tmp_path, {**SCRIPT, "operator": [op]})
+    c.poll_interval = 0.01
+    e.s.send("/pause")
+    run = asyncio.create_task(e.run())
+    await asyncio.sleep(0.1)
+    e.s.send("/ask pula a segunda")          # responde mesmo pausado
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if any(x["type"] == "operator" for x in e.s.events()):
+            break
+    ev = next(x for x in e.s.events() if x["type"] == "operator")
+    assert ev["commands"] == ["/skip 02"] and ev["reply"] == "Pulo a 02."
+    assert e.s.get("02-b", "result") is None  # nada aplicado sem confirmação
+    call = next(x for x in e.harness("fake").calls if x.role.name == "operator")
+    assert call.read_only and "pula a segunda" in call.prompt and "`01-a` pendente" in call.prompt
+    e.s.send("/stop")
+    await asyncio.wait_for(run, 5)

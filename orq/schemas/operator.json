@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reply", "commands"],
+  "properties": {
+    "reply": {"type": "string", "description": "resposta curta ao Victor, em pt-BR"},
+    "commands": {"type": "array", "maxItems": 5, "items": {"type": "string", "description": "um comando com barra, exatamente na sintaxe listada"}}
+  }
+}
