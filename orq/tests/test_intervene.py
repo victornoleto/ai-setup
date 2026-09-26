@@ -52,6 +52,7 @@ async def test_resposta_pelo_ntfy(tmp_path, monkeypatch):
     monkeypatch.setattr(intervene.notify, "poll", lambda cfg, since: ([f"{ask['id']} 1"], "m9"))
     assert await asyncio.wait_for(intervene.wait(e, ask), 5) == "1"
     assert any(x.get("source") == "ntfy" for x in e.s.events() if x["type"] == "control_ack")
+    assert ask["since"] == "m9"  # a próxima leitura continua de onde parou
 
 
 # --- conselho sem unanimidade -----------------------------------------------------------------------------------------
@@ -159,3 +160,46 @@ async def test_resume_com_pergunta_aberta_nao_chama_o_operador(tmp_path):
     await answer_when_open(e2, "1")
     assert await job2 and e2.s.get("01-a", "result") == "ok"
     assert not [c for c in e2.harness("fake").calls if c.name.startswith("intervene-")]
+
+
+# --- texto livre --------------------------------------------------------------------------------------------------------
+def res(**kw):
+    return {"sufficient": True, "reply": "ok", "option_id": "", "action": "", "note": "", "follow_up": None, **kw}
+
+
+async def test_texto_livre_insuficiente_vira_nova_pergunta(tmp_path):
+    follow = {"question": "Pular ou parar?", "diagnosis": "d", "recommended": "1",
+              "options": [{"id": "1", "label": "Pular", "detail": "", "action": "skip", "note": ""},
+                          {"id": "2", "label": "Parar", "detail": "", "action": "stop", "note": ""},
+                          {"id": "3", "label": "Tentar", "detail": "", "action": "retry", "note": ""}]}
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED], "review": [APPROVED], "ask": [ASK_OUT],
+                                "resolve": [res(sufficient=False, reply="Preciso saber mais.", follow_up=follow)]},
+                     intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await answer_when_open(e, "sei lá, vê aí")
+    await until(lambda: (e.s.top("open_ask") or {}).get("question") == "Pular ou parar?")
+    assert e.s.top("open_ask")["reply"] == "Preciso saber mais."
+    await answer_when_open(e, "1")
+    assert await job and e.s.get("01-a", "result") == "skipped"
+
+
+async def test_texto_livre_suficiente_vira_acao(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED, EXEC_OK], "review": [APPROVED],
+                                "ask": [ASK_OUT], "resolve": [res(action="retry", note="instale a lib X antes")]},
+                     intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await answer_when_open(e, "instala a X e tenta de novo")
+    assert await job and e.s.get("01-a", "result") == "ok"
+    execs = [c for c in e.harness("fake").calls if c.name.startswith("exec-")]
+    assert "instale a lib X antes" in execs[-1].prompt
+
+
+async def test_texto_livre_suficiente_no_conselho(tmp_path):
+    cfg = make_queue(tmp_path, {**COUNCIL, "resolve": [res(option_id="c")]}, intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await answer_when_open(e, "vai de C, é mais simples")
+    assert await job
+    assert [x for x in e.s.events() if x["type"] == "decision"][-1]["choice"] == "c"
