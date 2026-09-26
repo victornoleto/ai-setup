@@ -146,6 +146,12 @@ class RunStore:
         st["tasks"].pop(task, None)
         self._save(st)
 
+    def cost(self) -> float:
+        st = self.state()
+        if "cost" not in st and (self.dir / "cost").exists():  # run do orq em bash
+            return float((self.dir / "cost").read_text() or 0)
+        return float(st.get("cost", 0) or 0)
+
     def add_cost(self, usd: float) -> None:
         with locked(self.lock_path):
             st = self.state()

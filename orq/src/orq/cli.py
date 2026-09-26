@@ -166,7 +166,7 @@ def cmd_status(args) -> int:
     w = max((len(r[0]) for r in rows), default=0)
     for tid, res, cyc in rows:
         print(f"{tid:<{w}}  {res:<28}  {cyc}")
-    print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.top('cost', 0):.2f}")
+    print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.cost():.2f}")
     print(f"journal: {store.journal_path}")
     return 0
 
