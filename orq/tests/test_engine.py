@@ -198,7 +198,7 @@ async def test_verificacao_passa_e_vai_para_a_revisao(tmp_path):
     assert "tudo certo" in (e.s.dir / "01-a" / "verify-1.log").read_text()
     review = next((e.s.dir / "01-a" / "calls").glob("review-1-*.prompt.md")).read_text()
     assert "echo tudo certo; test -f a.txt" in review and "passou" in review and "tudo certo" in review
-    assert "verificação automática: passou" in e.s.journal_path.read_text()
+    assert "verificação automática: passou" in (e.s.dir / "01-a" / "report.md").read_text()
     assert event_line(verifies(e)[0]).startswith("[VERIFICAÇÃO c1] 01-a: passou")
 
 
@@ -330,8 +330,46 @@ async def test_custo_por_tarefa_e_por_papel(tmp_path):
     # o fake custa US$ 0,01 por chamada: plano + atualização do plano + revisão; 3 votos unânimes; 1 execução
     by = e.s.cost_by()["01-a"]
     assert by == {"planner": 0.03, "voter": 0.03, "executor": 0.01}
-    assert e.s.cost() == 0.07
+    assert e.s.cost() == 0.08  # + o resumo final, fora de tarefa
     end = next(x for x in e.s.events() if x["type"] == "task_end")
     assert end["cost"] == by
-    md = e.s.journal_path.read_text()
+    md = (e.s.dir / "01-a" / "report.md").read_text()
     assert "planejador US$ 0.03" in md and "conselho US$ 0.03" in md and "executor US$ 0.01" in md
+
+
+# --- relatórios -----------------------------------------------------------------------------------------------------
+async def test_relatorio_por_tarefa_e_journal_como_resumo(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]}, tasks=("01-a", "02-b"))
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    rep = (e.s.dir / "01-a" / "report.md").read_text()
+    assert "## Entrega" in rep and "a.txt" in rep and "1 file changed" in rep
+    assert "### Plano" in rep and "Criar a.txt." in rep
+    assert "(plan.md)" in rep and "(01-a/plan.md)" not in rep  # link relativo à pasta da tarefa
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert len(end["delivery"]["commits"]) == 1
+    md = e.s.journal_path.read_text()
+    assert "(01-a/report.md)" in md and "(02-b/report.md)" in md
+    assert "### Plano" not in md  # o detalhe fica no report
+
+
+async def test_resumo_llm_no_fim(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED],
+                                "summary": [{"narrative": "A fila criou a.txt ([01-a](01-a/report.md))."}]})
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    md = e.s.journal_path.read_text()
+    assert "## O que foi entregue" in md and "A fila criou a.txt" in md
+    req = e.harness("fake").calls[-1]
+    assert req.role.name == "planner" and req.read_only
+    base = next(x for x in e.s.events() if x["type"] == "task_start")["base"]
+    assert base in req.prompt and str(e.s.dir) in req.prompt
+    assert types(e)[-2:] == ["run_summary", "run_end"]
+
+
+async def test_resumo_llm_desligado(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml="[report]\nllm_summary = false\n")
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert "run_summary" not in types(e)

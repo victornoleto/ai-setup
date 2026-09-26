@@ -152,7 +152,7 @@ class Engine:
         return lambda line: self.s.stream(f"  [{name}] {shorten_paths(line, self.cfg.repo, self.s.dir)}")
 
     async def call(self, t: Task | None, role_name: str, name: str, schema_name: str, prompt_text: str,
-                   sid: str | None = None, resume: bool = False, gate: bool = True) -> tuple[dict | None, str | None]:
+                   sid: str | None = None, resume: bool = False, gate: bool = True, read_only: bool = False) -> tuple[dict | None, str | None]:
         """Uma chamada a um papel, com as tentativas. → (saída estruturada ou None, id da sessão)."""
         role = self.cfg.roles[role_name]
         h = self.harness(role.harness)
@@ -175,7 +175,7 @@ class Engine:
             self.s.log(f"{name}: {role.harness}{acc} · {role.model} · effort {role.effort} · "
                        f"{'resume' if resume else 'new'} {(sid or '-')[:8]}")
             req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.cfg.repo,
-                              calls_dir=calls_dir, read_only=role_name in ("voter", "tiebreak", "operator"),
+                              calls_dir=calls_dir, read_only=read_only or role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
                               env=self.git_env, thinking=self.thinking,
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
@@ -268,6 +268,8 @@ class Engine:
             summary = f"{failed} tarefa(s) com problema"
         else:
             summary = f"todas as {n} tarefas ok"
+        if self.cfg.get("report", "llm_summary", default=True) and any(e["type"] == "task_end" for e in self.s.events()):
+            await self.summarize()
         cost = f"{self.s.cost():.4f}"
         by_role: dict[str, float] = {}
         for roles in self.s.cost_by().values():
@@ -277,6 +279,16 @@ class Engine:
         self.s.log(f"fim: {summary} · journal: {self.s.journal_path}")
         notify(f"Fila terminou: {summary}")
         return failed == 0
+
+    async def summarize(self) -> None:
+        """Resumo final escrito pelo planejador (sessão nova, só leitura); falhou, fica o resumo determinístico."""
+        base = next((e["base"] for e in self.s.events() if e["type"] == "task_start"), "HEAD")
+        out, _ = await self.call(None, "planner", f"summary-{hms()}", "summary", prompt(
+            "summary", REPO=self.cfg.repo, RUN_DIR=self.s.dir, BASE=base), read_only=True)
+        if out is None:
+            self.s.notice("error", "O resumo final (LLM) falhou; o journal segue com o resumo determinístico.")
+            return
+        self.s.event("run_summary", {"text": out["narrative"]})
 
     # --- tarefa -------------------------------------------------------------------------------------
     async def run_task(self, f: Path) -> None:
@@ -288,13 +300,16 @@ class Engine:
 
     def end(self, t: Task, result: str, reason: str):
         started = self.s.get(t.id, "started", int(time.time()))
-        if result in ("ok", "ok_takeover") and git(self.cfg.repo, "rev-parse", "HEAD") == self.s.get(t.id, "base"):
+        base = self.s.get(t.id, "base")
+        delivery = {"commits": git(self.cfg.repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
+                    "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD")} if base and base != "none" else {}
+        if result in ("ok", "ok_takeover") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.set(t.id, "phase", "done")
         self.s.set(t.id, "result", result)
         self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
                                   "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1),
-                                  "cost": self.s.cost_by().get(t.id, {})})
+                                  "cost": self.s.cost_by().get(t.id, {}), "delivery": delivery})
         raise TaskEnded
 
     async def _run_task(self, t: Task) -> None:

@@ -35,12 +35,8 @@ def pts(p) -> str:
     return _s(p)
 
 
-def anchor(t: str) -> str:
-    return "t-" + re.sub(r"[^a-z0-9]+", "-", t.lower())
-
-
 def link(t: str) -> str:
-    return f"[{t}](#{anchor(t)})"
+    return f"[{t}]({t}/report.md)"
 
 
 COST_PARTS = (("planejador", ("planner",)), ("executor", ("executor",)), ("revisor final", ("reviewer",)),
@@ -168,6 +164,8 @@ def render(ev: list[dict]) -> str:
         "",
         *(attn or ["Nada exige atenção."]),
         "",
+        *([f"## O que foi entregue\n\n{summ['text'].strip()}\n"] if (summ := next(
+            (e for e in ev if e["type"] == "run_summary"), None)) else []),
         "## Resumo",
         "",
         "| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração | Custo |",
@@ -183,12 +181,40 @@ def render(ev: list[dict]) -> str:
                      f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} | "
                      + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
-    for i, s in enumerate(ts):
+    for s in ts:
         t = s["task"]
-        lines += [f'<a id="{anchor(t)}"></a>', "", f"## Run {i + 1} — {t}", "",
-                  f"Início {s['ts'][11:16]} · base `{s['base'][0:9]}` · tarefa: `{s['task_file']}`", ""]
-        lines += [sec for e in ev if e.get("task") == t and e["type"] != "task_start" if (sec := _section(e)) is not None]
-        lines.append("")
+        end = next((e for e in te if e["task"] == t), {})
+        last = next((e for e in reversed(last_exec) if e.get("task") == t), {})
+        stat = ((end.get("delivery") or {}).get("stat") or "").splitlines()
+        facts = [dur(end.get("duration_s")) if end else "em andamento"]
+        if end.get("cost"):
+            facts.append(f"US$ {sum(end['cost'].values()):.2f}")
+        if end.get("delivery"):
+            facts.append(f"{len(end['delivery']['commits'])} commit(s)" + (f", {stat[-1].strip()}" if stat else ""))
+        lines += [f"### {link(t)} — {result_label(end.get('result')) if end else 'em andamento'}", "",
+                  " · ".join(facts), ""]
+        if last.get("summary"):
+            lines += [esc(_clip(last["summary"], 400)), ""]
+    return "\n".join(lines) + "\n"
+
+
+def render_task(ev: list[dict], t: str) -> str:
+    """O report.md de uma tarefa: início, cada evento dela em ordem e, no fim, a entrega (commits e arquivos)."""
+    start = next((e for e in ev if e["type"] == "task_start" and e["task"] == t), None)
+    end = next((e for e in ev if e["type"] == "task_end" and e["task"] == t), None)
+    lines = [f"# {t} — {result_label(end['result']) if end else 'em andamento'}", "",
+             "[← resumo da execução](../journal.md)", ""]
+    if start:
+        lines += [f"Início {start['ts'][11:16]} · base `{start['base'][0:9]}` · tarefa: `{start['task_file']}`"
+                  + (f" · duração {dur(end.get('duration_s'))}" if end else ""), ""]
+    # as seções usam caminhos relativos ao run dir; o report mora dentro da pasta da tarefa
+    lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
+              if (sec := _section(e)) is not None]
+    d = (end or {}).get("delivery")
+    if d:
+        lines += ["## Entrega", "", *([f"- `{c}`" for c in d["commits"]] or ["Nenhum commit."]), ""]
+        if d.get("stat"):
+            lines += ["```", d["stat"], "```", ""]
     return "\n".join(lines) + "\n"
 
 
@@ -232,6 +258,8 @@ def event_line(e: dict) -> str | None:
     if t == "operator":
         n = len(e.get("commands") or [])
         return f"[OPERADOR] {_clip(e.get('reply', ''), 400)}" + (f" ({n} comando(s) propostos)" if n else "")
+    if t == "run_summary":
+        return f"[RESUMO] {_clip(e.get('text', ''), 300)}"
     if t == "control_ack":
         return f"[AJUSTE] {e.get('command')} → {e.get('result')}"
     return None
