@@ -178,7 +178,7 @@ def event_line(e: dict) -> str | None:
     t = e["type"]
     task = e.get("task") or ""
     if t == "run_start":
-        return f"▶ execução começou: fila {e.get('queue')} · repo {e.get('repo')}"
+        return f"▶ execução começou: fila {e.get('queue')}"
     if t == "run_end":
         return f"■ execução terminou: {e.get('result')} · US$ {e.get('cost')}"
     if t == "task_start":
