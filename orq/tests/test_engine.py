@@ -30,7 +30,8 @@ def vote(o):
     return {"option_id": o, "rationale": f"r-{o}"}
 
 
-def make_queue(tmp_path: Path, script: dict, tasks=("01-a",), extra_toml: str = "") -> config.Config:
+def make_queue(tmp_path: Path, script: dict, tasks=("01-a",), extra_toml: str = "",
+               intervene: str = "enabled = false") -> config.Config:
     repo = tmp_path / "repo"
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
     subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q",
@@ -40,7 +41,7 @@ def make_queue(tmp_path: Path, script: dict, tasks=("01-a",), extra_toml: str = 
     for t in tasks:
         (q / f"{t}.md").write_text(f"Tarefa {t}")
     (q / "script.json").write_text(json.dumps(script))
-    (q / "orq.toml").write_text(f'{ROLES_FAKE}\n[run]\nrepo = "{repo}"\n{extra_toml}')
+    (q / "orq.toml").write_text(f'{ROLES_FAKE}\n[run]\nrepo = "{repo}"\n[intervene]\n{intervene}\n{extra_toml}')
     return config.load(q)
 
 
