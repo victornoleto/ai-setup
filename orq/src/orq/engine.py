@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import context, council, harness as harness_mod, notify
+from . import context, council, harness as harness_mod, intervene, notify
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
@@ -541,6 +541,9 @@ class Engine:
             md += "\n\nDecisões do conselho sobre as dúvidas do revisor:\n" + answers
         return out.get("verdict", "changes"), md
 
+    def last_decision(self, qid: str) -> dict:
+        return next(e for e in reversed(self.s.events()) if e["type"] == "decision" and e.get("qid") == qid)
+
     async def resolve_questions(self, t: Task, source: str, out: dict) -> tuple[int, str]:
         """0 = havia perguntas e todas decididas · 1 = nenhuma pergunta · 2 = falha."""
         qs = out.get("questions") or []
@@ -553,9 +556,16 @@ class Engine:
             return 2, ""
         answers = ""
         for q in qs:
-            a = await council.decide(self, t, source, q)
-            if a is None:
-                return 2, ""
+            open_ = self.s.top("open_ask") or {}
+            if open_.get("kind") == "council" and open_.get("qid") == q["id"] and open_.get("task") == t.id:
+                a = await intervene.council(self, t, self.last_decision(q["id"]), ask=open_)  # resume: sem novo conselho
+            else:
+                a = await council.decide(self, t, source, q)
+                if a is None:
+                    return 2, ""
+                dec = self.last_decision(q["id"])
+                if self.cfg.intervene and dec.get("points") is not None and dec["points"] < 3:
+                    a = await intervene.council(self, t, dec)
             answers += a + "\n"
         return 0, answers
 
