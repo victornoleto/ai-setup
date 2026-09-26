@@ -6,11 +6,12 @@ import asyncio
 import time
 from typing import TYPE_CHECKING
 
-from . import notify
+from . import council as council_mod, notify
+from .council import points_label
 from .control import StopRun
 
 if TYPE_CHECKING:
-    from .engine import Engine
+    from .engine import Engine, Task
 
 POLL_S = 15
 ACTIONS = ("retry", "replan", "accept", "skip", "stop")
@@ -77,3 +78,26 @@ def close(eng: "Engine", ask: dict, **answer) -> None:
     eng.s.set_top("open_ask", None)
     eng.s.event("ask_answer", {"id": ask["id"], "task": ask["task"], "kind": ask["kind"],
                                "question": ask["question"], **answer})
+
+
+async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) -> str:
+    """Decisão com 2 ou 2,5 pts: pergunta ao Victor; sem resposta no prazo, fica a do conselho. → linha do prompt."""
+    votes = ", ".join(v["option_id"] for v in dec.get("votes") or [])
+    ask = ask or new_ask(t.id, "council", eng.s.get(t.id, "phase"), dec["question"],
+                         f"Conselho sem unanimidade ({points_label(dec['points'])} pts; votos {votes}). "
+                         f"Escolheu `{dec['choice']}` — {dec['label']}: {dec.get('why', '')}",
+                         [{**o, "action": "", "note": ""} for o in dec["options"]], dec["choice"],
+                         deadline=time.time() + eng.cfg.intervene_seconds("decision_timeout"))
+    ask["qid"] = dec["qid"]
+    while True:
+        text = await wait(eng, ask)
+        if text is None:
+            close(eng, ask, timeout=True, choice=dec["choice"])
+            eng.s.notice("decision_no_victor", f"Sem resposta: segue com `{dec['choice']}` — {dec['label']}.", t.id)
+            eng.notify(f"orq · {t.id}: a decisão seguiu sem você", notify.clip(dec["question"], 200))
+            return (f"- **{dec['question']}** → `{dec['choice']}` — {dec['label']} (conselho, "
+                    f"{points_label(dec['points'])} pontos; o Victor não respondeu no prazo).")
+        opt = match_option(ask, text)
+        choice, label = (opt["id"], opt["label"]) if opt else ("victor", text)
+        close(eng, ask, choice=choice, answer=text)
+        return council_mod.record_victor(eng.s, t.id, dec, choice, label, "Escolhida pelo Victor.")

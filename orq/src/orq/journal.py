@@ -12,7 +12,7 @@ NOTICE_LABEL = {"limit_wait": "LIMITE DE USO", "limit_giveup": "LIMITE DE USO", 
                 "timeout": "TIMEOUT", "error": "ERRO", "interrupted": "INTERROMPIDO", "resumed": "RETOMADA",
                 "retry": "REFEITA", "paused": "PAUSA", "stopped": "PARADA", "control": "AJUSTE",
                 "note": "NOTA", "operator": "OPERADOR",
-                "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT"}
+                "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT", "decision_no_victor": "DECISÃO SEM VICTOR"}
 
 
 def esc(v) -> str:

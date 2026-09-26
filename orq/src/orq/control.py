@@ -8,6 +8,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from . import council
+
 if TYPE_CHECKING:
     from .engine import Engine
 
@@ -193,16 +195,8 @@ class Control:
         opt = next((o for o in orig["options"] if o["id"] == answer), None)
         choice, label = (opt["id"], opt["label"]) if opt else ("victor", answer)
         task = orig["task"]
-        self.s.event("decision", {
-            "task": task, "source": "victor", "qid": qid, "question": orig["question"], "context": orig.get("context", ""),
-            "options": orig["options"], "votes": [], "choice": choice, "label": label, "points": None, "tiebreak": "",
-            "why": f"trocada pelo Victor (o conselho tinha escolhido `{orig['choice']}` — {orig['label']})",
-            "override": True})
-        d = self.s.dir / task / "decisions.md"
-        d.parent.mkdir(parents=True, exist_ok=True)
-        with open(d, "a") as fh:
-            fh.write(f"## {orig['question']} (decisão do Victor)\n\nEscolha: `{choice}` — {label}. Substitui a do "
-                     f"conselho (`{orig['choice']}` — {orig['label']}).\n\n")
+        council.record_victor(self.s, task, orig, choice, label,
+                              f"Trocada pelo Victor (o conselho tinha escolhido `{orig['choice']}` — {orig['label']}).")
         if self.s.get(task, "phase") != "done":
             return True, f"{task} recebe a decisão no próximo prompt"
         files = self.eng.task_files()

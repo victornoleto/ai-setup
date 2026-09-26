@@ -89,6 +89,19 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     return record(eng, t, source, q, votes, choice, points, tb_rationale)
 
 
+def record_victor(store, task: str, orig: dict, choice: str, label: str, why: str) -> str:
+    """Decisão do Victor sobre uma pergunta do conselho: evento + decisions.md. → a linha para o prompt."""
+    store.event("decision", {
+        "task": task, "source": "victor", "qid": orig["qid"], "question": orig["question"],
+        "context": orig.get("context", ""), "options": orig["options"], "votes": [], "choice": choice,
+        "label": label, "points": None, "tiebreak": "", "why": why, "override": choice != orig["choice"]})
+    d = store.dir / task / "decisions.md"
+    d.parent.mkdir(parents=True, exist_ok=True)
+    with open(d, "a") as fh:
+        fh.write(f"## {orig['question']} (decisão do Victor)\n\nEscolha: `{choice}` — {label}. {why}\n\n")
+    return f"- **{orig['question']}** → `{choice}` — {label} (decisão do Victor). {why}"
+
+
 def record(eng: "Engine", t: "Task", source: str, q: dict, votes: list[dict], choice: str, points, tb: str) -> str:
     label = next(o["label"] for o in q["options"] if o["id"] == choice)
     why = tb or next(v["rationale"] for v in votes if v["option_id"] == choice)

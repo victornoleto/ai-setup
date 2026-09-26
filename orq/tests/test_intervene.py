@@ -52,3 +52,41 @@ async def test_resposta_pelo_ntfy(tmp_path, monkeypatch):
     monkeypatch.setattr(intervene.notify, "poll", lambda cfg, since: ([f"{ask['id']} 1"], "m9"))
     assert await asyncio.wait_for(intervene.wait(e, ask), 5) == "1"
     assert any(x.get("source") == "ntfy" for x in e.s.events() if x["type"] == "control_ack")
+
+
+# --- conselho sem unanimidade -----------------------------------------------------------------------------------------
+from .test_engine import Q, vote  # noqa: E402
+
+COUNCIL = {"plan": [{"summary": "s", "questions": [Q]}, PLAN], "execute": [EXEC_OK], "review": [APPROVED],
+           "voter:vote": [vote("a"), vote("a"), vote("b")]}
+
+
+async def test_conselho_2_pts_pergunta_e_victor_escolhe(tmp_path):
+    e = engine(tmp_path, make_queue(tmp_path, COUNCIL, intervene="enabled = true"))
+    job = asyncio.create_task(e.run())
+    await until(lambda: e.s.top("open_ask"))
+    ask = e.s.top("open_ask")
+    assert ask["kind"] == "council" and ask["recommended"] == "a" and len(ask["options"]) == 3
+    e.s.send(f"/answer {ask['id']} 2")
+    assert await job
+    decs = [x for x in e.s.events() if x["type"] == "decision"]
+    assert (decs[-1]["source"], decs[-1]["choice"]) == ("victor", "b")
+    upd = next((e.s.dir / "01-a" / "calls").glob("plan-update-*.prompt.md")).read_text()
+    assert "decisão do Victor" in upd
+
+
+async def test_conselho_sem_resposta_segue_com_a_escolha(tmp_path):
+    e = engine(tmp_path, make_queue(tmp_path, COUNCIL, intervene='enabled = true\ndecision_timeout = "1s"'))
+    assert await e.run()
+    assert [x.get("kind") for x in e.s.events() if x["type"] == "notice"].count("decision_no_victor") == 1
+    assert "[DECISÃO SEM VICTOR]" in e.s.journal_path.read_text()
+    assert e.s.top("open_ask") is None
+    upd = next((e.s.dir / "01-a" / "calls").glob("plan-update-*.prompt.md")).read_text()
+    assert "`a`" in upd and "não respondeu" in upd
+
+
+async def test_conselho_unanime_nao_pergunta(tmp_path):
+    script = {**COUNCIL, "voter:vote": [vote("a")]}
+    e = engine(tmp_path, make_queue(tmp_path, script, intervene="enabled = true"))
+    assert await asyncio.wait_for(e.run(), 10)
+    assert "ask" not in [x["type"] for x in e.s.events()]
