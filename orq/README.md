@@ -4,7 +4,8 @@ Roda uma fila de tarefas sem supervisão, com papéis separados e **uma sessão 
 
 1. O **planejador** lê a tarefa e o repositório e escreve o plano.
 2. O **executor** executa e commita.
-3. Se houver `[verify] command`, o orq o roda: falhou, a entrega volta ao executor sem revisão (gasta um ciclo).
+3. Se a execução deixou arquivo sem commit, quem executou tem uma chance de arrumar (sem gastar ciclo); senão, a
+   tarefa fica **bloqueada**. Se houver `[verify] command`, o orq o roda: falhou, a entrega volta ao executor sem revisão (gasta um ciclo).
    Passou, o planejador **revisa**, com a saída do comando à mão. Se reprovar, o executor corrige, até `max_cycles` (3) execuções revisadas.
 4. Reprovado no último ciclo, o planejador **assume**; a verificação roda de novo e um **revisor** em sessão
    nova confere.
@@ -139,7 +140,7 @@ O `queue.conf` das filas antigas continua sendo lido: `ORQ_ACCOUNT`, `ORQ_RULES_
 Etiquetas do journal e da timeline: **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
 **[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDENTE]**,
 **[DESTAQUE]**, **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
-**[AJUSTE]**, **[OPERADOR]**.
+**[AJUSTE]**, **[OPERADOR]**, **[ÁRVORE SUJA]**, **[SEM COMMIT]** (terminou ok sem commit: confira).
 
 ## Proteções
 

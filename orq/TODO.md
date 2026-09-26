@@ -28,7 +28,7 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
     relatório do executor.
   - Registrar no journal/timeline (evento próprio, ex. `[VERIFICAÇÃO]`), com tempo e código de saída.
 
-- [ ] **Árvore limpa conferida no fim da tarefa, não só no começo da próxima.** Hoje o check fica no
+- [x] **Árvore limpa conferida no fim da tarefa, não só no começo da próxima.** Hoje o check fica no
   `phase == "start"` (`src/orq/engine.py`): um arquivo esquecido sem commit bloqueia a tarefa seguinte e,
   com `on_fail = "stop"`, para a fila.
   - Ao terminar a execução: se `git status --porcelain` não estiver vazio, retomar a sessão do executor
