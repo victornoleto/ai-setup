@@ -96,7 +96,7 @@ cmd_run() {
 	QUEUE_DIR=$(cd "$queue" && pwd -P)
 	orq_load_config "$QUEUE_DIR/queue.conf"
 	ORQ_DRY_RUN=$dry; export ORQ_DRY_RUN
-	RUN_DIR=${run_dir:-$QUEUE_DIR/runs/$(date +%F-%H%M)$([ "$dry" = 1 ] && echo -dry-run)}
+	RUN_DIR=${run_dir:-$QUEUE_DIR/runs/$(date +%F-%H%M)$([ "$dry" = 1 ] && echo -dry-run || true)}
 	mkdir -p "$RUN_DIR"; RUN_DIR=$(cd "$RUN_DIR" && pwd -P)
 	[ -f "$RUN_DIR/state.json" ] && orq_die "$RUN_DIR já tem uma execução; use orq resume"
 
