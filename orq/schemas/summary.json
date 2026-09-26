@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["narrative"],
+  "properties": {
+    "narrative": {"type": "string", "description": "resumo final em markdown, pt-BR, com links relativos para NN-tarefa/report.md"}
+  }
+}

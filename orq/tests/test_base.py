@@ -18,8 +18,10 @@ def test_journal_etiquetas():
     md = journal.render(read_jsonl(FIXTURES / "events.jsonl"))
     assert md.count("- **[FALHOU]** [02-dificil]") == 1
     assert "DECISÃO 2,5 pts" in md
-    assert "md \\| é melhor" in md
-    assert md.count("## Run ") == 2
+    assert md.count("### [0") == 2  # uma entrada curta por tarefa, com link para o report
+    ev = read_jsonl(FIXTURES / "events.jsonl")
+    assert any("md \\| é melhor" in journal.render_task(ev, t) for t in ("01-hello", "02-dificil"))
+    assert journal.render_task(ev, "02-dificil").startswith("# 02-dificil — **FALHOU**")
 
 
 def test_event_line_sem_cor():

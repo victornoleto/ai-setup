@@ -73,11 +73,11 @@ Pendências anotadas durante a primeira execução real do orq v2 (gt-v3, 2026-0
 
 ## Relatórios
 
-- [ ] **Relatório por tarefa.** Um `NN-tarefa/report.md` ao terminar cada tarefa: resultado, resumo do
+- [x] **Relatório por tarefa.** Um `NN-tarefa/report.md` ao terminar cada tarefa: resultado, resumo do
   que foi feito, commits (`base..HEAD`), arquivos alterados (`--stat`), verificação, decisões, custo por
   papel e duração.
 
-- [ ] **Resumo da execução inteira.** No `run_end`, um `summary.md` no run dir: resultado geral, tempo
+- [x] **Resumo da execução inteira.** No `run_end`, um `summary.md` no run dir: resultado geral, tempo
   e custo totais (com detalhamento), tabela de tarefas com link para cada `report.md`, pontos que pedem
   atenção (decisões sem unanimidade, takeovers, intervenções). Avaliar reaproveitar a skill `entrega`
   sobre o intervalo de commits da fila.

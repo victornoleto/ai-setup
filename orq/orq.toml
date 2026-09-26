@@ -57,6 +57,9 @@ on_fail = "stop"           # stop | continue
 command = ""               # ex. "make test": roda na raiz do repo depois de cada execução; falhou = reprovada (gasta ciclo)
 timeout = "30m"
 
+[report]
+llm_summary = true         # no fim, o planejador (só leitura) escreve o resumo da entrega no journal
+
 [time]
 call_timeout = "4h"        # por chamada ao harness
 limit_max_wait = "8h"      # espera total máxima por limite de uso, por chamada

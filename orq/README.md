@@ -112,6 +112,9 @@ effort = "high"                  # claude: low…max · codex: minimal…high ·
 command = "make test"            # vazio = desligado; roda via sh -c na raiz do repo, sem push
 timeout = "30m"
 
+[report]
+llm_summary = true               # no fim, o planejador (só leitura) escreve "O que foi entregue" no journal
+
 [accounts.claude]
 default = "2"                    # 1 = ~/.claude (xclaude) · 2 = ~/.claude2 (xclaude2); por papel: account = "1"
 fallback = ""                    # "1": no limite de uso troca de conta em vez de esperar
@@ -129,7 +132,10 @@ O `queue.conf` das filas antigas continua sendo lido: `ORQ_ACCOUNT`, `ORQ_RULES_
 
 | Arquivo | O quê |
 |---|---|
-| `journal.md` | o relatório, regenerado a cada evento; comece pelo **"Leia primeiro"** |
+| `journal.md` | o resumo da execução, regenerado a cada evento: **"Leia primeiro"**, "O que foi entregue" (escrito
+pelo planejador no fim, só leitura) e uma linha por tarefa com link para o report |
+| `NN-tarefa/report.md` | o relatório da tarefa: plano, execuções, verificações, revisões, decisões, custo e a entrega
+(commits e arquivos alterados) |
 | `events.jsonl` | a fonte do journal e da timeline |
 | `state.json` | fase, ciclo e sessões de cada tarefa (o que o `resume` lê) |
 | `stream.log` / `orq.log` | o stream dos harnesses / o log corrido |

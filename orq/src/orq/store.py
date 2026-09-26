@@ -106,7 +106,10 @@ class RunStore:
             with open(self.events_path, "a") as fh:
                 fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
             try:
-                write_atomic(self.journal_path, journal.render(self.events()))
+                evs = self.events()
+                write_atomic(self.journal_path, journal.render(evs))
+                if ev.get("task") and (self.dir / ev["task"]).is_dir():
+                    write_atomic(self.dir / ev["task"] / "report.md", journal.render_task(evs, ev["task"]))
             except Exception as exc:  # o jsonl continua intacto; o journal é derivado
                 self.log(f"aviso: falha ao renderizar o journal: {exc}")
         return ev

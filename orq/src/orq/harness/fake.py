@@ -18,7 +18,7 @@ from pathlib import Path
 from ..config import Role
 from .base import CallRequest, CallResult, Harness, OnLine
 
-SCHEMA_KEYS = {"summary": "plan", "status": "execute", "verdict": "review", "option_id": "vote", "reply": "operator"}
+SCHEMA_KEYS = {"summary": "plan", "status": "execute", "verdict": "review", "option_id": "vote", "reply": "operator", "narrative": "summary"}
 
 
 def schema_key(schema: dict) -> str:
@@ -55,6 +55,8 @@ class FakeHarness(Harness):
         counts[ck] = i + 1
         counter.parent.mkdir(parents=True, exist_ok=True)
         counter.write_text(json.dumps(counts))
+        if not seq and key == "summary":  # resumo final: resposta padrão, para não exigir no script de todo teste
+            seq = [{"narrative": "(fake) resumo da execução"}]
         if not seq:
             return CallResult(error="fatal", message=f"fake: sem resposta para {ck}")
         resp = dict(seq[min(i, len(seq) - 1)])
