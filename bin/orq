@@ -1,0 +1,188 @@
+#!/usr/bin/env bash
+# orq — fila de tarefas para o Claude Code: o planejador (Opus) planeja e revisa, o executor (Sonnet) executa, até
+# ORQ_MAX_CYCLES ciclos; depois o planejador assume. Dúvidas vão a um conselho de votantes com desempate.
+# Tudo fica num journal.md por execução. Documentação: ~/.ai-setup/orq/README.md
+set -euo pipefail
+
+ORQ_HOME=$(cd "$(dirname "$(readlink -f "$0")")/../orq" && pwd -P)
+export ORQ_HOME
+for f in common claude council journal loop; do
+	# shellcheck source=/dev/null
+	. "$ORQ_HOME/lib/$f.sh"
+done
+
+usage() {
+	cat <<'EOF'
+Uso:
+  orq run <fila> [--repo DIR] [--account 1|2] [--run-dir DIR] [--dry-run]
+  orq resume <run-dir> [--account 1|2] [--retry NN-tarefa]...
+  orq status <run-dir>
+  orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
+  orq selftest
+
+Conta: 1 = xclaude (~/.claude), 2 = xclaude2 (~/.claude2). Padrão: ORQ_ACCOUNT de orq.conf (2).
+Fila: diretório com NN-nome.md (um prompt por tarefa, em ordem de nome) e queue.conf opcional.
+EOF
+}
+
+# Configuração: queue.conf (atribuições simples) → orq.conf (preenche o que falta) → flags (já exportadas antes).
+orq_load_config() {
+	local queue_conf=$1
+	# shellcheck source=/dev/null
+	[ -n "$queue_conf" ] && [ -f "$queue_conf" ] && . "$queue_conf"
+	# shellcheck source=/dev/null
+	. "$ORQ_HOME/orq.conf"
+	[ -n "${FLAG_ACCOUNT:-}" ] && ORQ_ACCOUNT=$FLAG_ACCOUNT
+	[ -n "${FLAG_REPO:-}" ] && ORQ_REPO=$FLAG_REPO
+	[ -n "$ORQ_REPO" ] && ORQ_REPO=$(cd "$ORQ_REPO" && pwd -P)
+	orq_account_dir "$ORQ_ACCOUNT" >/dev/null
+	return 0
+}
+
+orq_rules_text() {
+	local f=$ORQ_RULES_FILE
+	[ -z "$f" ] && { echo "(nenhuma)"; return; }
+	case "$f" in /*) ;; *) f="$QUEUE_DIR/$f" ;; esac
+	[ -f "$f" ] || orq_die "ORQ_RULES_FILE não existe: $f"
+	cat "$f"
+}
+
+orq_run_queue() {
+	local task result n=0 failed=0 stop=0
+	RULES_TEXT=$(orq_rules_text)
+	export ORQ_REPO
+	orq_block_push "${ORQ_REPO:-.}"
+	trap 'orq_notice interrupted "Execução interrompida (sinal). Continue com: orq resume $RUN_DIR"; exit 130' INT TERM
+
+	for task in "$QUEUE_DIR"/[0-9]*.md; do
+		[ -e "$task" ] || orq_die "fila sem tarefas (NN-nome.md) em $QUEUE_DIR"
+		n=$((n + 1))
+		if [ "$stop" = 1 ]; then continue; fi
+		orq_log "=== tarefa $n: $(basename "$task")"
+		orq_run_task "$task"
+		result=$(orq_state_get "$(basename "$task" .md)" result)
+		case "$result" in
+			ok|ok_takeover) ;;
+			*) failed=$((failed + 1))
+			   [ "$ORQ_ON_FAIL" = stop ] && { stop=1; orq_log "ORQ_ON_FAIL=stop: a fila para aqui"; } ;;
+		esac
+	done
+
+	local summary cost
+	cost=$(cat "$RUN_DIR/cost" 2>/dev/null || echo 0)
+	if [ "$stop" = 1 ]; then summary="parada na tarefa que falhou ($failed com problema)"
+	elif [ "$failed" -gt 0 ]; then summary="$failed tarefa(s) com problema"
+	else summary="todas as $n tarefas ok"; fi
+	orq_event run_end "$(jq -cn --arg r "$summary" --arg c "$cost" '{result: $r, cost: $c}')"
+	orq_log "fim: $summary · journal: $RUN_DIR/journal.md"
+	orq_notify "Fila terminou: $summary"
+	trap - INT TERM
+	[ "$failed" = 0 ]
+}
+
+cmd_run() {
+	local queue="" run_dir="" dry=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--repo) FLAG_REPO=$2; shift 2 ;;
+			--account) FLAG_ACCOUNT=$2; shift 2 ;;
+			--run-dir) run_dir=$2; shift 2 ;;
+			--dry-run) dry=1; shift ;;
+			-*) orq_die "opção desconhecida: $1" ;;
+			*) queue=$1; shift ;;
+		esac
+	done
+	[ -n "$queue" ] && [ -d "$queue" ] || orq_die "informe o diretório da fila"
+	QUEUE_DIR=$(cd "$queue" && pwd -P)
+	orq_load_config "$QUEUE_DIR/queue.conf"
+	ORQ_DRY_RUN=$dry; export ORQ_DRY_RUN
+	RUN_DIR=${run_dir:-$QUEUE_DIR/runs/$(date +%F-%H%M)$([ "$dry" = 1 ] && echo -dry-run)}
+	mkdir -p "$RUN_DIR"; RUN_DIR=$(cd "$RUN_DIR" && pwd -P)
+	[ -f "$RUN_DIR/state.json" ] && orq_die "$RUN_DIR já tem uma execução; use orq resume"
+
+	jq -n --arg q "$QUEUE_DIR" --arg a "$ORQ_ACCOUNT" '{queue: $q, account: $a, tasks: {}}' > "$RUN_DIR/state.json"
+	: > "$RUN_DIR/events.jsonl"
+	orq_event run_start "$(jq -cn --arg queue "$(basename "$QUEUE_DIR")" --arg repo "${ORQ_REPO:-$PWD}" \
+		--arg account "$ORQ_ACCOUNT" --arg planner "$ORQ_PLANNER_MODEL $ORQ_PLANNER_EFFORT" \
+		--arg executor "$ORQ_EXECUTOR_MODEL $ORQ_EXECUTOR_EFFORT" --arg voter "$ORQ_VOTER_MODEL $ORQ_VOTER_EFFORT" \
+		--arg tiebreak "$ORQ_TIEBREAK_MODEL $ORQ_TIEBREAK_EFFORT" --argjson voters "$ORQ_VOTERS" \
+		--argjson max "$ORQ_MAX_CYCLES" \
+		'{queue: $queue, repo: $repo, account: $account, planner: $planner, executor: $executor, voter: $voter,
+		  tiebreak: $tiebreak, voters: $voters, max_cycles: $max}')"
+	orq_log "run dir: $RUN_DIR"
+	orq_run_queue
+}
+
+cmd_resume() {
+	local run_dir="" retry=() id
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--account) FLAG_ACCOUNT=$2; shift 2 ;;
+			--retry) retry+=("$2"); shift 2 ;;
+			*) run_dir=$1; shift ;;
+		esac
+	done
+	[ -f "$run_dir/state.json" ] || orq_die "não é um run dir: $run_dir"
+	RUN_DIR=$(cd "$run_dir" && pwd -P)
+	# --retry ID: a tarefa recomeça do zero (o que ela já commitou fica; o plano novo parte do HEAD atual).
+	for id in "${retry[@]}"; do
+		jq --arg id "$id" 'del(.tasks[$id])' "$RUN_DIR/state.json" > "$RUN_DIR/state.json.tmp" \
+			&& mv "$RUN_DIR/state.json.tmp" "$RUN_DIR/state.json"
+		mv "$RUN_DIR/$id" "$RUN_DIR/$id.tentativa-$(date +%H%M%S)" 2>/dev/null || true
+		orq_notice retry "Tarefa $id recomeça do zero (orq resume --retry)."
+	done
+	QUEUE_DIR=$(jq -r '.queue' "$RUN_DIR/state.json")
+	orq_load_config "$QUEUE_DIR/queue.conf"
+	ORQ_DRY_RUN=0; export ORQ_DRY_RUN
+	orq_notice resumed "Execução retomada."
+	orq_run_queue
+}
+
+cmd_status() {
+	local run_dir=${1:-}
+	[ -f "$run_dir/state.json" ] || orq_die "não é um run dir: $run_dir"
+	jq -r '.tasks | to_entries[] | "\(.key)\t\(.value.result // ("em andamento: " + (.value.phase // "?")))\tciclo \(.value.cycle // 1)"' \
+		"$run_dir/state.json" | column -t -s $'\t'
+	echo "journal: $run_dir/journal.md"
+}
+
+cmd_decide() {
+	local question="" context="" opts=() q
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--option) opts+=("$2"); shift 2 ;;
+			--context) context=$2; shift 2 ;;
+			--repo) FLAG_REPO=$2; shift 2 ;;
+			--account) FLAG_ACCOUNT=$2; shift 2 ;;
+			*) question=$1; shift ;;
+		esac
+	done
+	[ -n "$question" ] && [ "${#opts[@]}" -ge 2 ] || orq_die 'uso: orq decide "<pergunta>" --option a="…" --option b="…"'
+	orq_load_config ""
+	QUEUE_DIR=$PWD
+	RUN_DIR=$(mktemp -d "${TMPDIR:-/tmp}/orq-decide-XXXX")
+	jq -n '{tasks: {}}' > "$RUN_DIR/state.json"; : > "$RUN_DIR/events.jsonl"
+	orq_event run_start "$(jq -cn --arg repo "${ORQ_REPO:-$PWD}" --arg a "$ORQ_ACCOUNT" \
+		--arg v "$ORQ_VOTER_MODEL $ORQ_VOTER_EFFORT" --arg t "$ORQ_TIEBREAK_MODEL $ORQ_TIEBREAK_EFFORT" \
+		--argjson n "$ORQ_VOTERS" \
+		'{queue: "decide", repo: $repo, account: $a, planner: "-", executor: "-", voter: $v, tiebreak: $t, voters: $n, max_cycles: 0}')"
+	q=$(printf '%s\n' "${opts[@]}" | jq -Rn --arg question "$question" --arg context "${context:-(sem contexto)}" \
+		'{id: "decide", question: $question, context: $context,
+		  options: [inputs | capture("^(?<id>[^=]+)=(?<rest>.*)$") | {id, label: (.rest | split(":")[0]), detail: .rest}]}')
+	TASK_ID=decide; TASK_DIR="$RUN_DIR/decide"; TASK_TEXT="(decisão avulsa)"; RULES_TEXT="(nenhuma)"
+	PLAN_FILE="(nenhum)"; DECISIONS_FILE="$TASK_DIR/decisions.md"; mkdir -p "$TASK_DIR"
+	orq_council "linha de comando" "$q"
+	echo "detalhes: $RUN_DIR/journal.md" >&2
+}
+
+cmd_selftest() { bash "$ORQ_HOME/tests/selftest.sh"; }
+
+case "${1:-}" in
+	run) shift; cmd_run "$@" ;;
+	resume) shift; cmd_resume "$@" ;;
+	status) shift; cmd_status "$@" ;;
+	decide) shift; cmd_decide "$@" ;;
+	selftest) shift; cmd_selftest "$@" ;;
+	-h|--help|help|"") usage ;;
+	*) usage; exit 1 ;;
+esac

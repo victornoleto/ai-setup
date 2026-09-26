@@ -48,7 +48,8 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 │   ├── opencode/          opencode.jsonc, AGENTS.md, package.json
 │   └── antigravity/       skills.json (aponta o agy para ~/.agents/skills)
 ├── skills/                skills nossas, um link por harness (UPSTREAM.md: as copiadas)
-├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff)
+├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff), orq
+├── orq/                   fila de tarefas Opus planeja/revisa, Sonnet executa, conselho decide (README)
 ├── sync/memory/
 │   ├── GLOBAL.md          quem é o Victor, em qualquer máquina
 │   └── machine/pc.md      o que só vale nesta máquina
@@ -138,6 +139,10 @@ symlink sumiria na primeira reescrita. Arquivo real no caminho vira `<nome>.pre-
 container do ai-memory healthy, memória nativa do Claude Code e do Codex **desligada**, skills sem
 cópia duplicada, plugins substituídos desligados, Codex sem confiança em `/home`, nenhum hook do
 Orca, tamanho do `GLOBAL.md` e idade das skills copiadas.
+
+**`bin/orq`** roda uma fila de tarefas sem supervisão: o Opus planeja e revisa, o Sonnet executa, e as dúvidas
+vão a um conselho de 3 votantes. Escreve um journal por execução. Uso e formato da fila em
+[`orq/README.md`](orq/README.md); no PATH por `~/.local/bin/orq`.
 
 ## Máquina nova
 
