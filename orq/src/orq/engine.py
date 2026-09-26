@@ -17,7 +17,7 @@ from pathlib import Path
 from . import context, council, harness as harness_mod
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
-from .harness.base import CallRequest, Harness, shorten_paths
+from .harness.base import CallRequest, Harness, run_process, shorten_paths
 from .store import RunStore
 
 OK_RESULTS = ("ok", "ok_takeover", "skipped")
@@ -354,7 +354,7 @@ class Engine:
                 s.set(t.id, "exec_mode", "resume")
                 (t.dir / f"exec-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
                 self.exec_event(t, out, cycle, f"executor, {self.cfg.roles['executor'].label()}")
-                phase = await self.after_exec(t, out, "exec_answers", "review")
+                phase = await self.after_exec(t, out, "exec_answers", "verify")
 
             elif phase == "exec_answers":
                 p = t.dir / f"exec_answers-{hms()}.prompt.md"
@@ -363,22 +363,16 @@ class Engine:
                 s.set(t.id, "next_exec_prompt", str(p))
                 phase = "exec"
 
+            elif phase == "verify":
+                ok, verify_md = await self.verify(t, cycle)
+                phase = "review" if ok else self.reject(t, cycle, verify_md)
+
             elif phase == "review":
                 report = _read(t.dir / f"exec-{cycle}.out.json", "{}")
                 verdict, review_md = await self.review(t, "planner", psid, True, report, "executor", cycle)
                 if verdict == "approved":
                     self.end(t, "ok", f"Aprovada pelo revisor no ciclo {cycle}.")
-                if cycle < self.cfg.max_cycles:
-                    cycle += 1
-                    s.set(t.id, "cycle", cycle)
-                    p = t.dir / f"fix-{cycle}.prompt.md"
-                    p.write_text(prompt("fix", CYCLE=cycle - 1, MAX_CYCLES=self.cfg.max_cycles, REVIEW=review_md))
-                    s.set(t.id, "next_exec_prompt", str(p))
-                    phase = "exec"
-                else:
-                    (t.dir / "takeover.prompt.md").write_text(
-                        prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=review_md))
-                    phase = "takeover"
+                phase = self.reject(t, cycle, review_md)
 
             elif phase == "takeover":
                 out, _ = await self.call(t, "planner", f"takeover-{hms()}", "execute",
@@ -387,12 +381,19 @@ class Engine:
                     self.end(t, "failed", "O takeover do planejador falhou.")
                 (t.dir / "takeover.out.json").write_text(json.dumps(out, ensure_ascii=False))
                 self.exec_event(t, out, cycle + 1, f"planejador assumiu, {self.cfg.roles['planner'].label()}")
-                phase = await self.after_exec(t, out, "takeover_answers", "final_review")
+                phase = await self.after_exec(t, out, "takeover_answers", "final_verify")
 
             elif phase == "takeover_answers":
                 (t.dir / "takeover.prompt.md").write_text(prompt(
                     "exec_answers", ANSWERS=(t.dir / "answers.last").read_text(), DECISIONS_FILE=t.decisions_file))
                 phase = "takeover"
+
+            elif phase == "final_verify":
+                ok, _ = await self.verify(t, cycle + 1)
+                if not ok:
+                    self.end(t, "failed", "A verificação automática falhou depois de o planejador assumir "
+                                          f"(ver {t.id}/verify-{cycle + 1}.log).")
+                phase = "final_review"
 
             elif phase == "final_review":
                 rsid = s.get(t.id, "final_review_sid")
@@ -405,6 +406,38 @@ class Engine:
                 self.end(t, "failed", "Nem o takeover do planejador passou na revisão independente.")
             else:
                 raise RuntimeError(f"fase desconhecida: {phase}")
+
+    def reject(self, t: Task, cycle: int, why_md: str) -> str:
+        """Entrega reprovada (revisão ou verificação): próximo ciclo do executor ou, no último, o takeover."""
+        if cycle < self.cfg.max_cycles:
+            self.s.set(t.id, "cycle", cycle + 1)
+            p = t.dir / f"fix-{cycle + 1}.prompt.md"
+            p.write_text(prompt("fix", CYCLE=cycle, MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
+            self.s.set(t.id, "next_exec_prompt", str(p))
+            return "exec"
+        (t.dir / "takeover.prompt.md").write_text(prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
+        return "takeover"
+
+    async def verify(self, t: Task, cycle: int) -> tuple[bool, str]:
+        """Roda o `[verify] command` na raiz do repo. → (passou?, texto para o prompt). Sem comando: passa calado."""
+        cmd = self.cfg.verify_command
+        if not cmd:
+            return True, ""
+        await self.checkpoint(t)
+        log = t.dir / f"verify-{cycle}.log"
+        started = time.time()
+        rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.cfg.repo, self.git_env,
+                                             self.cfg.verify_timeout, log, lambda _: None)
+        log.with_suffix(".err").unlink(missing_ok=True)  # stderr já vai junto no log
+        ok, secs = rc == 0 and not timed_out, int(time.time() - started)
+        self.s.event("verify", {"task": t.id, "cycle": cycle, "command": cmd, "ok": ok, "exit": rc,
+                                "timed_out": timed_out, "duration_s": secs, "log_rel": f"{t.id}/verify-{cycle}.log"})
+        status = "passou" if ok else "estourou o timeout" if timed_out else f"falhou (código de saída {rc})"
+        tail = log.read_text(errors="replace").splitlines()[-(30 if ok else 80):]
+        md = (f"Verificação automática `{cmd}`: {status}, em {secs} s. Últimas linhas da saída:\n\n```\n"
+              + "\n".join(tail) + "\n```\n")
+        (t.dir / f"verify-{cycle}.md").write_text(md)
+        return ok, md
 
     def exec_event(self, t: Task, out: dict, cycle: int, actor: str) -> None:
         self.s.event("exec", {"task": t.id, "cycle": cycle, "actor": actor, **{
@@ -427,7 +460,8 @@ class Engine:
                      sid_key: str | None = None) -> tuple[str, str]:
         out, new_sid = await self.call(t, role, f"review-{cycle}-{hms()}", "review", prompt(
             "review", BASE=t.base_prompt, PLAN_FILE=t.plan_file, DECISIONS_FILE=t.decisions_file,
-            BASE_SHA=self.s.get(t.id, "base"), ACTOR=actor, CYCLE=cycle, EXEC_REPORT=report), sid, resume=resume)
+            BASE_SHA=self.s.get(t.id, "base"), ACTOR=actor, CYCLE=cycle, EXEC_REPORT=report,
+            VERIFY=_read(t.dir / f"verify-{cycle}.md", "Nenhuma verificação automática configurada.")), sid, resume=resume)
         if out is None:
             self.end(t, "failed", f"A revisão (ciclo {cycle}) falhou.")
         if sid_key:

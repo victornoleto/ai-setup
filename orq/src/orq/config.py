@@ -90,6 +90,14 @@ class Config:
     def voters(self) -> int:
         return self.roles["voter"].count
 
+    @property
+    def verify_command(self) -> str:
+        return str(self.get("verify", "command", default="") or "").strip()
+
+    @property
+    def verify_timeout(self) -> int:
+        return parse_duration(self.get("verify", "timeout", default="30m"))
+
     def seconds(self, key: str) -> int:
         return parse_duration(self.get("time", key))
 
@@ -219,6 +227,7 @@ def load(queue_dir: Path | None, flags: dict | None = None, env: dict | None = N
             cfg.account_dir(cfg.roles[name].account)
     for key in ("call_timeout", "limit_max_wait", "limit_poll"):
         cfg.seconds(key)
+    cfg.verify_timeout  # valida a duração já no load
     if cfg.on_fail not in ("stop", "continue"):
         raise ConfigError(f"loop.on_fail inválido: {cfg.on_fail}")
     return cfg

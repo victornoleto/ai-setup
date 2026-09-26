@@ -53,6 +53,10 @@ max_cycles = 3             # execuções revisadas antes de o planejador assumir
 max_decision_rounds = 5    # rodadas de conselho por tarefa (trava contra laço de dúvidas)
 on_fail = "stop"           # stop | continue
 
+[verify]
+command = ""               # ex. "make test": roda na raiz do repo depois de cada execução; falhou = reprovada (gasta ciclo)
+timeout = "30m"
+
 [time]
 call_timeout = "4h"        # por chamada ao harness
 limit_max_wait = "8h"      # espera total máxima por limite de uso, por chamada

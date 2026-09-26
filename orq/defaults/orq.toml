@@ -15,6 +15,11 @@ rules_file = "regras.md"
 # model = "gpt-5.6-sol"
 # effort = "high"
 
+# Verificação automática depois de cada execução, antes da revisão. Falhou = reprovada (gasta um ciclo).
+# [verify]
+# command = "make test"
+# timeout = "30m"
+
 # [loop]
 # max_cycles = 3
 # on_fail = "stop"         # stop | continue

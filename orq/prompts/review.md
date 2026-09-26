@@ -9,6 +9,10 @@ O plano está em `{{PLAN_FILE}}`; as decisões, em `{{DECISIONS_FILE}}` (se exis
 {{EXEC_REPORT}}
 </relatorio>
 
+<verificacao>
+{{VERIFY}}
+</verificacao>
+
 1. Leia `git log --oneline {{BASE_SHA}}..HEAD`, `git diff {{BASE_SHA}}..HEAD` e `git status`.
 2. Confira contra o plano, as decisões, a tarefa e as regras. Rode os comandos de verificação do plano.
 3. **Não altere o repositório.**

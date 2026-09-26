@@ -10,9 +10,9 @@ from ..journal import event_line
 from ..store import RunStore
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
-               "exec": "executando", "exec_answers": "executando", "review": "revisando",
+               "exec": "executando", "exec_answers": "executando", "verify": "verificando", "review": "revisando",
                "takeover": "planejador assumiu", "takeover_answers": "planejador assumiu",
-               "final_review": "revisão final"}
+               "final_verify": "verificação final", "final_review": "revisão final"}
 RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "failed": ("✗", "FALHOU"),
           "blocked": ("✗", "BLOQUEADA"), "skipped": ("⊘", "pulada")}
 
@@ -64,7 +64,7 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None) -> 
             glyph = "⏸" if is_paused else "▶"
             status = PHASE_LABEL.get(phase, phase)
             cycle = t.get("cycle", 1)
-            if phase in ("exec", "exec_answers", "review") and cycle:
+            if phase in ("exec", "exec_answers", "verify", "review") and cycle:
                 status += f" c{cycle}"
             extra = fmt_dur(now - t["started"]) if t.get("started") else ""
         else:

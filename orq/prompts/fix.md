@@ -1,4 +1,4 @@
-O revisor reprovou a entrega (ciclo {{CYCLE}} de {{MAX_CYCLES}}).
+A entrega foi reprovada (ciclo {{CYCLE}} de {{MAX_CYCLES}}), pela revisão ou pela verificação automática.
 
 {{REVIEW}}
 

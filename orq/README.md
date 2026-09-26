@@ -4,8 +4,10 @@ Roda uma fila de tarefas sem supervisão, com papéis separados e **uma sessão 
 
 1. O **planejador** lê a tarefa e o repositório e escreve o plano.
 2. O **executor** executa e commita.
-3. O planejador **revisa**. Se reprovar, o executor corrige, até `max_cycles` (3) execuções revisadas.
-4. Reprovado no último ciclo, o planejador **assume**; um **revisor** em sessão nova confere.
+3. Se houver `[verify] command`, o orq o roda: falhou, a entrega volta ao executor sem revisão (gasta um ciclo).
+   Passou, o planejador **revisa**, com a saída do comando à mão. Se reprovar, o executor corrige, até `max_cycles` (3) execuções revisadas.
+4. Reprovado no último ciclo, o planejador **assume**; a verificação roda de novo e um **revisor** em sessão
+   nova confere.
 5. Toda **dúvida** vai a um **conselho**: N votantes em paralelo, só leitura. Unânime = **3 pontos**; maioria =
    **2 pontos**; sem maioria, o desempatador decide = **2,5 pontos**.
 6. Cada sessão recebe o **progresso** da fila: o que já foi feito (resumo e commits), a tarefa atual e o que falta.
@@ -104,6 +106,10 @@ harness = "codex"                # claude | codex | opencode
 model = "gpt-5.6-sol"            # opencode: "provedor/modelo", ex. "openrouter/~deepseek/deepseek-v4-flash-latest"
 effort = "high"                  # claude: low…max · codex: minimal…high · opencode: --variant
 
+[verify]
+command = "make test"            # vazio = desligado; roda via sh -c na raiz do repo, sem push
+timeout = "30m"
+
 [accounts.claude]
 default = "2"                    # 1 = ~/.claude (xclaude) · 2 = ~/.claude2 (xclaude2); por papel: account = "1"
 fallback = ""                    # "1": no limite de uso troca de conta em vez de esperar
@@ -127,9 +133,10 @@ O `queue.conf` das filas antigas continua sendo lido: `ORQ_ACCOUNT`, `ORQ_RULES_
 | `stream.log` / `orq.log` | o stream dos harnesses / o log corrido |
 | `inbox.jsonl` | os comandos do painel e do `orq send` |
 | `NN-tarefa/plan.md`, `decisions.md` | o plano e as decisões |
+| `NN-tarefa/verify-<ciclo>.log` | a saída completa da verificação automática |
 | `NN-tarefa/calls/*` | prompt, stream cru e resposta de cada chamada |
 
-Etiquetas do journal e da timeline: **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
+Etiquetas do journal e da timeline: **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
 **[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDENTE]**,
 **[DESTAQUE]**, **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
 **[AJUSTE]**, **[OPERADOR]**.

@@ -8,6 +8,7 @@ import pytest
 
 from orq import config, council
 from orq.engine import Engine, block_push_env, reset_wait
+from orq.journal import event_line
 from orq.store import RunStore
 
 ROLES_FAKE = "\n".join(f'[roles.{r}]\nharness = "fake"\nmodel = "script.json"\n'
@@ -180,3 +181,78 @@ def test_reset_wait():
     assert reset_wait("limit reached, resets 3am", 1800, now) == 5 * 3600 + 120
     assert reset_wait("resets at 11:30 PM", 1800, now) == 90 * 60 + 120
     assert reset_wait("sem horário", 1800, now) == 1800
+
+
+# --- verificação determinística ([verify] command) ------------------------------------------------------------------
+def verifies(e: Engine) -> list[dict]:
+    return [x for x in e.s.events() if x["type"] == "verify"]
+
+
+async def test_verificacao_passa_e_vai_para_a_revisao(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml='[verify]\ncommand = "echo tudo certo; test -f a.txt"\n')
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert e.s.get("01-a", "result") == "ok"
+    assert [(v["cycle"], v["ok"]) for v in verifies(e)] == [(1, True)]
+    assert "tudo certo" in (e.s.dir / "01-a" / "verify-1.log").read_text()
+    review = next((e.s.dir / "01-a" / "calls").glob("review-1-*.prompt.md")).read_text()
+    assert "echo tudo certo; test -f a.txt" in review and "passou" in review and "tudo certo" in review
+    assert "verificação automática: passou" in e.s.journal_path.read_text()
+    assert event_line(verifies(e)[0]).startswith("[VERIFICAÇÃO c1] 01-a: passou")
+
+
+async def test_verificacao_falha_gasta_um_ciclo_sem_revisao(tmp_path):
+    cmd = 'n=$(wc -l < a.txt); echo "linhas: $n"; [ "$n" -ge 2 ]'
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml=f"[verify]\ncommand = '{cmd}'\n")
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert e.s.get("01-a", "result") == "ok"
+    assert [(v["cycle"], v["ok"]) for v in verifies(e)] == [(1, False), (2, True)]
+    assert [x["cycle"] for x in e.s.events() if x["type"] == "review"] == [2]
+    fix = (e.s.dir / "01-a" / "fix-2.prompt.md").read_text()
+    assert "linhas: 1" in fix and "verificação" in fix.lower()
+
+
+async def test_verificacao_sempre_falha_termina_falhada_depois_do_takeover(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml='[verify]\ncommand = "echo quebrou; false"\n')
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    assert e.s.get("01-a", "result") == "failed"
+    assert [v["cycle"] for v in verifies(e)] == [1, 2, 3, 4]
+    assert "review" not in types(e)
+    assert "quebrou" in (e.s.dir / "01-a" / "takeover.prompt.md").read_text()
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert "verificação" in end["reason"].lower()
+
+
+async def test_verificacao_com_timeout_conta_como_falha(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml='[loop]\nmax_cycles = 1\n[verify]\ncommand = "sleep 5"\ntimeout = "1s"\n')
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    assert [(v["ok"], v["timed_out"]) for v in verifies(e)] == [(False, True), (False, True)]
+
+
+async def test_retomada_na_fase_de_verificacao(tmp_path):
+    solto = tmp_path / "solto"
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml=f'[verify]\ncommand = "while [ ! -f {solto} ]; do sleep 0.1; done"\n')
+    e = engine(tmp_path, cfg)
+    task = asyncio.create_task(e.run())
+    for _ in range(200):
+        await asyncio.sleep(0.02)
+        if e.s.get("01-a", "phase") == "verify":
+            break
+    assert e.s.get("01-a", "phase") == "verify"
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    solto.write_text("")
+    e2 = Engine(cfg, RunStore(e.s.dir))
+    assert await e2.run()
+    assert e2.s.get("01-a", "result") == "ok"
+    assert types(e2).count("exec") == 1  # a execução não foi refeita
+    assert [v["ok"] for v in verifies(e2)] == [True]

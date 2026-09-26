@@ -52,6 +52,12 @@ def result_label(r) -> str:
     return "em andamento" if r is None else RESULT_LABEL.get(r, r)
 
 
+def verify_label(e: dict) -> str:
+    if e["ok"]:
+        return "passou"
+    return "**estourou o timeout**" if e.get("timed_out") else f"**falhou** (código {e.get('exit')})"
+
+
 def _hm(ts: str) -> str:
     return ts[0:16].replace("T", " ", 1)
 
@@ -101,6 +107,9 @@ def _section(e: dict) -> str | None:
         if e.get("highlights"):
             out += "\n**Destaques:**\n" + "\n".join(f"- {esc(h)}" for h in e["highlights"]) + "\n"
         return out
+    if t == "verify":
+        return (f"### Ciclo {e['cycle']} — verificação automática: {verify_label(e)}\n\n"
+                f"`{esc(e['command'])}` em {dur(e.get('duration_s'))}. Saída: [{e['log_rel']}]({e['log_rel']})\n")
     if t == "notice":
         return f"> **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** {esc(e['text'])}\n"
     if t == "task_end":
@@ -193,6 +202,8 @@ def event_line(e: dict) -> str | None:
         extra = f" · {len(e['pending'])} pendência(s)" if e.get("pending") else ""
         return (f"[EXECUÇÃO c{e['cycle']}] {task} ({e['actor']}): {STATUS_LABEL.get(e['status'], e['status']).replace('**', '')}"
                 f" · {len(e.get('commits') or [])} commit(s){extra} — {_clip(e['summary'], 200)}")
+    if t == "verify":
+        return f"[VERIFICAÇÃO c{e['cycle']}] {task}: {verify_label(e).replace('**', '')} · {dur(e.get('duration_s'))}"
     if t == "review":
         n = {s: sum(1 for i in e.get("issues") or [] if i["severity"] == s) for s in ("alta", "media", "baixa")}
         return (f"[REVISÃO c{e['cycle']}] {task}: {VERDICT_LABEL.get(e['verdict'], e['verdict']).replace('**', '')}"
