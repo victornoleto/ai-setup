@@ -203,6 +203,9 @@ def event_line(e: dict) -> str | None:
         return f"[{tag}] {task}: {_clip(e['question'], 120)} → `{e['choice']}` {e['label']}" + (f" (votos {votes})" if votes else "")
     if t == "notice":
         return f"[{NOTICE_LABEL.get(e['kind'], 'AVISO')}] " + (f"{task}: " if task else "") + _clip(e["text"], 300)
+    if t == "operator":
+        n = len(e.get("commands") or [])
+        return f"[OPERADOR] {_clip(e.get('reply', ''), 400)}" + (f" ({n} comando(s) propostos)" if n else "")
     if t == "control_ack":
         return f"[AJUSTE] {e.get('command')} → {e.get('result')}"
     return None

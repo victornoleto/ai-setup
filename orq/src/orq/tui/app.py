@@ -199,6 +199,8 @@ class OrqApp(App):
         if text.startswith("/edit"):
             self.edit_task(text[5:].strip())
             return
+        if not self.store.engine_alive():
+            self.local("✗ motor parado: o comando fica na caixa de entrada e vale no próximo orq resume")
         if text.startswith("/"):
             self.store.send(text)
             self.local(f"› {text}")

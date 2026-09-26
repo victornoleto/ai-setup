@@ -152,12 +152,12 @@ class Engine:
         return lambda line: self.s.stream(f"  [{name}] {shorten_paths(line, self.cfg.repo, self.s.dir)}")
 
     async def call(self, t: Task | None, role_name: str, name: str, schema_name: str, prompt_text: str,
-                   sid: str | None = None, resume: bool = False) -> tuple[dict | None, str | None]:
+                   sid: str | None = None, resume: bool = False, gate: bool = True) -> tuple[dict | None, str | None]:
         """Uma chamada a um papel, com as tentativas. → (saída estruturada ou None, id da sessão)."""
         role = self.cfg.roles[role_name]
         h = self.harness(role.harness)
         account = role.account
-        calls_dir = (t.dir if t else self.s.dir / "decide") / "calls"
+        calls_dir = (t.dir if t else self.s.dir / "operator") / "calls"
         calls_dir.mkdir(parents=True, exist_ok=True)
         (calls_dir / f"{name}.prompt.md").write_text(prompt_text)
         if not resume and not sid and h.preset_session_ids:
@@ -165,7 +165,8 @@ class Engine:
         waited, tries, asked_again = 0, 0, False
         limit_s = self.cfg.seconds("limit_max_wait")
         tid = t.id if t else ""
-        await self.checkpoint(t)
+        if gate:  # o operador responde mesmo com a execução pausada
+            await self.checkpoint(t)
         while True:
             tries += 1
             seen = len(self.s.events())

@@ -62,3 +62,17 @@ async def test_tela_estreita(tmp_path):
         assert not app.query_one("#right").display
         await pilot.press("ctrl+t")
         assert app.query_one("#right").display and not app.query_one("#left").display
+
+
+async def test_confirmacao_do_operador(tmp_path):
+    from orq.tui.app import ConfirmScreen
+    e = await finished_run(tmp_path)
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        app.pending_ops.add("op1")
+        e.s.event("operator", {"id": "op1", "text": "x", "reply": "Faço assim.", "commands": ["/note y"]})
+        await pilot.pause(0.8)
+        assert isinstance(app.screen, ConfirmScreen)
+        await pilot.press("y")
+        await pilot.pause()
+        assert '"/note y"' in e.s.inbox_path.read_text()
