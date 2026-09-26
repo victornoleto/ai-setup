@@ -1,0 +1,70 @@
+# orq — configuração global. Precedência, da mais fraca para a mais forte:
+#   este arquivo → <fila>/orq.toml → variáveis ORQ_* (nomes do orq.conf antigo) → flags (--account, --repo).
+# A fila só repete o que muda (ex.: [roles.executor] harness = "codex").
+#
+# harness: claude | codex | opencode (OpenRouter: harness = "opencode", model = "openrouter/<modelo>")
+# effort: claude → low|medium|high|max · codex → minimal|low|medium|high · opencode → --variant do provedor
+
+[roles.planner]      # planeja, revisa cada ciclo e assume no último
+harness = "claude"
+model = "claude-opus-5-5"
+effort = "high"
+
+[roles.executor]     # executa e commita
+harness = "claude"
+model = "claude-sonnet-5"
+effort = "high"
+
+[roles.reviewer]     # revisão independente, em sessão nova, depois do takeover
+harness = "claude"
+model = "claude-opus-5-5"
+effort = "high"
+
+[roles.voter]        # conselho: votam em paralelo, só leitura
+harness = "claude"
+model = "claude-opus-5-5"
+effort = "high"
+count = 3
+
+[roles.tiebreak]     # desempate quando o conselho não tem maioria
+harness = "claude"
+model = "claude-opus-5-5"
+effort = "max"
+
+[roles.operator]     # chat do painel: traduz texto livre em comandos
+harness = "claude"
+model = "claude-sonnet-5"
+effort = "medium"
+
+[roles.wizard]       # orq new: monta a fila com você, em sessão interativa
+harness = "claude"
+model = "claude-opus-5-5"
+effort = "high"
+
+# Conta do claude por papel: `account = 1` no papel; vazio = default. Os aliases xclaude/xclaude2 não valem
+# em script: o orq faz o que eles fazem (CLAUDE_CONFIG_DIR + permissões).
+[accounts.claude]
+default = "2"
+fallback = ""        # vazio: no limite de uso, espera o reset; "1" ou "2": troca para essa conta
+dirs = { "1" = "~/.claude", "2" = "~/.claude2" }
+
+[loop]
+max_cycles = 3             # execuções revisadas antes de o planejador assumir
+max_decision_rounds = 5    # rodadas de conselho por tarefa (trava contra laço de dúvidas)
+on_fail = "stop"           # stop | continue
+
+[time]
+call_timeout = "4h"        # por chamada ao harness
+limit_max_wait = "8h"      # espera total máxima por limite de uso, por chamada
+limit_poll = "30m"         # espera quando a mensagem não traz o horário do reset
+
+[run]
+repo = ""                  # vazio: o toplevel git da pasta da fila
+rules_file = ""            # regras anexadas a todo prompt (relativo à fila)
+
+[ui]
+stream = "main"            # main (sem os votantes) | all | none
+thinking = false
+
+[test]
+force_changes = false      # força a revisão do planejador a reprovar (exercita o takeover)

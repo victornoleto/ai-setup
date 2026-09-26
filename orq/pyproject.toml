@@ -1,0 +1,23 @@
+[project]
+name = "orq"
+version = "2.0.0"
+description = "Fila de tarefas para agentes de código: planejador, executor, revisor e conselho, com painel no terminal"
+requires-python = ">=3.12"
+dependencies = ["textual>=1.0", "jsonschema>=4.0"]
+
+[project.scripts]
+orq = "orq.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/orq"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

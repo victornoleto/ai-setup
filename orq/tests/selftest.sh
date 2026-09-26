@@ -14,7 +14,7 @@ check "três diferentes = desempate" "$(orq_tally "$(v a b c)" 3)" "tie"
 check "voto inválido + 2 iguais"    "$(orq_tally "$(v a a)" 3)"   "a 2"
 check "voto inválido + divergência" "$(orq_tally "$(v a b)" 3)"   "tie"
 
-md=$(jq -rs -f "$ORQ_HOME/lib/journal.jq" "$ORQ_HOME/tests/events.fixture.jsonl")
+md=$(jq -rs -f "$ORQ_HOME/lib/journal.jq" "$ORQ_HOME/tests/fixtures/events.jsonl")
 check "journal: falha no topo"      "$(grep -c '^- \*\*\[FALHOU\]\*\* \[02-dificil\]' <<< "$md")" 1
 check "journal: decisão 2,5 pts"    "$(grep -c 'DECISÃO 2,5 pts' <<< "$md")" 1
 check "journal: pendente"           "$(grep -c '^- \*\*\[PENDENTE\]\*\*' <<< "$md")" 1
@@ -37,7 +37,7 @@ check "segundos"                    "$(orq_seconds 4h)" 14400
 
 # Conselho de ponta a ponta com o orq_call trocado por um dublê: votos a, b, c → desempate escolhe b (2,5 pts).
 RUN_DIR="$tmp/run"; mkdir -p "$RUN_DIR"; jq -n '{tasks: {}}' > "$RUN_DIR/state.json"
-cp "$ORQ_HOME/tests/events.fixture.jsonl" "$RUN_DIR/events.jsonl"
+cp "$ORQ_HOME/tests/fixtures/events.jsonl" "$RUN_DIR/events.jsonl"
 TASK_ID=t; TASK_DIR="$RUN_DIR/t"; TASK_TEXT=x; RULES_TEXT=x; PLAN_FILE=x; DECISIONS_FILE="$TASK_DIR/decisions.md"
 mkdir -p "$TASK_DIR"
 orq_call() {  # ROLE NAME SCHEMA PROMPT MODE SID OUT
