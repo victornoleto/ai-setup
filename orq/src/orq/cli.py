@@ -20,6 +20,7 @@ Uso:
   orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
   orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
   orq status <run-dir>
+  orq send <run-dir> "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
   orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
   orq selftest
 
@@ -99,7 +100,7 @@ def task_status_rows(store: RunStore, queue_dir: Path) -> list[tuple[str, str, s
     for f in sorted(queue_dir.glob("[0-9]*.md")):
         st = tasks.get(f.stem, {})
         res = st.get("result") or (f"em andamento: {st.get('phase')}" if st.get("phase") else "pendente")
-        rows.append((f.stem, res, f"ciclo {st.get('cycle', 1)}" if st else ""))
+        rows.append((f.stem, res, f"ciclo {st['cycle']}" if st.get("cycle") else ""))
     return rows
 
 
@@ -113,6 +114,25 @@ def cmd_status(args) -> int:
         print(f"{tid:<{w}}  {res:<28}  {cyc}")
     print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.top('cost', 0):.2f}")
     print(f"journal: {store.journal_path}")
+    return 0
+
+
+def cmd_send(args) -> int:
+    import time
+    store = RunStore(Path(args.run_dir))
+    if not store.exists():
+        die(f"não é um run dir: {args.run_dir}")
+    cmd = store.send(args.text, source="orq send")
+    if not store.engine_alive():
+        print("motor parado: o comando fica na caixa de entrada e vale no próximo orq resume")
+        return 0
+    for _ in range(50):
+        ack = next((e for e in store.events() if e["type"] == "control_ack" and e.get("id") == cmd["id"]), None)
+        if ack:
+            print(("ok: " if ack["ok"] else "recusado: ") + ack["result"])
+            return 0 if ack["ok"] else 1
+        time.sleep(0.1)
+    print("enviado; o motor ainda não respondeu (ver a timeline)")
     return 0
 
 
@@ -170,9 +190,12 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--context")
     d.add_argument("--repo")
     d.add_argument("--account")
+    se = sub.add_parser("send")
+    se.add_argument("run_dir")
+    se.add_argument("text")
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "decide": cmd_decide,
+    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "decide": cmd_decide,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")

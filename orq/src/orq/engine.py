@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import context, council, harness as harness_mod
 from .config import ORQ_HOME, Config
+from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, shorten_paths
 from .store import RunStore
 
@@ -100,6 +101,8 @@ class Engine:
         self.git_env: dict = {}
         self.stream_mode = str(cfg.get("ui", "stream", default="main"))
         self.thinking = bool(cfg.get("ui", "thinking", default=False))
+        self.handled: set[str] = set()   # tarefas por que o laço já passou nesta execução
+        self.control = Control(self)
 
     # --- infraestrutura -----------------------------------------------------------------------------
     def harness(self, name: str) -> Harness:
@@ -139,7 +142,8 @@ class Engine:
             self.s.set_top("sessions", sessions)
 
     async def checkpoint(self, t: Task | None) -> None:
-        """Ponto seguro entre duas chamadas: aqui entram os ajustes ao vivo (etapa de controle)."""
+        """Ponto seguro entre duas chamadas: pausa e parada pedidas pelo painel valem aqui."""
+        await self.control.checkpoint()
 
     def on_line_for(self, role: str, name: str):
         silent = self.stream_mode == "none" or (self.stream_mode == "main" and role in ("voter", "tiebreak"))
@@ -227,16 +231,26 @@ class Engine:
 
     async def run(self) -> bool:
         self.git_env = block_push_env(self.cfg.repo)
-        handled: set[str] = set()
-        failed, stop = 0, False
         if not self.task_files():
             raise SystemExit(f"orq: fila sem tarefas (NN-nome.md) em {self.cfg.queue_dir}")
+        poller = asyncio.create_task(self.control.loop())
+        try:
+            return await self._run_queue()
+        except StopRun:
+            self.s.notice("stopped", f"Execução parada pelo painel. Continue com: orq resume {self.s.dir}")
+            return True
+        finally:
+            poller.cancel()
+
+    async def _run_queue(self) -> bool:
+        failed, stop = 0, False
         while not stop:
-            todo = [f for f in self.task_files() if f.stem not in handled]  # relida a cada tarefa: /add entra aqui
+            await self.checkpoint(None)
+            todo = [f for f in self.task_files() if f.stem not in self.handled]  # relida a cada tarefa: /add entra aqui
             if not todo:
                 break
             f = todo[0]
-            handled.add(f.stem)
+            self.handled.add(f.stem)
             if self.s.get(f.stem, "phase") != "done":
                 self.s.log(f"=== tarefa: {f.name}")
                 await self.run_task(f)
@@ -245,6 +259,7 @@ class Engine:
                 if self.cfg.on_fail == "stop":
                     stop = True
                     self.s.log("on_fail = stop: a fila para aqui")
+        self.control.drain()
         n = len(self.task_files())
         if stop:
             summary = f"parada na tarefa que falhou ({failed} com problema)"
