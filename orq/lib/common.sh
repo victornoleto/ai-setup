@@ -35,12 +35,27 @@ orq_render() {
 orq_event() {
 	local line
 	line=$(jq -cn --arg type "$1" --arg ts "$(date -Iseconds)" --argjson data "$2" '$data + {type: $type, ts: $ts}')
+	orq_event_echo "$line"
 	# votantes em paralelo também geram eventos: uma escrita por vez.
 	(
 		flock 8
 		printf '%s\n' "$line" >> "$RUN_DIR/events.jsonl"
 		orq_journal_render
 	) 8> "$RUN_DIR/events.lock"
+}
+
+# Uma linha legível por evento, no terminal e no orq.log (o journal tem o detalhe).
+orq_event_echo() {
+	local msg
+	msg=$(jq -r '
+		def n(f): [f] | length;
+		if .type == "plan" then "▶ plano: \(.summary | gsub("\\s+"; " ") | .[0:300])"
+		elif .type == "exec" then "▶ execução ciclo \(.cycle) (\(.actor)): \(.status) · \(.commits | length) commit(s)\(if (.pending | length) > 0 then " · \(.pending | length) pendência(s)" else "" end) — \(.summary | gsub("\\s+"; " ") | .[0:200])"
+		elif .type == "review" then "▶ revisão ciclo \(.cycle): \(.verdict) · problemas alta \(n(.issues[] | select(.severity == "alta"))) / média \(n(.issues[] | select(.severity == "media"))) / baixa \(n(.issues[] | select(.severity == "baixa")))"
+		elif .type == "decision" then "▶ conselho: \(.question | .[0:120]) → `\(.choice)` \(.label) (\(if .points == 2.5 then "2,5" else .points end) pts; votos \([.votes[].option_id] | join(", ")))"
+		else empty end' <<< "$1")
+	[ -n "$msg" ] && orq_log "$msg"
+	return 0
 }
 
 # Estado por tarefa em state.json: state_get TASK KEY [PADRÃO] · state_set TASK KEY JSON

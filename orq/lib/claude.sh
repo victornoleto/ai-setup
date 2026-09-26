@@ -30,11 +30,15 @@ orq_call() {
 		tries=$((tries + 1))
 		orq_log "$name: conta $account · $model · effort $effort · $mode ${sid:0:8}"
 		rc=0
+		# stream-json: cada passo sai ao vivo (orq_stream_print) e fica em .stream.jsonl; a última linha,
+		# type=result, tem o mesmo formato do --output-format json e vira o $raw.
 		( cd "${ORQ_REPO:-.}" && CLAUDE_CONFIG_DIR=$(orq_account_dir "$account") \
 			timeout -k 60s "$ORQ_CALL_TIMEOUT" claude -p "${perm[@]}" "${resume_flag[@]}" \
 			--model "$model" --effort "$effort" -n "orq:$name" \
-			--output-format json --json-schema "$(cat "$ORQ_HOME/schemas/$schema.json")" \
-			< "$prompt" > "$raw" 2> "$err" ) || rc=$?
+			--output-format stream-json --verbose --json-schema "$(cat "$ORQ_HOME/schemas/$schema.json")" \
+			< "$prompt" 2> "$err" | tee "$raw.stream.jsonl" | orq_stream_print "$role" "$name"
+			exit "${PIPESTATUS[0]}" ) || rc=$?
+		jq -c 'select(.type == "result")' "$raw.stream.jsonl" 2>/dev/null | tail -1 > "$raw" || true
 
 		if [ "$rc" = 124 ] || [ "$rc" = 137 ]; then
 			orq_notice timeout "$name passou de $ORQ_CALL_TIMEOUT e foi encerrada."
@@ -133,4 +137,43 @@ orq_cost_add() {
 orq_notice() {
 	orq_log "[$1] $2"
 	orq_event notice "$(jq -cn --arg task "${TASK_ID:-}" --arg kind "$1" --arg text "$2" '{task: $task, kind: $kind, text: $text}')"
+}
+
+# Mostra o stream do claude no terminal (stderr) e no orq.log: texto do modelo e cada ferramenta chamada.
+# ORQ_STREAM: main (padrão: planejador, executor e revisor; votantes em silêncio) | all | none.
+# ORQ_STREAM_THINKING=1 mostra também o raciocínio.
+orq_stream_print() {
+	local role=$1 name=$2
+	if [ "$ORQ_STREAM" = none ] || { [ "$ORQ_STREAM" = main ] && { [ "$role" = VOTER ] || [ "$role" = TIEBREAK ]; }; }; then
+		cat > /dev/null; return 0
+	fi
+	jq --unbuffered -rR --arg p "  [$name]" --arg think "$ORQ_STREAM_THINKING" \
+		--arg repo "${ORQ_REPO:-$PWD}/" --arg run "${RUN_DIR:-/nenhum}/" '
+		def short: tostring | split($run) | join("run/") | split($repo) | join("");
+		def clip($n): short | gsub("\\s+"; " ") | if length > $n then .[0:$n] + "…" else . end;
+		def tool:
+			if .name == "Bash" then "$ " + (.input.command // "" | clip(220))
+			elif (.name | test("^(Read|Write|Edit|NotebookEdit)$")) then "\(.name) \(.input.file_path // .input.notebook_path // "" | short)"
+			elif (.name | test("^(Grep|Glob)$")) then "\(.name) \(.input.pattern // "")\(if .input.path then " em " + .input.path else "" end)"
+			elif .name == "Agent" or .name == "Task" then "subagente: \(.input.description // "")"
+			elif .name == "Skill" then "skill \(.input.skill // "")"
+			elif .name == "TodoWrite" or .name == "StructuredOutput" then empty
+			else "\(.name) \(.input | tostring | clip(120))" end;
+		(try fromjson catch null) as $e
+		| if $e == null then empty
+		  elif $e.type == "assistant" then
+			$e.message.content[]?
+			| if .type == "text" then (.text | split("\n")[] | select(test("\\S")) | "\($p) \(.)")
+			  elif .type == "tool_use" then (tool | "\($p) › \(.)")
+			  elif .type == "thinking" and $think == "1" then "\($p) (pensando) \(.thinking | clip(300))"
+			  else empty end
+		  elif $e.type == "user" then
+			$e.message.content[]? | select(type == "object" and .type == "tool_result" and .is_error == true)
+			| "\($p) ✗ \(.content | if type == "array" then map(.text? // "") | join(" ") else . end | clip(200))"
+		  else empty end' \
+		| while IFS= read -r line; do
+			printf '%s\n' "$line" >&2
+			[ -n "${RUN_DIR:-}" ] && printf '%s\n' "$line" >> "$RUN_DIR/orq.log"
+		done
+	return 0
 }
