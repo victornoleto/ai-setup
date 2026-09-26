@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from rich.text import Text
+
 from ..context import title
 from ..journal import cost_parts, event_line
 from ..store import RunStore
@@ -44,6 +46,11 @@ class TaskRow:
     extra: str
     title: str
 
+    def styled(self, width: int = 60) -> Text:
+        """Estado por glifo e intensidade; a cor só reforça (concluída apagada, em curso negrito, esperando inverso)."""
+        style = {"✓": "dim", "⊘": "dim", "▶": "bold yellow", "⏸": "reverse bold", "✗": "bold red"}.get(self.glyph, "")
+        return Text(self.text(width), style=style)
+
     def text(self, width: int = 60) -> str:
         head = f"{self.glyph} {self.id}  {self.status}" + (f" · {self.extra}" if self.extra else "")
         return head + "\n    " + self.title[: max(20, width - 4)]
@@ -66,6 +73,7 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None) -> 
     is_paused = paused(events)
     now = now or time.time()
     cost_by = store.cost_by()
+    waiting = (store.top("open_ask") or {}).get("task")
     rows = []
     for f in sorted(queue.glob("[0-9]*.md")):
         t = st["tasks"].get(f.stem, {})
@@ -82,6 +90,8 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None) -> 
             extra = fmt_hms(now - t["started"]) if t.get("started") else ""
         else:
             glyph, status, extra = "·", "pendente", ""
+        if f.stem == waiting:
+            glyph, status = "⏸", "esperando você"
         cost = sum(cost_by.get(f.stem, {}).values())
         if cost:
             extra += (" · " if extra else "") + f"US$ {cost:.2f}"
@@ -114,11 +124,45 @@ def header(store: RunStore, events: list[dict], rows: list[TaskRow], now: float 
     done = sum(1 for r in rows if r.glyph in "✓⊘")
     alive = store.engine_alive()
     motor = "terminou" if re_ else ("⏸ pausado" if paused(events) and alive else "rodando" if alive else "parado")
+    ask = store.top("open_ask")
+    if ask and not re_:
+        motor = f"⏸ esperando você · {fmt_hms(now - ask['opened'])}"
     clock = fmt_hms((_epoch(re_["ts"]) if re_ else now) - _epoch(rs["ts"])) if rs else ""
     end = eta(events, rows, now) if not re_ else None
     return (f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · {clock}"
             + (f" · termina ~{datetime.fromtimestamp(end):%H:%M}" if end else "")
             + f" · US$ {store.cost():.2f} estimado")
+
+
+STYLE_BY_TYPE = {"task_start": "bold", "task_end": "bold", "run_start": "bold", "run_end": "bold",
+                 "plan": "cyan", "verify": "blue", "review": "magenta", "decision": "yellow",
+                 "operator": "italic green", "ask_reply": "italic green", "ask": "reverse bold yellow",
+                 "ask_answer": "bold yellow", "notice": "bold red", "run_summary": "italic"}
+
+
+def line_style(e: dict) -> str:
+    """Estilo da linha na timeline. Cada tipo já tem prefixo próprio ([PLANO], [REVISÃO]…): a cor só reforça."""
+    return STYLE_BY_TYPE.get(e.get("type", ""), "")
+
+
+def ask_text(ask: dict) -> Text:
+    """O bloco da pergunta aberta: título invertido, opções numeradas, a recomendada marcada por texto e negrito."""
+    kind = {"council": "decisão sem unanimidade", "blocked": "bloqueada", "failed": "falhou"}.get(ask["kind"], ask["kind"])
+    t = Text()
+    t.append(f" [PRECISA DE VOCÊ] {ask['task']} · {kind} \n", style="reverse bold")
+    t.append(ask["question"] + "\n", style="bold")
+    if ask.get("diagnosis"):
+        t.append("Por quê: " + ask["diagnosis"] + "\n")
+    for i, o in enumerate(ask["options"], 1):
+        rec = o["id"] == ask["recommended"]
+        t.append(f" {i}) " + ("★ RECOMENDADA  " if rec else "") + o["label"] + "\n", style="bold yellow" if rec else "")
+    if ask.get("reply"):
+        t.append("operador: " + ask["reply"] + "\n", style="italic")
+    foot = f"responda 1–{len(ask['options'])} ou escreva"
+    if ask.get("deadline"):
+        foot += f" · segue sozinha com a recomendada às {datetime.fromtimestamp(ask['deadline']):%H:%M}"
+    t.append(foot, style="dim")
+    return t
 
 
 def cost_lines(store: RunStore, ref: str = "") -> list[str]:
