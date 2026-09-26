@@ -19,11 +19,13 @@ USAGE = """\
 Uso:
   orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
   orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
+  orq attach <run-dir>          reabre o painel (q desanexa; a execução continua)
   orq status <run-dir>
   orq send <run-dir> "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
   orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
   orq selftest
 
+Sem --headless (e num terminal), o motor roda em segundo plano e o painel abre por cima.
 <pasta>: a pasta da atividade (com orq/ dentro) ou a própria fila (NN-nome.md + orq.toml ou queue.conf).
 """
 
@@ -62,26 +64,76 @@ def run_engine(cfg: config.Config, store: RunStore) -> int:
         store.pid_path.unlink(missing_ok=True)
 
 
+def engine_flags(args) -> list[str]:
+    out = []
+    for k in ("account", "repo"):
+        if getattr(args, k, None):
+            out += [f"--{k}", str(getattr(args, k))]
+    return out
+
+
+def start(store: RunStore, cfg: config.Config, args) -> int:
+    """Headless: o motor em primeiro plano. Senão: motor desanexado + painel."""
+    if args.headless or not sys.stdout.isatty():
+        store.echo = True
+        return run_engine(cfg, store)
+    import subprocess
+    import time
+    with open(store.dir / "engine.out", "a") as out:
+        subprocess.Popen([sys.executable, "-m", "orq.cli", "_engine", str(store.dir), *engine_flags(args)],
+                         start_new_session=True, stdin=subprocess.DEVNULL, stdout=out, stderr=out)
+    for _ in range(50):
+        if store.engine_alive():
+            break
+        time.sleep(0.1)
+    return attach(store)
+
+
+def attach(store: RunStore) -> int:
+    from .tui.app import run_tui
+    run_tui(store.dir)
+    if store.engine_alive():
+        print(f"O motor segue em segundo plano. Reabra com: orq attach {store.dir}")
+    else:
+        print(f"Motor parado. journal: {store.journal_path}")
+    return 0
+
+
+def cmd_attach(args) -> int:
+    store = RunStore(Path(args.run_dir))
+    if not store.exists():
+        die(f"não é um run dir: {args.run_dir}")
+    return attach(store)
+
+
+def cmd_engine(args) -> int:
+    """Interno: o motor desanexado que o `orq run` sobe."""
+    store = RunStore(Path(args.run_dir))
+    return run_engine(load_cfg(Path(store.top("queue")), args), store)
+
+
 def cmd_run(args) -> int:
     if not Path(args.queue).is_dir():
         die("informe a pasta da fila")
     queue_dir = config.resolve_queue_dir(args.queue)
     cfg = load_cfg(queue_dir, args)
     run_dir = Path(args.run_dir) if args.run_dir else queue_dir / "runs" / datetime.now().strftime("%Y-%m-%d-%H%M")
-    store = RunStore(run_dir, echo=True)
+    store = RunStore(run_dir)
     try:
         store.create(queue_dir, str(cfg.get("accounts", "claude", "default")))
     except FileExistsError as e:
         die(str(e))
     Engine(cfg, store).start_event()
     store.log(f"run dir: {store.dir}")
-    return run_engine(cfg, store)
+    return start(store, cfg, args)
 
 
 def cmd_resume(args) -> int:
-    store = RunStore(Path(args.run_dir), echo=True)
+    store = RunStore(Path(args.run_dir))
     if not store.exists():
         die(f"não é um run dir: {args.run_dir}")
+    if store.engine_alive():
+        die(f"o motor desta execução ainda está rodando; use orq attach {store.dir}")
     for tid in args.retry or []:
         # a tarefa recomeça do zero (o que ela já commitou fica; o plano novo parte do HEAD atual)
         store.drop_task(tid)
@@ -91,7 +143,7 @@ def cmd_resume(args) -> int:
         store.notice("retry", f"Tarefa {tid} recomeça do zero (orq resume --retry).", tid)
     cfg = load_cfg(Path(store.top("queue")), args)
     store.notice("resumed", "Execução retomada.")
-    return run_engine(cfg, store)
+    return start(store, cfg, args)
 
 
 def task_status_rows(store: RunStore, queue_dir: Path) -> list[tuple[str, str, str]]:
@@ -182,6 +234,12 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--account")
     rs.add_argument("--retry", action="append")
     rs.add_argument("--headless", action="store_true")
+    at = sub.add_parser("attach")
+    at.add_argument("run_dir")
+    en = sub.add_parser("_engine")
+    en.add_argument("run_dir")
+    en.add_argument("--account")
+    en.add_argument("--repo")
     st = sub.add_parser("status")
     st.add_argument("run_dir")
     d = sub.add_parser("decide")
@@ -195,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
     se.add_argument("text")
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "decide": cmd_decide,
+    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")
