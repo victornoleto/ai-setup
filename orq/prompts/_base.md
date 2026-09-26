@@ -14,3 +14,8 @@ Regras da fila (valem para toda tarefa):
 <regras>
 {{RULES}}
 </regras>
+
+Onde esta tarefa está na fila:
+<progresso>
+{{PROGRESS}}
+</progresso>

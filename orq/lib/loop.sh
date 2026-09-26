@@ -12,7 +12,7 @@ orq_task_setup() {
 	DECISIONS_FILE="$TASK_DIR/decisions.md"
 	mkdir -p "$TASK_DIR/calls"
 	BASE_PROMPT=$(orq_render "$ORQ_HOME/prompts/_base.md" \
-		"REPO=${ORQ_REPO:-$PWD}" "TASK_ID=$TASK_ID" "TASK=$TASK_TEXT" "RULES=$RULES_TEXT")
+		"REPO=${ORQ_REPO:-$PWD}" "TASK_ID=$TASK_ID" "TASK=$TASK_TEXT" "RULES=$RULES_TEXT" "PROGRESS=(sem bloco de progresso no orq em bash)")
 }
 
 # O resultado final fica em state.json (result: ok | ok_takeover | failed | blocked).

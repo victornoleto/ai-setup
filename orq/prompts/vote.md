@@ -12,6 +12,10 @@ Tarefa em curso: `{{TASK_ID}}`. Plano (se já existe): `{{PLAN_FILE}}`. Quem per
 {{RULES}}
 </regras>
 
+<progresso>
+{{PROGRESS}}
+</progresso>
+
 ## A dúvida
 
 {{QUESTION}}

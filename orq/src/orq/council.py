@@ -45,7 +45,7 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     n = eng.cfg.voters
     common = dict(VOTERS=n, REPO=eng.cfg.repo, TASK_ID=t.id, PLAN_FILE=t.plan_file, SOURCE=source,
                   TASK=t.text.rstrip("\n"), RULES=eng.rules.rstrip("\n"), QUESTION=q["question"],
-                  QCONTEXT=q["context"], OPTIONS=options_md)
+                  QCONTEXT=q["context"], OPTIONS=options_md, PROGRESS=eng.progress(t))
     vote_prompt = prompt("vote", **common)
     (d / "vote.md").write_text(vote_prompt)
     eng.s.log(f"conselho: {qid} ({n} votantes)")

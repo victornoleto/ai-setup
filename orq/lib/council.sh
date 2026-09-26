@@ -17,7 +17,7 @@ orq_council() {
 	orq_render "$ORQ_HOME/prompts/vote.md" \
 		"VOTERS=$ORQ_VOTERS" "REPO=${ORQ_REPO:-$PWD}" "TASK_ID=$TASK_ID" "PLAN_FILE=$PLAN_FILE" \
 		"SOURCE=$source" "TASK=$TASK_TEXT" "RULES=$RULES_TEXT" "QUESTION=$question" "QCONTEXT=$qctx" \
-		"OPTIONS=$options_md" > "$dir/vote.md"
+		"OPTIONS=$options_md" "PROGRESS=(sem progresso no orq em bash)" > "$dir/vote.md"
 
 	orq_log "conselho: $qid ($ORQ_VOTERS votantes)"
 	for i in $(seq 1 "$ORQ_VOTERS"); do
@@ -49,7 +49,7 @@ orq_council() {
 		orq_render "$ORQ_HOME/prompts/tiebreak.md" \
 			"VOTERS=$ORQ_VOTERS" "REPO=${ORQ_REPO:-$PWD}" "TASK_ID=$TASK_ID" "PLAN_FILE=$PLAN_FILE" \
 			"SOURCE=$source" "TASK=$TASK_TEXT" "RULES=$RULES_TEXT" "QUESTION=$question" "QCONTEXT=$qctx" \
-			"OPTIONS=$options_md" \
+			"OPTIONS=$options_md" "PROGRESS=(sem progresso no orq em bash)" \
 			"VOTES=$(jq -r '.[] | "- Conselheiro \(.voter): `\(.option_id)` — \(.rationale)"' <<< "$votes")" \
 			> "$dir/tiebreak.md"
 		orq_call TIEBREAK "tiebreak-$qid" vote "$dir/tiebreak.md" new "$(uuidgen)" "$dir/tiebreak.json" || true

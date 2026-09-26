@@ -11,6 +11,10 @@ Repositório (só leitura): {{REPO}} · Tarefa: `{{TASK_ID}}` · Plano: `{{PLAN_
 {{RULES}}
 </regras>
 
+<progresso>
+{{PROGRESS}}
+</progresso>
+
 ## A dúvida
 
 {{QUESTION}}

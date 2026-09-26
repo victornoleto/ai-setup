@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import council, harness as harness_mod
+from . import context, council, harness as harness_mod
 from .config import ORQ_HOME, Config
 from .harness.base import CallRequest, Harness, shorten_paths
 from .store import RunStore
@@ -117,7 +117,26 @@ class Engine:
         return Task(id=tid, file=f, dir=d, text=f.read_text(), plan_file=d / "plan.md", decisions_file=d / "decisions.md")
 
     def base_prompt(self, t: Task) -> str:
-        return prompt("_base", REPO=self.cfg.repo, TASK_ID=t.id, TASK=t.text.rstrip("\n"), RULES=self.rules.rstrip("\n"))
+        return prompt("_base", REPO=self.cfg.repo, TASK_ID=t.id, TASK=t.text.rstrip("\n"), RULES=self.rules.rstrip("\n"),
+                      PROGRESS=self.progress(t))
+
+    def progress(self, t: Task) -> str:
+        return context.progress(self.s.events(), self.task_files(), t.id)
+
+    def with_inbox(self, t: Task | None, sid: str | None, resume: bool, text: str) -> str:
+        """Sessão retomada: acrescenta o que o Victor mandou desde o último prompt dela. Sessão nova já recebe
+        tudo pelo PROGRESS."""
+        if not (t and resume and sid):
+            return text
+        seen = int(self.s.top("sessions", {}).get(sid, 0))  # nº de eventos quando a sessão recebeu o último prompt
+        msgs = context.victor_messages(self.s.events()[seen:], t.id)
+        return text + context.inbox_block(msgs) if msgs else text
+
+    def mark_session(self, sid: str | None, seen: int) -> None:
+        if sid:
+            sessions = self.s.top("sessions", {})
+            sessions[sid] = seen
+            self.s.set_top("sessions", sessions)
 
     async def checkpoint(self, t: Task | None) -> None:
         """Ponto seguro entre duas chamadas: aqui entram os ajustes ao vivo (etapa de controle)."""
@@ -145,15 +164,18 @@ class Engine:
         await self.checkpoint(t)
         while True:
             tries += 1
+            seen = len(self.s.events())
+            full_prompt = self.with_inbox(t, sid, resume, prompt_text)
             acc = f" · conta {account}" if role.harness == "claude" else ""
             self.s.log(f"{name}: {role.harness}{acc} · {role.model} · effort {role.effort} · "
                        f"{'resume' if resume else 'new'} {(sid or '-')[:8]}")
-            req = CallRequest(role=role, name=name, prompt=prompt_text, schema=schema(schema_name), cwd=self.cfg.repo,
+            req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.cfg.repo,
                               calls_dir=calls_dir, read_only=role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
                               env=self.git_env, thinking=self.thinking,
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
             res = await h.call(req, self.on_line_for(role_name, name))
+            self.mark_session(res.session_id or sid, seen)
             if res.error is None:
                 self.s.add_cost(res.cost)
                 return res.output, res.session_id or sid
@@ -258,8 +280,8 @@ class Engine:
         phase = s.get(t.id, "phase", "start")
         if phase == "done":
             return
-        t.base_prompt = self.base_prompt(t)
         while True:
+            t.base_prompt = self.base_prompt(t)  # refeito a cada fase: o PROGRESS muda com a fila
             s.set(t.id, "phase", phase)
             cycle = s.get(t.id, "cycle", 1)
             psid = s.get(t.id, "planner_sid")
