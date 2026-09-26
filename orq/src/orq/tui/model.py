@@ -84,7 +84,7 @@ def header(store: RunStore, events: list[dict], rows: list[TaskRow]) -> str:
     ended = any(e["type"] == "run_end" for e in events)
     alive = store.engine_alive()
     motor = "terminou" if ended else ("⏸ pausado" if paused(events) and alive else "rodando" if alive else "parado")
-    cost = float(store.top("cost", 0) or 0)
+    cost = store.cost()
     return f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · US$ {cost:.2f}"
 
 

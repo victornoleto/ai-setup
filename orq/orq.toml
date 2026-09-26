@@ -1,5 +1,5 @@
 # orq — configuração global. Precedência, da mais fraca para a mais forte:
-#   este arquivo → <fila>/orq.toml → variáveis ORQ_* (nomes do orq.conf antigo) → flags (--account, --repo).
+#   este arquivo → <fila>/orq.toml → variáveis ORQ_* (nomes do queue.conf antigo) → flags (--account, --repo).
 # A fila só repete o que muda (ex.: [roles.executor] harness = "codex").
 #
 # harness: claude | codex | opencode (OpenRouter: harness = "opencode", model = "openrouter/<modelo>")

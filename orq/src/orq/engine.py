@@ -268,7 +268,7 @@ class Engine:
             summary = f"{failed} tarefa(s) com problema"
         else:
             summary = f"todas as {n} tarefas ok"
-        cost = f"{float(self.s.top('cost', 0)):.4f}"
+        cost = f"{self.s.cost():.4f}"
         self.s.event("run_end", {"result": summary, "cost": cost})
         self.s.log(f"fim: {summary} · journal: {self.s.journal_path}")
         notify(f"Fila terminou: {summary}")
