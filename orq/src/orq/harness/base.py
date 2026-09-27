@@ -33,13 +33,14 @@ class CallRequest:
     env: dict = field(default_factory=dict)   # acrescentado ao ambiente (bloqueio de push, conta)
     account_dir: str | None = None
     thinking: bool = False
+    on_session: Callable[[str], None] | None = None
 
 
 @dataclass
 class CallResult:
     output: dict | None = None
     session_id: str | None = None
-    cost: float = 0.0
+    cost: float | None = None  # None = não informado pelo harness, distinto de custo zero
     error: str | None = None  # None | limit | transient | timeout | session_exists | no_output | fatal
     message: str = ""
 
@@ -139,10 +140,8 @@ async def run_process(argv: list[str], stdin_text: str | None, cwd: Path, env: d
                     except json.JSONDecodeError:
                         continue
                     if isinstance(ev, dict):
-                        try:
-                            on_json(ev)
-                        except Exception:  # o stream ao vivo nunca derruba a chamada
-                            pass
+                        # O callback também persiste a sessão: erro de disco não pode sumir.
+                        on_json(ev)
             return await proc.wait()
 
         try:
@@ -154,11 +153,22 @@ async def run_process(argv: list[str], stdin_text: str | None, cwd: Path, env: d
             except ProcessLookupError:
                 pass
             rc = await proc.wait()
-        except asyncio.CancelledError:
+        except BaseException:
             try:
                 os.killpg(proc.pid, signal.SIGTERM)
             except ProcessLookupError:
                 pass
+            # O pai pode sair antes de um descendente: sempre encerre o grupo ao fim da tolerância.
+            try:
+                await asyncio.wait_for(proc.wait(), 1)
+            except asyncio.TimeoutError:
+                pass
+            finally:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                await proc.wait()
             raise
         finally:
             _active.discard(proc)

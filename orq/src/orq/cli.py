@@ -45,7 +45,20 @@ def load_cfg(queue_dir: Path, args) -> config.Config:
         die(str(e))
 
 
-def run_engine(cfg: config.Config, store: RunStore) -> int:
+def load_run_cfg(store: RunStore, args) -> config.Config:
+    q = Path(store.top("queue"))
+    raw = store.top("config")
+    if raw:
+        if getattr(args, "account", None):
+            raw = config.deep_merge(raw, {"accounts": {"claude": {"default": str(args.account)}}})
+        return config.from_raw(raw, q)
+    # Runs anteriores ao snapshot: ao menos preserve o repo registrado no início.
+    initial = next((e for e in store.events() if e["type"] == "run_start"), {})
+    return config.load(q, flags={"repo": initial.get("repo"),
+                                 "account": getattr(args, "account", None) or store.top("account")})
+
+
+def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -> int:
     """O motor em primeiro plano: roda a fila até o fim ou até um sinal."""
     async def main() -> int:
         eng = Engine(cfg, store)
@@ -60,11 +73,34 @@ def run_engine(cfg: config.Config, store: RunStore) -> int:
             store.notice("interrupted", f"Execução interrompida (sinal). Continue com: orq resume {store.dir}")
             return 130
 
-    store.pid_path.write_text(str(os.getpid()))
     try:
-        return asyncio.run(main())
-    finally:
-        store.pid_path.unlink(missing_ok=True)
+        with store.engine_lock(cfg.repo):
+            known = {p.stem for p in cfg.queue_dir.glob("[0-9]*.md") if p.is_file()}
+            if any(tid not in known for tid in retries):
+                die("--retry exige o nome exato de uma tarefa existente")
+            for tid in dict.fromkeys(retries):
+                d = store.dir / tid
+                archive = f"{tid}.tentativa-{datetime.now():%Y%m%d%H%M%S%f}"
+                if d.exists():
+                    d.rename(store.dir / archive)
+                store.drop_task(tid)
+                if (store.top("open_ask") or {}).get("task") == tid:
+                    store.set_top("open_ask", None)
+                store.set_top("active_calls", {k: v for k, v in store.top("active_calls", {}).items()
+                                               if not k.startswith(tid + ":")})
+                store.event("notice", {"kind": "retry", "task": tid, "archive": archive,
+                                       "text": f"Tarefa {tid} recomeça do zero (orq resume --retry)."})
+            store.set_top("config", cfg.raw)
+            if resumed:
+                store.set_top("control", {"paused": False, "stop": False})
+                store.event("run_resume")
+            store.pid_path.write_text(str(os.getpid()))
+            try:
+                return asyncio.run(main())
+            finally:
+                store.pid_path.unlink(missing_ok=True)
+    except RuntimeError as exc:
+        die(str(exc))
 
 
 def engine_flags(args) -> list[str]:
@@ -72,6 +108,10 @@ def engine_flags(args) -> list[str]:
     for k in ("account", "repo"):
         if getattr(args, k, None):
             out += [f"--{k}", str(getattr(args, k))]
+    for tid in getattr(args, "retry", None) or []:
+        out += ["--retry", tid]
+    if getattr(args, "cmd", None) == "resume":
+        out += ["--resumed"]
     return out
 
 
@@ -79,7 +119,7 @@ def start(store: RunStore, cfg: config.Config, args) -> int:
     """Headless: o motor em primeiro plano. Senão: motor desanexado + painel."""
     if args.headless or not sys.stdout.isatty():
         store.echo = True
-        return run_engine(cfg, store)
+        return run_engine(cfg, store, getattr(args, "retry", None) or [], getattr(args, "cmd", None) == "resume")
     import subprocess
     import time
     with open(store.dir / "engine.out", "a") as out:
@@ -112,7 +152,7 @@ def cmd_attach(args) -> int:
 def cmd_engine(args) -> int:
     """Interno: o motor desanexado que o `orq run` sobe."""
     store = RunStore(Path(args.run_dir))
-    return run_engine(load_cfg(Path(store.top("queue")), args), store)
+    return run_engine(load_run_cfg(store, args), store, args.retry or [], args.resumed)
 
 
 def cmd_run(args) -> int:
@@ -137,15 +177,7 @@ def cmd_resume(args) -> int:
         die(f"não é um run dir: {args.run_dir}")
     if store.engine_alive():
         die(f"o motor desta execução ainda está rodando; use orq attach {store.dir}")
-    for tid in args.retry or []:
-        # a tarefa recomeça do zero (o que ela já commitou fica; o plano novo parte do HEAD atual)
-        store.drop_task(tid)
-        d = store.dir / tid
-        if d.exists():
-            d.rename(store.dir / f"{tid}.tentativa-{datetime.now():%H%M%S}")
-        store.notice("retry", f"Tarefa {tid} recomeça do zero (orq resume --retry).", tid)
-    cfg = load_cfg(Path(store.top("queue")), args)
-    store.notice("resumed", "Execução retomada.")
+    cfg = load_run_cfg(store, args)
     return start(store, cfg, args)
 
 
@@ -167,7 +199,8 @@ def cmd_status(args) -> int:
     w = max((len(r[0]) for r in rows), default=0)
     for tid, res, cyc in rows:
         print(f"{tid:<{w}}  {res:<28}  {cyc}")
-    print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.cost():.2f}")
+    print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.cost():.2f}"
+          + (" (parcial: há tentativas com custo não informado)" if store.unknown_costs() else ""))
     print(f"journal: {store.journal_path}")
     return 0
 
@@ -274,6 +307,8 @@ def main(argv: list[str] | None = None) -> int:
     en.add_argument("run_dir")
     en.add_argument("--account")
     en.add_argument("--repo")
+    en.add_argument("--retry", action="append")
+    en.add_argument("--resumed", action="store_true")
     st = sub.add_parser("status")
     st.add_argument("run_dir")
     d = sub.add_parser("decide")

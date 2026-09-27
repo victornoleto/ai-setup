@@ -12,9 +12,11 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+import subprocess
 import sys
 import time
 from contextlib import contextmanager
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 
@@ -45,8 +47,8 @@ def read_jsonl(path: Path) -> list[dict]:
     if not path.exists():
         return []
     out = []
-    for line in path.read_text().splitlines():
-        if line.strip():
+    for line in path.read_text().splitlines(keepends=True):
+        if line.endswith("\n") and line.strip():
             try:
                 out.append(json.loads(line))
             except json.JSONDecodeError:
@@ -67,6 +69,11 @@ class RunStore:
         self.journal_path = self.dir / "journal.md"
         self.notes_path = self.dir / "notes.md"
         self.lock_path = self.dir / "events.lock"
+        self._state_stamp = None
+        self._state_cache = None
+        self._event_stamp = None
+        self._event_pos = 0
+        self._event_cache = []
 
     # --- criação ---------------------------------------------------------------------------------
     def create(self, queue_dir: Path, account: str) -> None:
@@ -118,11 +125,35 @@ class RunStore:
         self.event("notice", {"task": task, "kind": kind, "text": text})
 
     def events(self) -> list[dict]:
-        return read_jsonl(self.events_path)
+        if not self.events_path.exists():
+            self._event_stamp, self._event_pos, self._event_cache = None, 0, []
+            return []
+        stat = self.events_path.stat()
+        stamp = (stat.st_ino, stat.st_size, stat.st_mtime_ns)
+        if stamp != self._event_stamp:
+            if self._event_stamp and (stamp[0] != self._event_stamp[0] or stamp[1] <= self._event_stamp[1]):
+                self._event_pos, self._event_cache = 0, []
+            with self.events_path.open("rb") as fh:
+                fh.seek(self._event_pos)
+                data = fh.read()
+            cut = data.rfind(b"\n") + 1
+            for line in data[:cut].splitlines():
+                try:
+                    self._event_cache.append(json.loads(line))
+                except (ValueError, UnicodeDecodeError):
+                    pass
+            self._event_pos += cut
+            self._event_stamp = stamp
+        return deepcopy(self._event_cache)
 
     # --- estado -----------------------------------------------------------------------------------
     def state(self) -> dict:
-        return json.loads(self.state_path.read_text())
+        stat = self.state_path.stat()
+        stamp = (stat.st_ino, stat.st_size, stat.st_mtime_ns)
+        if stamp != self._state_stamp:
+            self._state_cache = json.loads(self.state_path.read_text())
+            self._state_stamp = stamp
+        return deepcopy(self._state_cache)
 
     def _save(self, st: dict) -> None:
         write_atomic(self.state_path, json.dumps(st, indent=1, ensure_ascii=False))
@@ -132,8 +163,11 @@ class RunStore:
         return default if v in (None, "") else v
 
     def set(self, task: str, key: str, value) -> None:
+        self.update_task(task, {key: value})
+
+    def update_task(self, task: str, values: dict) -> None:
         st = self.state()
-        st["tasks"].setdefault(task, {})[key] = value
+        st["tasks"].setdefault(task, {}).update(values)
         self._save(st)
 
     def top(self, key: str, default=None):
@@ -159,15 +193,21 @@ class RunStore:
         """Custo estimado por tarefa e por papel ("" = fora de tarefa, como o operador)."""
         return self.state().get("cost_by", {})
 
-    def add_cost(self, usd: float, task: str = "", role: str = "") -> None:
+    def add_cost(self, usd: float | None, task: str = "", role: str = "") -> None:
         with locked(self.lock_path):
             st = self.state()
+            if usd is None:
+                unknown = st.setdefault("cost_unknown", {}).setdefault(task, {})
+                unknown[role] = unknown.get(role, 0) + 1
             usd = float(usd or 0)
             st["cost"] = round(float(st.get("cost", 0)) + usd, 4)
             if role:
                 by = st.setdefault("cost_by", {}).setdefault(task, {})
                 by[role] = round(by.get(role, 0) + usd, 4)
             self._save(st)
+
+    def unknown_costs(self) -> int:
+        return sum(sum(roles.values()) for roles in self.top("cost_unknown", {}).values())
 
     # --- inbox ------------------------------------------------------------------------------------
     def send(self, text: str, source: str = "painel") -> dict:
@@ -178,15 +218,49 @@ class RunStore:
         return cmd
 
     def take_inbox(self) -> list[dict]:
-        """Comandos ainda não lidos; avança o offset em state.json."""
+        """Comandos pendentes; ler não confirma entrega."""
         cmds = read_jsonl(self.inbox_path)
         off = int(self.top("inbox_offset", 0))
-        if off < len(cmds):
-            self.set_top("inbox_offset", len(cmds))
         return cmds[off:]
 
+    def ack_inbox(self, cmd: dict) -> None:
+        pending = self.take_inbox()
+        if pending and pending[0]["id"] == cmd["id"]:
+            self.set_top("inbox_offset", int(self.top("inbox_offset", 0)) + 1)
+
     # --- processo ---------------------------------------------------------------------------------
+    @contextmanager
+    def engine_lock(self, repo: Path):
+        git_dir = subprocess.run(["git", "-C", str(repo), "rev-parse", "--absolute-git-dir"],
+                                 capture_output=True, text=True, check=True).stdout.strip()
+        handles = []
+        try:
+            for path in (self.dir / "engine.lock", Path(git_dir) / "orq.lock"):
+                fh = open(path, "a")
+                handles.append(fh)
+                # engine_alive() testa o lock por um instante (painel a cada 500 ms): tolera essa colisão
+                for attempt in range(20):
+                    try:
+                        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if attempt == 19:
+                            raise RuntimeError("já há um motor rodando nesta execução ou árvore de trabalho") from None
+                        time.sleep(0.05)
+            yield
+        finally:
+            for fh in reversed(handles):
+                fh.close()
+
     def engine_alive(self) -> bool:
+        lock = self.dir / "engine.lock"
+        if lock.exists():
+            with open(lock, "a") as fh:
+                try:
+                    fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    return True
+                return False
         try:
             pid = int(self.pid_path.read_text())
             os.kill(pid, 0)

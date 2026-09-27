@@ -131,11 +131,15 @@ def _section(e: dict) -> str | None:
     if t == "task_end":
         cost = f"\n\nCusto estimado: US$ {sum((e.get('cost') or {}).values()):.2f} ({cost_parts(e['cost'])})" \
             if e.get("cost") else ""
+        if e.get("cost_unknown"):
+            cost += f"\n\nTotal parcial: custo não informado em {e['cost_unknown']} tentativa(s)."
         return f"### Resultado: {result_label(e['result'])}\n\n{e.get('reason') or ''}{cost}\n"
     return None
 
 
 def render(ev: list[dict]) -> str:
+    history = ev
+    ev = current_events(ev)
     rs = next((e for e in ev if e["type"] == "run_start"), {})
     re_ = next((e for e in ev if e["type"] == "run_end"), None)
     ts = [e for e in ev if e["type"] == "task_start"]
@@ -193,6 +197,12 @@ def render(ev: list[dict]) -> str:
                      f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} | "
                      + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
+    if re_ and re_.get("cost_unknown"):
+        lines += [f"Total parcial: custo não informado em {re_['cost_unknown']} tentativa(s).", ""]
+    archives = [e for e in history if e.get("archive")]
+    if archives:
+        lines += ["Tentativas anteriores: " + " · ".join(
+            f"[{e['task']}]({e['archive']}/report.md)" for e in archives), ""]
     for s in ts:
         t = s["task"]
         end = next((e for e in te if e["task"] == t), {})
@@ -212,6 +222,7 @@ def render(ev: list[dict]) -> str:
 
 def render_task(ev: list[dict], t: str) -> str:
     """O report.md de uma tarefa: início, cada evento dela em ordem e, no fim, a entrega (commits e arquivos)."""
+    ev = current_events(ev)
     start = next((e for e in ev if e["type"] == "task_start" and e["task"] == t), None)
     end = next((e for e in ev if e["type"] == "task_end" and e["task"] == t), None)
     lines = [f"# {t} — {result_label(end['result']) if end else 'em andamento'}", "",
@@ -239,6 +250,8 @@ def event_line(e: dict) -> str | None:
     """Uma linha legível por evento (orq.log e timeline). None = evento sem linha."""
     t = e["type"]
     task = e.get("task") or ""
+    if t == "run_resume":
+        return "▶ execução retomada"
     if t == "run_start":
         return f"▶ execução começou: fila {e.get('queue')}"
     if t == "run_end":
@@ -283,3 +296,14 @@ def event_line(e: dict) -> str | None:
     if t == "control_ack":
         return f"[AJUSTE] {e.get('command')} → {e.get('result')}"
     return None
+
+
+def current_events(events: list[dict]) -> list[dict]:
+    """Projeção atual; o JSONL e os reports arquivados preservam todas as tentativas."""
+    retries = {e["task"]: i for i, e in enumerate(events)
+               if e["type"] == "notice" and e.get("kind") == "retry" and e.get("task")}
+    resumed = max((i for i, e in enumerate(events) if e["type"] == "run_resume"
+                   or (e["type"] == "notice" and e.get("kind") in ("retry", "resumed"))), default=-1)
+    return [e for i, e in enumerate(events)
+            if i >= retries.get(e.get("task"), -1)
+            and not (e["type"] in ("run_end", "run_summary") and i < resumed)]

@@ -220,7 +220,12 @@ def load(queue_dir: Path | None, flags: dict | None = None, env: dict | None = N
         repo_path = git_toplevel(qd) or Path.cwd()
     raw.setdefault("run", {})["repo"] = str(repo_path)
 
-    cfg = Config(raw=raw, queue_dir=qd)
+    return from_raw(raw, qd)
+
+
+def from_raw(raw: dict, queue_dir: Path) -> Config:
+    """Valida a configuração efetiva salva, sem reler ambiente ou arquivos da fila."""
+    cfg = Config(raw=raw, queue_dir=queue_dir)
     default_account = str(cfg.get("accounts", "claude", "default", default="1"))
     for name in ROLES:
         r = raw.get("roles", {}).get(name, {})
@@ -238,5 +243,6 @@ def load(queue_dir: Path | None, flags: dict | None = None, env: dict | None = N
     cfg.verify_timeout, cfg.intervene_seconds("decision_timeout"), cfg.intervene_seconds("reminder")  # valida já no load
     if cfg.on_fail not in ("stop", "continue"):
         raise ConfigError(f"loop.on_fail inválido: {cfg.on_fail}")
+    if cfg.voters < 1 or cfg.max_cycles < 1 or cfg.max_decision_rounds < 1:
+        raise ConfigError("votantes, ciclos e rodadas devem ser positivos")
     return cfg
-
