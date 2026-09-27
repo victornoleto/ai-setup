@@ -41,7 +41,7 @@ class CallResult:
     output: dict | None = None
     session_id: str | None = None
     cost: float | None = None  # None = não informado pelo harness, distinto de custo zero
-    error: str | None = None  # None | limit | transient | timeout | session_exists | no_output | fatal
+    error: str | None = None  # None | limit | transient | timeout | session_exists | no_output | background_killed | fatal
     message: str = ""
 
 

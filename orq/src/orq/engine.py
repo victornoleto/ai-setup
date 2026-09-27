@@ -254,6 +254,13 @@ class Engine:
                 asked_again, resume, sid = True, True, res.session_id
                 prompt_text = "Responda de novo, preenchendo a saída estruturada do schema pedido.\n"
                 continue
+            if res.error == "background_killed" and not asked_again and (res.session_id or sid):
+                self.s.notice("background_killed", f"{name}: {res.message}; retomando a sessão uma vez", tid)
+                asked_again, resume, sid = True, True, res.session_id or sid
+                prompt_text = ("A sessão anterior terminou com um subagent em background, que foi encerrado sem "
+                               "terminar: o resultado dele se perdeu. Confira `git status` e `git log`, termine você "
+                               "mesmo, em primeiro plano, e só então devolva a saída estruturada.\n")
+                continue
             self.s.notice("error", f"{name} falhou ({res.error}): {res.message}", tid)
             return finish(None, res.session_id or sid)
 
