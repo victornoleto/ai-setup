@@ -2,9 +2,16 @@
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 
 from ..config import Role
 from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, tool_line
+
+
+# nega subagent em background: ver no_background_agent.py
+HOOKS = json.dumps({"hooks": {"PreToolUse": [{"matcher": "Agent|Task", "hooks": [
+    {"type": "command", "command": f'"{sys.executable}" "{Path(__file__).with_name("no_background_agent.py")}"'}]}]}})
 
 
 class ClaudeHarness(Harness):
@@ -16,7 +23,7 @@ class ClaudeHarness(Harness):
         sess = ["--resume", req.session_id] if req.resume else (["--session-id", req.session_id] if req.session_id else [])
         return ["claude", "-p", *perm, *sess, "--model", req.role.model, "--effort", req.role.effort,
                 "-n", f"orq:{req.name}", "--output-format", "stream-json", "--verbose",
-                "--json-schema", json.dumps(req.schema)]
+                "--settings", HOOKS, "--json-schema", json.dumps(req.schema)]
 
     async def call(self, req: CallRequest, on_line: OnLine) -> CallResult:
         env = dict(req.env)
@@ -40,6 +47,10 @@ class ClaudeHarness(Harness):
         if timed_out:
             return CallResult(error="timeout", message="timeout", cost=cost)
         sid = result.get("session_id") or req.session_id
+        killed = ((result.get("subagent_stats") or {}).get("killed") or {}).get("system") or 0
+        if killed:  # o claude -p matou subagent em background ao encerrar: a saída fala de um trabalho que se perdeu
+            return CallResult(error="background_killed", session_id=sid, cost=cost,
+                              message=f"{killed} subagent(s) em background encerrado(s) sem terminar, ao fim da sessão")
         if rc == 0 and result.get("is_error") is False and result.get("structured_output") is not None:
             return CallResult(output=result["structured_output"], session_id=sid, cost=cost)
         text = f"{result.get('result') or ''} {err}"

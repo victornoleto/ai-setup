@@ -374,3 +374,22 @@ async def test_resumo_llm_desligado(tmp_path):
     e = engine(tmp_path, cfg)
     assert await e.run()
     assert "run_summary" not in types(e)
+
+
+async def test_subagent_em_background_morto_retoma_a_sessao_uma_vez(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [{"_error": "background_killed"}, EXEC_OK],
+                                "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    assert e.s.get("01-a", "result") == "ok"
+    execs = [c for c in e.harness("fake").calls if c.name.startswith("exec-")]
+    assert len(execs) == 2 and execs[1].resume and "subagent em background" in execs[1].prompt
+    assert any(x.get("kind") == "background_killed" for x in e.s.events() if x["type"] == "notice")
+
+
+async def test_subagent_em_background_morto_duas_vezes_falha(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [{"_error": "background_killed"}], "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    assert e.s.get("01-a", "result") == "failed"
+    assert len([c for c in e.harness("fake").calls if c.name.startswith("exec-")]) == 2

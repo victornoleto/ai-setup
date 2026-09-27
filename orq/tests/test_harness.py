@@ -1,4 +1,5 @@
 import json
+import os
 
 from orq.harness import claude, codex, opencode
 from orq.harness.base import classify
@@ -55,3 +56,40 @@ def test_classify():
     assert classify("Error: 529 overloaded") == "transient"
     assert classify("Session ID x is already in use") == "session_exists"
     assert classify("syntax error") is None
+
+
+def test_claude_nega_subagent_em_background(tmp_path):
+    import subprocess
+    import sys
+    from orq.config import Role
+    from orq.harness.base import CallRequest
+    req = CallRequest(role=Role("executor", "claude", "m", "high"), name="n", prompt="p", schema={}, cwd=tmp_path,
+                      calls_dir=tmp_path, read_only=False, session_id=None, resume=False, timeout=10)
+    a = claude.ClaudeHarness().argv(req)
+    hook = json.loads(a[a.index("--settings") + 1])["hooks"]["PreToolUse"][0]
+    assert hook["matcher"] == "Agent|Task"
+    script = claude.Path(claude.__file__).with_name("no_background_agent.py")
+
+    def run(tool_input):
+        return subprocess.run([sys.executable, str(script)], input=json.dumps({"tool_input": tool_input}),
+                              capture_output=True, text=True)
+    bg = run({"prompt": "x", "run_in_background": True})
+    assert bg.returncode == 2 and "primeiro plano" in bg.stderr
+    assert run({"prompt": "x", "run_in_background": False}).returncode == 0
+    assert run({"prompt": "x"}).returncode == 0
+
+
+async def test_claude_subagent_morto_no_fim_nao_vale_como_saida(tmp_path, monkeypatch):
+    from orq.config import Role
+    from orq.harness.base import CallRequest
+    result = {"type": "result", "session_id": "s1", "is_error": False, "total_cost_usd": 1.5,
+              "structured_output": {"status": "blocked"}, "subagent_stats": {"killed": {"system": 1}}}
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "claude").write_text(f"#!/bin/sh\ncat >/dev/null\necho '{json.dumps(result)}'\n")
+    (bin_dir / "claude").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    req = CallRequest(role=Role("executor", "claude", "m", "high"), name="n", prompt="p", schema={}, cwd=tmp_path,
+                      calls_dir=tmp_path, read_only=False, session_id="s1", resume=False, timeout=10)
+    res = await claude.ClaudeHarness().call(req, lambda line: None)
+    assert res.error == "background_killed" and res.output is None and res.session_id == "s1" and res.cost == 1.5

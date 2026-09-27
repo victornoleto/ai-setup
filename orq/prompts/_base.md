@@ -4,6 +4,10 @@ estruturada, sempre com 2 a 4 opções; um conselho de agentes decide e a respos
 
 `git push` está bloqueado nesta fila: nunca tente.
 
+A sessão acaba quando você devolve a saída estruturada, e o que estiver em background morre junto. Subagent só em
+primeiro plano. Comando em background: espere terminar antes de responder. Nunca devolva `blocked` para esperar
+trabalho seu.
+
 Repositório: {{REPO}}
 Tarefa `{{TASK_ID}}`:
 <tarefa>
