@@ -3,12 +3,19 @@ tarefa atual, o que falta) e as mensagens do Victor que ainda não chegaram a um
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
-from .journal import RESULT_LABEL
+from .journal import RESULT_LABEL, current_events
 
 
 def title(f: Path) -> str:
+    stat = f.stat()
+    return _title(f, stat.st_ino, stat.st_mtime_ns, stat.st_size)
+
+
+@lru_cache(maxsize=256)
+def _title(f: Path, inode: int, mtime: int, size: int) -> str:
     for line in f.read_text().splitlines():
         s = re.sub(r"^[#>\-*\s]+", "", line).strip()
         if s:
@@ -33,6 +40,7 @@ def victor_messages(events: list[dict], task: str) -> list[str]:
 
 
 def progress(events: list[dict], task_files: list[Path], current: str) -> str:
+    events = current_events(events)
     ends = {e["task"]: e for e in events if e["type"] == "task_end"}
     execs: dict[str, dict] = {}
     for e in events:

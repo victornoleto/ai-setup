@@ -9,7 +9,7 @@ from pathlib import Path
 from rich.text import Text
 
 from ..context import title
-from ..journal import cost_parts, event_line
+from ..journal import cost_parts, current_events, event_line
 from ..store import RunStore
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
@@ -66,14 +66,15 @@ def paused(events: list[dict]) -> bool:
     return state
 
 
-def task_rows(store: RunStore, events: list[dict], now: float | None = None) -> list[TaskRow]:
-    st = store.state()
+def task_rows(store: RunStore, events: list[dict], now: float | None = None, state: dict | None = None) -> list[TaskRow]:
+    events = current_events(events)
+    st = store.state() if state is None else state
     queue = Path(st["queue"])
     ends = {e["task"]: e for e in events if e["type"] == "task_end"}
     is_paused = paused(events)
     now = now or time.time()
-    cost_by = store.cost_by()
-    waiting = (store.top("open_ask") or {}).get("task")
+    cost_by = st.get("cost_by", {})
+    waiting = (st.get("open_ask") or {}).get("task")
     rows = []
     for f in sorted(queue.glob("[0-9]*.md")):
         t = st["tasks"].get(f.stem, {})
@@ -117,21 +118,24 @@ def eta(events: list[dict], rows: list[TaskRow], now: float) -> float | None:
     return now + left
 
 
-def header(store: RunStore, events: list[dict], rows: list[TaskRow], now: float | None = None) -> str:
+def header(store: RunStore, events: list[dict], rows: list[TaskRow], now: float | None = None,
+           state: dict | None = None) -> str:
+    events = current_events(events)
     now = now or time.time()
     rs = next((e for e in events if e["type"] == "run_start"), {})
     re_ = next((e for e in events if e["type"] == "run_end"), None)
     done = sum(1 for r in rows if r.glyph in "✓⊘")
     alive = store.engine_alive()
     motor = "terminou" if re_ else ("⏸ pausado" if paused(events) and alive else "rodando" if alive else "parado")
-    ask = store.top("open_ask")
+    st = store.state() if state is None else state
+    ask = st.get("open_ask")
     if ask and not re_:
         motor = f"⏸ esperando você · {fmt_hms(now - ask['opened'])}"
     clock = fmt_hms((_epoch(re_["ts"]) if re_ else now) - _epoch(rs["ts"])) if rs else ""
     end = eta(events, rows, now) if not re_ else None
     return (f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · {clock}"
             + (f" · termina ~{datetime.fromtimestamp(end):%H:%M}" if end else "")
-            + f" · US$ {store.cost():.2f} estimado")
+            + f" · US$ {float(st.get('cost') or 0):.2f} estimado" + (" (parcial)" if st.get("cost_unknown") else ""))
 
 
 STYLE_BY_TYPE = {"task_start": "bold", "task_end": "bold", "run_start": "bold", "run_end": "bold",
@@ -179,6 +183,9 @@ def cost_lines(store: RunStore, ref: str = "") -> list[str]:
         if by.get(""):
             lines.append(f"  fora de tarefa: {cost_parts(by[''])}")
     lines += [f"  {k}: US$ {sum(by[k].values()):.2f} · {cost_parts(by[k])}" for k in tasks]
+    missing = sum(sum(v.values()) for k, v in store.top("cost_unknown", {}).items() if not ref or k.startswith(ref))
+    if missing:
+        lines.append(f"total parcial: custo não informado em {missing} tentativa(s)")
     return lines or [f"✗ /cost: nenhuma tarefa '{ref}' com custo"]
 
 

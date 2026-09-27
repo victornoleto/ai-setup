@@ -94,7 +94,10 @@ def test_store_evento_estado_inbox(tmp_path):
     assert s.get("01-a", "phase") == "plan" and s.get("01-a", "x", "d") == "d"
     s.send("/note oi")
     s.send("/pause")
-    assert [c["text"] for c in s.take_inbox()] == ["/note oi", "/pause"]
+    pending = s.take_inbox()
+    assert [c["text"] for c in pending] == ["/note oi", "/pause"]
+    for cmd in pending:
+        s.ack_inbox(cmd)
     assert s.take_inbox() == []
     s.add_cost(1.5); s.add_cost(0.25)
     assert s.top("cost") == 1.75

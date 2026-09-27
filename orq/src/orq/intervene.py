@@ -55,7 +55,7 @@ async def wait(eng: "Engine", ask: dict) -> str | None:
         if ctl.stop:
             raise StopRun
         if ask["id"] in ctl.answers:
-            return ctl.answers.pop(ask["id"])
+            return ctl.answers[ask["id"]]
         now = time.time()
         if ask.get("deadline") and now >= ask["deadline"]:
             return None
@@ -65,10 +65,11 @@ async def wait(eng: "Engine", ask: dict) -> str | None:
                                                          ask.get("since") or str(int(ask["opened"])))
             for m in msgs:
                 eng.s.send(f"/answer {m}", source="ntfy")
+            eng.s.set_top("open_ask", ask)
             next_poll = now + POLL_S
             continue  # a resposta do ntfy entra já no próximo drain
         if not ask.get("deadline") and now - last_remind >= eng.cfg.intervene_seconds("reminder"):
-            eng.notify(f"orq · lembrete: {ask['task']} ainda precisa de você", notify.clip(ask["question"], 200), 4)
+            eng.notify(f"orq {eng.queue_name()} · lembrete: {ask['task']} ainda precisa de você", notify.clip(ask["question"], 200), 4)
             last_remind = now
         ctl.resumed.clear()
         try:
@@ -78,6 +79,7 @@ async def wait(eng: "Engine", ask: dict) -> str | None:
 
 
 def close(eng: "Engine", ask: dict, **answer) -> None:
+    eng.control.forget_answer(ask["id"])
     eng.s.set_top("open_ask", None)
     eng.s.event("ask_answer", {"id": ask["id"], "task": ask["task"], "kind": ask["kind"],
                                "question": ask["question"], **answer})
@@ -97,7 +99,7 @@ async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) 
         if text is None:
             close(eng, ask, timeout=True, choice=dec["choice"])
             eng.s.notice("decision_no_victor", f"Sem resposta: segue com `{dec['choice']}` — {dec['label']}.", t.id)
-            eng.notify(f"orq · {t.id}: a decisão seguiu sem você", notify.clip(dec["question"], 200))
+            eng.notify(f"orq {eng.queue_name()} · {t.id}: a decisão seguiu sem você", notify.clip(dec["question"], 200))
             return (f"- **{dec['question']}** → `{dec['choice']}` — {dec['label']} (conselho, "
                     f"{points_label(dec['points'])} pontos; o Victor não respondeu no prazo).")
         opt = match_option(ask, text)
@@ -153,6 +155,11 @@ async def failure(eng: "Engine", t: "Task", p, ask: dict | None = None) -> tuple
                 ask = out
                 continue
             action, note = out[1]["action"] or "retry", out[1]["note"] or text
+        if action == "stop":
+            eng.control.forget_answer(ask["id"])
+            eng.s.event("ask_answer", {"id": ask["id"], "task": ask["task"], "kind": ask["kind"],
+                                       "question": ask["question"], "action": action, "answer": text})
+            raise StopRun
         close(eng, ask, action=action, note=note, answer=text)
         return action, note
 
@@ -170,6 +177,7 @@ async def resolve(eng: "Engine", t: "Task", ask: dict, text: str) -> dict | None
 
 def reask(eng: "Engine", ask: dict, reply: str, follow: dict | None = None) -> dict:
     """A pergunta continua aberta com a resposta do operador; com `follow`, a pergunta nova entra no lugar."""
+    eng.control.forget_answer(ask["id"])
     new = {**ask, "rounds": ask["rounds"] + 1, "reply": reply}
     if follow and new["rounds"] < MAX_ROUNDS:
         opts = [o for o in follow.get("options") or [] if o.get("action") in ACTIONS][:4]

@@ -42,7 +42,7 @@ def test_ask_payload_botoes_e_limites():
     assert len(labels) == 3 and labels[0].startswith("2")  # recomendada primeiro (é a 2ª opção)
     assert p["actions"][0]["body"] == "q1 2" and p["actions"][0]["url"] == "https://ntfy.sh/orq-abc-r"
     assert "★" in p["message"] and "A" * 61 not in p["message"]  # rótulo cortado em 60
-    assert p["priority"] == 5 and "04-x" in p["title"]
+    assert p["priority"] == 5 and p["title"] == "orq gt-v3 · 04-x precisa de você"
 
 
 def test_poll(monkeypatch):
@@ -71,7 +71,7 @@ async def test_motor_avisa_no_fim(tmp_path, monkeypatch):
     e = engine(tmp_path, make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]}))
     e.notifier = CFG
     assert await e.run()
-    assert sent and "terminou" in sent[-1][0] and "ok" in sent[-1][1]
+    assert sent and "terminou" in sent[-1][0] and "painel" in sent[-1][1]
 
 
 def test_cli_notify_test_sem_config(capsys):

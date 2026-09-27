@@ -9,7 +9,7 @@ Roda uma fila de tarefas sem supervisão, com papéis separados e **uma sessão 
    Passou, o planejador **revisa**, com a saída do comando à mão. Se reprovar, o executor corrige, até `max_cycles` (3) execuções revisadas.
 4. Reprovado no último ciclo, o planejador **assume**; a verificação roda de novo e um **revisor** em sessão
    nova confere.
-5. Toda **dúvida** vai a um **conselho**: N votantes em paralelo, só leitura. Unânime = **3 pontos**; maioria =
+5. Toda **dúvida** vai a um **conselho**: N votantes em paralelo, só leitura. Unânime = **3 pontos**; maioria absoluta (mais da metade dos N votantes configurados) =
    **2 pontos**; sem maioria, o desempatador decide = **2,5 pontos**.
 6. Cada sessão recebe o **progresso** da fila: o que já foi feito (resumo e commits), a tarefa atual e o que falta.
 
@@ -60,6 +60,12 @@ orq selftest
 começo de cada tarefa; se não estiver, a tarefa fica **bloqueada**. Com `on_fail = "stop"` (padrão), a fila para
 na primeira tarefa que falha.
 
+Cada execução nova salva a configuração efetiva (incluindo o `--repo`) em `state.json`. O `resume` usa esse
+snapshot, mesmo que o TOML ou o ambiente tenham mudado; `--account` continua sendo uma substituição explícita.
+Execuções antigas recuperam o repositório do evento inicial e carregam as demais opções da configuração atual.
+O motor mantém locks exclusivos da execução e da árvore de trabalho: duas filas não executam simultaneamente
+no mesmo worktree. `--retry` exige o nome exato da tarefa e arquiva seus relatórios antes de recomeçar.
+
 ## Painel
 
 ```
@@ -99,6 +105,10 @@ TIMELINE  (enter: detalhe)               │   [exec-2-1131] ✗ Exit code 1 …
 
 Os mesmos comandos funcionam sem painel: `orq send <run-dir> "/skip 03"`.
 
+Comandos são confirmados individualmente depois de aplicados. A criação de tarefas, notas e trocas de decisão
+usam o ID do comando para evitar duplicação na reentrega; respostas à intervenção são persistidas. `/stop`
+também interrompe a espera entre tentativas por quota ou erro transitório, antes da próxima chamada.
+
 ## Quando a fila precisa de você
 
 Com `[intervene] enabled = true` (padrão), a fila **pausa e pergunta** em vez de falhar ou bloquear:
@@ -111,8 +121,9 @@ Com `[intervene] enabled = true` (padrão), a fila **pausa e pergunta** em vez d
 Cada opção de bloqueio/falha é uma ação: `retry` (refaz a fase com uma nota), `replan` (volta ao plano), `accept`
 (fecha como **ok, aceita pelo Victor**), `skip` (pula) ou `stop` (para; `orq resume` volta à mesma pergunta).
 
-A pergunta aparece num bloco destacado acima do chat (`[PRECISA DE VOCÊ]`, a recomendada com `★ RECOMENDADA`) e no
-celular (ntfy). Responda com o **número** da opção (no painel ou no botão da notificação) ou com **texto livre** no
+A pergunta aparece num bloco destacado acima do chat (`[PRECISA DE VOCÊ]`, a recomendada com `★ RECOMENDADA`); o
+celular (ntfy) recebe só a fila e a tarefa. Consulte os detalhes no painel antes de responder com o **número** da
+opção (no painel ou no botão da notificação) ou com **texto livre** no
 painel: o operador avalia se basta; se não, faz a próxima pergunta. Depois de 3 rodadas, só número.
 
 ### ntfy no celular
@@ -126,8 +137,9 @@ painel: o operador avalia se basta; se não, faz a próxima pergunta. Depois de 
 
 Os botões de resposta funcionam no Android e no web app (`https://ntfy.sh/app`); no iPhone, o ntfy não mostra
 botões — a notificação avisa e você responde pelo painel (ou pelo web app no navegador do celular). O ntfy mostra
-no máximo 3 botões: a recomendada e as duas seguintes. A notificação leva só a fila, a tarefa, a pergunta e os
-rótulos das opções: **nunca** código, caminhos, diffs ou saída de teste. Sem `notify.toml`, fica só o `notify-send`.
+no máximo 3 botões: a recomendada e as duas seguintes, identificadas por número. O título leva só a fila e o id da
+tarefa; pergunta, rótulos, caminhos e saídas nunca vão ao ntfy: a mensagem é fixa, com o ID da pergunta e os
+números das opções. O diagnóstico completo permanece no painel e no aviso local. Sem `notify.toml`, fica só o `notify-send`.
 
 Também notificam: lembrete de pergunta aberta, decisão que seguiu sem você, espera por limite de uso acima de 30 min
 e o fim da fila.
@@ -184,6 +196,11 @@ pelo planejador no fim, só leitura) e uma linha por tarefa com link para o repo
 | `NN-tarefa/verify-<ciclo>.log` | a saída completa da verificação automática |
 | `NN-tarefa/calls/*` | prompt, stream cru e resposta de cada chamada |
 
+O journal e o painel mostram a tentativa atual; `events.jsonl` mantém o histórico completo. Depois de `--retry`,
+o journal aponta também para o relatório arquivado. Custos incluem tentativas com erro quando o harness informa
+o consumo. Sem informação de custo (por exemplo, no adaptador Codex), o total aparece como **parcial**; zero
+informado e custo desconhecido são situações distintas. O detalhamento está em `/cost` e nos relatórios finais.
+
 Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**, **[DECISÃO SEM VICTOR]**, **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
 **[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDENTE]**,
 **[DESTAQUE]**, **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
@@ -197,7 +214,13 @@ Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**,
   eles podem fazer é o que a tarefa e as regras dizem.
 - Timeout por chamada (`call_timeout`, 4 h). Erro transitório tem nova tentativa. No limite de uso, espera o reset
   (até `limit_max_wait`, 8 h) ou troca de conta.
-- `Ctrl-C`/`kill` no motor registram "interrompido"; `orq resume` continua da fase em curso, retomando as sessões.
+- `Ctrl-C`/`kill` no motor registram "interrompido"; `orq resume` continua da fase em curso. IDs de sessão são
+  persistidos assim que conhecidos (antes da chamada quando o harness permite escolher o ID). A retomada do
+  Codex preserva o acesso somente leitura. O encerramento aguarda até 1 s após TERM e usa KILL no grupo restante.
+
+Retomada de sessão não garante execução exatamente uma vez de ferramentas externas: uma queda entre uma ação
+do agente e seu registro ainda exige conferir o estado do repositório. Nenhuma limpeza ou rollback automático
+é aplicado aos commits existentes.
 
 ## Desenvolvimento
 
@@ -205,3 +228,13 @@ Projeto uv em Python ([`src/orq/`](src/orq/)); o painel usa Textual. `orq selfte
 `uv run --project ~/.ai-setup/orq pytest`) roda a suíte com o harness **fake**
 ([`harness/fake.py`](src/orq/harness/fake.py)): respostas de um JSON por schema, sem gastar quota. O mesmo fake
 serve para ver o painel com uma fila de mentira (`harness = "fake"`, `model = "script.json"`).
+
+Para rodar a suíte local isolada, sem rede nem acesso às credenciais:
+
+```sh
+bash tests/run-isolated.sh -q
+```
+
+Esse lançador requer Linux com Bubblewrap e `prlimit`, além da `.venv` já instalada. O checkout fica somente
+leitura; arquivos temporários ficam em tmpfs limitado a 256 MiB. A execução tem limites de 110 s de parede,
+90 s de CPU, 2 GiB de memória virtual, 128 processos, 32 MiB por arquivo e 256 descritores. Não instala dependências.

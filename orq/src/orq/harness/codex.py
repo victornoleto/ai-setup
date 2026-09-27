@@ -15,7 +15,10 @@ class CodexHarness(Harness):
         common = ["--json", "--output-schema", schema_file, "-m", req.role.model,
                   "-c", f"model_reasoning_effort={req.role.effort}", "--skip-git-repo-check"]
         if req.resume:
-            return ["codex", "exec", "resume", *common, "--dangerously-bypass-approvals-and-sandbox", req.session_id, "-"]
+            # `exec resume` não aceita -s: sobrescreva a política pela configuração.
+            access = ["-c", 'sandbox_mode="read-only"', "-c", 'approval_policy="never"'] if req.read_only else [
+                "--dangerously-bypass-approvals-and-sandbox"]
+            return ["codex", "exec", "resume", *common, *access, req.session_id, "-"]
         access = ["-s", "read-only"] if req.read_only else ["--dangerously-bypass-approvals-and-sandbox"]
         return ["codex", "exec", *common, *access, "-C", str(req.cwd), "-"]
 
@@ -32,6 +35,8 @@ class CodexHarness(Harness):
             t = ev.get("type")
             if t == "thread.started":
                 sid = ev.get("thread_id") or sid
+                if sid and req.on_session:
+                    req.on_session(sid)
             elif t == "error":
                 errors.append(str(ev.get("message", "")))
             elif t == "turn.failed":

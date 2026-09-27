@@ -58,14 +58,15 @@ def clip(s: str, n: int) -> str:
 def ask_payload(cfg: dict, queue: str, ask: dict) -> dict:
     """Pergunta → kwargs de publish: pergunta e rótulos curtos; botões para a recomendada e as duas seguintes."""
     opts = ask["options"]
-    lines = [f"{i}) " + ("★ " if o["id"] == ask["recommended"] else "") + clip(o["label"], 60)
+    lines = [f"{i}) " + ("★ Recomendada · " if o["id"] == ask["recommended"] else "") + f"Opção {i}"
              for i, o in enumerate(opts, 1)]
     order = sorted(range(len(opts)), key=lambda i: opts[i]["id"] != ask["recommended"])[:3]
-    actions = [{"action": "http", "label": clip(f"{i + 1} · {opts[i]['label']}", 40), "method": "POST",
+    actions = [{"action": "http", "label": f"{i + 1} · Opção {i + 1}", "method": "POST",
                 "url": f"{cfg['server']}/{cfg['topic']}-r", "body": f"{ask['id']} {i + 1}", "clear": True}
                for i in order]
     return {"title": f"orq {queue} · {ask['task']} precisa de você", "priority": 5, "tags": ["raising_hand"],
-            "message": clip(ask["question"], 200) + "\n" + "\n".join(lines), "actions": actions}
+            "message": "Consulte a pergunta e os detalhes no painel antes de responder.\n" + "\n".join(lines),
+            "actions": actions}
 
 
 def poll(cfg: dict, since: str) -> tuple[list[str], str]:

@@ -44,6 +44,8 @@ class FakeHarness(Harness):
 
     async def call(self, req: CallRequest, on_line: OnLine) -> CallResult:
         self.calls.append(req)
+        if req.session_id and req.on_session:
+            req.on_session(req.session_id)
         key = schema_key(req.schema)
         # contador persistido ao lado das chamadas: sobrevive a um `resume`
         counter = req.calls_dir.parent.parent / "fake-counts.json"

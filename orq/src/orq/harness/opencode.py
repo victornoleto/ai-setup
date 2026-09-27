@@ -40,17 +40,20 @@ class OpencodeHarness(Harness):
         sid = req.session_id if req.resume else None
         texts: list[str] = []
         errors: list[str] = []
-        cost = 0.0
+        cost = None
 
         def on_json(ev: dict):
             nonlocal sid, cost
             sid = ev.get("sessionID") or sid
+            if sid and req.on_session:
+                req.on_session(sid)
             part = ev.get("part") or {}
             t = ev.get("type")
             if t == "text":
                 texts.append(part.get("text", ""))
             elif t == "step_finish":
-                cost += float(part.get("cost") or 0)
+                if part.get("cost") is not None:
+                    cost = (cost or 0) + float(part["cost"])
             elif t == "error":
                 err = ev.get("error") or {}
                 data = err.get("data") or {}
@@ -63,7 +66,7 @@ class OpencodeHarness(Harness):
         rc, timed_out, err = await run_process(self.argv(req, prompt), None, req.cwd, req.env, req.timeout,
                                                req.calls_dir / f"{req.name}.stream.jsonl", on_json)
         if timed_out:
-            return CallResult(error="timeout", session_id=sid, message="timeout")
+            return CallResult(error="timeout", session_id=sid, message="timeout", cost=cost)
         final = texts[-1] if texts else ""
         out = extract_json(final)
         valid = out is not None and is_valid(out, req.schema)

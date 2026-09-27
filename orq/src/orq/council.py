@@ -20,7 +20,7 @@ def tally(votes: list[dict], n: int) -> tuple[str, float] | None:
     top_id, top = counts[0]
     if top == n:
         return top_id, 3
-    if top >= 2 and sum(1 for _, c in counts if c == top) == 1:
+    if top > n / 2:
         return top_id, 2
     return None
 
@@ -89,16 +89,19 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     return record(eng, t, source, q, votes, choice, points, tb_rationale)
 
 
-def record_victor(store, task: str, orig: dict, choice: str, label: str, why: str) -> str:
+def record_victor(store, task: str, orig: dict, choice: str, label: str, why: str, command_id: str = "") -> str:
     """Decisão do Victor sobre uma pergunta do conselho: evento + decisions.md. → a linha para o prompt."""
-    store.event("decision", {
-        "task": task, "source": "victor", "qid": orig["qid"], "question": orig["question"],
-        "context": orig.get("context", ""), "options": orig["options"], "votes": [], "choice": choice,
-        "label": label, "points": None, "tiebreak": "", "why": why, "override": choice != orig["choice"]})
-    d = store.dir / task / "decisions.md"
-    d.parent.mkdir(parents=True, exist_ok=True)
-    with open(d, "a") as fh:
-        fh.write(f"## {orig['question']} (decisão do Victor)\n\nEscolha: `{choice}` — {label}. {why}\n\n")
+    # reentrega do mesmo comando: o evento e a linha do decisions.md já existem
+    if not command_id or not any(e["type"] == "decision" and e.get("command_id") == command_id for e in store.events()):
+        store.event("decision", {
+            "task": task, "source": "victor", "qid": orig["qid"], "question": orig["question"],
+            "context": orig.get("context", ""), "options": orig["options"], "votes": [], "choice": choice,
+            "label": label, "points": None, "tiebreak": "", "why": why, "override": choice != orig["choice"],
+            "command_id": command_id})
+        d = store.dir / task / "decisions.md"
+        d.parent.mkdir(parents=True, exist_ok=True)
+        with open(d, "a") as fh:
+            fh.write(f"## {orig['question']} (decisão do Victor)\n\nEscolha: `{choice}` — {label}. {why}\n\n")
     return f"- **{orig['question']}** → `{choice}` — {label} (decisão do Victor). {why}"
 
 

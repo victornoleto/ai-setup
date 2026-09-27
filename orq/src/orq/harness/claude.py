@@ -26,6 +26,8 @@ class ClaudeHarness(Harness):
 
         def on_json(ev: dict):
             nonlocal result
+            if ev.get("session_id") and req.on_session:
+                req.on_session(ev["session_id"])
             if ev.get("type") == "result":
                 result = ev
             for line in render_event(ev, req.thinking):
@@ -34,17 +36,18 @@ class ClaudeHarness(Harness):
         raw = req.calls_dir / f"{req.name}.stream.jsonl"
         rc, timed_out, err = await run_process(self.argv(req), req.prompt, req.cwd, env, req.timeout, raw, on_json)
         (req.calls_dir / f"{req.name}.json").write_text(json.dumps(result, ensure_ascii=False))
+        cost = float(result["total_cost_usd"]) if result.get("total_cost_usd") is not None else None
         if timed_out:
-            return CallResult(error="timeout", message="timeout")
+            return CallResult(error="timeout", message="timeout", cost=cost)
         sid = result.get("session_id") or req.session_id
         if rc == 0 and result.get("is_error") is False and result.get("structured_output") is not None:
-            return CallResult(output=result["structured_output"], session_id=sid, cost=float(result.get("total_cost_usd") or 0))
+            return CallResult(output=result["structured_output"], session_id=sid, cost=cost)
         text = f"{result.get('result') or ''} {err}"
         if rc == 0 and result and result.get("structured_output") is None and not result.get("is_error"):
             return CallResult(error="no_output", session_id=sid, message=clip(text, 300),
-                              cost=float(result.get("total_cost_usd") or 0))
+                              cost=cost)
         return CallResult(error=classify(text) or "fatal", session_id=sid if result else None,
-                          message=clip(text, 300) or f"saída {rc}")
+                          message=clip(text, 300) or f"saída {rc}", cost=cost)
 
     def interactive_argv(self, role: Role, prompt: str) -> list[str]:
         return ["claude", "--model", role.model, "--effort", role.effort, prompt]

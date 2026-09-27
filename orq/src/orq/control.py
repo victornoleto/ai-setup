@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import council
+from .store import write_atomic
 
 if TYPE_CHECKING:
     from .engine import Engine
@@ -70,29 +71,46 @@ class Control:
 
     def __init__(self, eng: "Engine"):
         self.eng = eng
-        self.paused = False
-        self.stop = False
+        saved = eng.s.top("control", {})
+        self.paused = saved.get("paused", False)
+        self.stop = saved.get("stop", False)
         self.resumed = asyncio.Event()
         self.background: set[asyncio.Task] = set()
-        self.answers: dict[str, str] = {}  # id da pergunta aberta → resposta do Victor (intervene.wait consome)
+        self.running_ops: set[str] = set()
+
+    @property
+    def answers(self) -> dict[str, str]:
+        return self.s.top("answers", {})
+
+    def forget_answer(self, ask_id: str) -> None:
+        answers = self.answers
+        answers.pop(ask_id, None)
+        self.s.set_top("answers", answers)
 
     @property
     def s(self):
         return self.eng.s
 
     async def loop(self) -> None:
+        for cmd_id, message in self.s.top("pending_ops", {}).items():
+            if not any(e["type"] == "operator" and e.get("id") == cmd_id for e in self.s.events()):
+                self.launch_ask(cmd_id, message)
         while True:
             self.drain()
             await asyncio.sleep(self.poll_interval)
 
     def drain(self) -> None:
         for cmd in self.s.take_inbox():
+            if any(e["type"] == "control_ack" and e.get("id") == cmd["id"] for e in self.s.events()):
+                self.s.ack_inbox(cmd)
+                continue
             try:
                 ok, result = self.apply(cmd["text"], cmd["id"])
             except Exception as exc:  # comando ruim nunca derruba o motor
                 ok, result = False, f"erro: {exc}"
             self.s.event("control_ack", {"id": cmd["id"], "command": cmd["text"], "ok": ok, "result": result,
                                          "source": cmd.get("source", "")})
+            self.s.ack_inbox(cmd)
 
     async def checkpoint(self) -> None:
         self.drain()
@@ -112,14 +130,50 @@ class Control:
 
     # --- comandos ---------------------------------------------------------------------------------
     def apply(self, text: str, cmd_id: str = "") -> tuple[bool, str]:
+        done = self.s.top("command_results", {})
+        if cmd_id and cmd_id in done:
+            return tuple(done[cmd_id])
+        result = self._apply(text, cmd_id)
+        self.s.set_top("control", {"paused": self.paused, "stop": self.stop})
+        if cmd_id:
+            done[cmd_id] = result
+            self.s.set_top("command_results", done)
+        return result
+
+    def create_task(self, text: str, files: list[Path], after: Path | None, cmd_id: str, title: str = "") -> str:
+        prepared = self.s.top("command_files", {})
+        if cmd_id and cmd_id in prepared:
+            name, body = prepared[cmd_id]
+        else:
+            name, body = new_task_name(files, title or text, after), text.rstrip() + "\n"
+            if cmd_id:
+                prepared[cmd_id] = [name, body]
+                self.s.set_top("command_files", prepared)
+        target = self.eng.cfg.queue_dir / name
+        if target.exists() and target.read_text() != body:
+            raise ValueError(f"{name} mudou desde a preparação do comando; não foi sobrescrita")
+        write_atomic(target, body)
+        return name
+
+    def launch_ask(self, cmd_id: str, message: str) -> None:
+        if cmd_id in self.running_ops:
+            return
+        self.running_ops.add(cmd_id)
+        job = asyncio.get_running_loop().create_task(self.ask(cmd_id, message))
+        self.background.add(job)
+        job.add_done_callback(self.background.discard)
+        job.add_done_callback(lambda _: self.running_ops.discard(cmd_id))
+
+    def _apply(self, text: str, cmd_id: str = "") -> tuple[bool, str]:
         cmd, opts, rest = parse(text)
         files = self.eng.task_files()
         if cmd == "ask":
             if not rest:
                 return False, "uso: /ask <mensagem>"
-            job = asyncio.get_running_loop().create_task(self.ask(cmd_id, rest))
-            self.background.add(job)
-            job.add_done_callback(self.background.discard)
+            pending = self.s.top("pending_ops", {})
+            pending[cmd_id] = rest
+            self.s.set_top("pending_ops", pending)
+            self.launch_ask(cmd_id, rest)
             return True, "operador consultado; a resposta aparece aqui"
         if cmd == "add":
             if not rest:
@@ -127,8 +181,7 @@ class Control:
             after = find_task(files, opts["after"]) if opts.get("after") else None
             if opts.get("after") and not after:
                 return False, f"tarefa {opts['after']} não existe"
-            name = new_task_name(files, rest, after)
-            (self.eng.cfg.queue_dir / name).write_text(rest.rstrip() + "\n")
+            name = self.create_task(rest, files, after, cmd_id)
             return True, f"tarefa {Path(name).stem} criada na fila"
         if cmd in ("skip", "unskip"):
             f = find_task(files, rest)
@@ -138,8 +191,7 @@ class Control:
             if cmd == "skip":
                 if st.get("phase"):
                     return False, f"{f.stem} já começou ({st.get('result') or st.get('phase')}); só tarefa pendente é pulada"
-                self.s.set(f.stem, "phase", "done")
-                self.s.set(f.stem, "result", "skipped")
+                self.s.update_task(f.stem, {"phase": "done", "result": "skipped"})
                 return True, f"{f.stem} será pulada"
             if st.get("result") != "skipped":
                 return False, f"{f.stem} não está pulada"
@@ -155,7 +207,8 @@ class Control:
                 if not f:
                     return False, f"tarefa {opts['task']} não existe"
                 task = f.stem
-            self.s.event("note", {"text": rest, "for_task": task})
+            if not cmd_id or not any(e["type"] == "note" and e.get("command_id") == cmd_id for e in self.s.events()):
+                self.s.event("note", {"text": rest, "for_task": task, "command_id": cmd_id})
             return True, f"nota para {task or 'todas as tarefas'}: entra no próximo prompt"
         if cmd == "answer":
             m = re.match(r"(\S+)\s+(.+)$", rest, re.S)
@@ -163,11 +216,13 @@ class Control:
                 return False, "uso: /answer <id da pergunta> <nº da opção ou texto>"
             if (self.s.top("open_ask") or {}).get("id") != m.group(1):
                 return False, f"a pergunta {m.group(1)} não está aberta"
-            self.answers[m.group(1)] = m.group(2).strip()
+            answers = self.answers
+            answers[m.group(1)] = m.group(2).strip()
+            self.s.set_top("answers", answers)
             self.resumed.set()
             return True, "resposta recebida"
         if cmd == "decision":
-            return self.decision(rest)
+            return self.decision(rest, cmd_id)
         if cmd == "pause":
             self.paused = True
             return True, "pausa no próximo ponto seguro (fim da chamada atual)"
@@ -183,7 +238,7 @@ class Control:
             return False, "/edit só no painel (abre o $EDITOR)"
         return False, f"comando desconhecido. {HELP}"
 
-    def decision(self, rest: str) -> tuple[bool, str]:
+    def decision(self, rest: str, cmd_id: str = "") -> tuple[bool, str]:
         m = re.match(r"(\S+)\s+(.+)$", rest, re.S)
         if not m:
             return False, "uso: /decision <qid> <id da opção ou texto livre>"
@@ -196,7 +251,8 @@ class Control:
         choice, label = (opt["id"], opt["label"]) if opt else ("victor", answer)
         task = orig["task"]
         council.record_victor(self.s, task, orig, choice, label,
-                              f"Trocada pelo Victor (o conselho tinha escolhido `{orig['choice']}` — {orig['label']}).")
+                              f"Trocada pelo Victor (o conselho tinha escolhido `{orig['choice']}` — {orig['label']}).",
+                              command_id=cmd_id)
         if self.s.get(task, "phase") != "done":
             return True, f"{task} recebe a decisão no próximo prompt"
         files = self.eng.task_files()
@@ -205,8 +261,7 @@ class Control:
                 f"`{orig['choice']}` ({orig['label']}) para `{choice}` ({label}).\n\n"
                 f"Leia o que a `{task}` fez (`git log`, o plano e o journal da execução em {self.s.dir}) e ajuste o "
                 "código, os testes e a documentação para a decisão nova. Commits no padrão do repositório.\n")
-        name = new_task_name(files, f"ajuste decisao {qid}", after)
-        (self.eng.cfg.queue_dir / name).write_text(text)
+        name = self.create_task(text, files, after, cmd_id, title=f"ajuste decisao {qid}")
         return True, f"{task} já terminou: criada a tarefa {Path(name).stem} para aplicar a decisão"
 
     async def ask(self, cmd_id: str, message: str) -> None:
@@ -230,3 +285,6 @@ class Control:
             out = {"reply": "O operador não respondeu (ver orq.log).", "commands": []}
         cmds = [c.strip() for c in out.get("commands") or [] if c.strip().startswith("/") and not c.startswith("/ask")]
         self.s.event("operator", {"id": cmd_id, "text": message, "reply": out.get("reply", ""), "commands": cmds})
+        pending = self.s.top("pending_ops", {})
+        pending.pop(cmd_id, None)
+        self.s.set_top("pending_ops", pending)

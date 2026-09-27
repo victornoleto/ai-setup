@@ -169,14 +169,36 @@ class Engine:
         calls_dir = (t.dir if t else self.s.dir / "operator") / "calls"
         calls_dir.mkdir(parents=True, exist_ok=True)
         (calls_dir / f"{name}.prompt.md").write_text(prompt_text)
+        tid = t.id if t else ""
+        key = f"{tid}:{role_name}:{re.sub(r'-[0-9]{6}$', '', name)}"
+        active = self.s.top("active_calls", {}).get(key)
+        if active:
+            sid, resume = active["sid"], active["resume"]
+            account = active.get("account", account)
         if not resume and not sid and h.preset_session_ids:
             sid = str(uuid.uuid4())
+
+        def save_session(new_sid: str | None, can_resume: bool = True):
+            record = {"sid": new_sid, "resume": can_resume, "account": account}
+            calls = self.s.top("active_calls", {})
+            if calls.get(key) != record:
+                calls[key] = record
+                self.s.set_top("active_calls", calls)
+
+        def finish(output, result_sid):
+            calls = self.s.top("active_calls", {})
+            calls.pop(key, None)
+            self.s.set_top("active_calls", calls)
+            return output, result_sid
+
+        save_session(sid, resume)
         waited, tries, asked_again = 0, 0, False
         limit_s = self.cfg.seconds("limit_max_wait")
-        tid = t.id if t else ""
         if gate:  # o operador responde mesmo com a execução pausada
             await self.checkpoint(t)
         while True:
+            if gate:
+                await self.checkpoint(t)
             tries += 1
             seen = len(self.s.events())
             full_prompt = self.with_inbox(t, sid, resume, prompt_text)
@@ -187,15 +209,18 @@ class Engine:
                               calls_dir=calls_dir, read_only=read_only or role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
                               env=self.git_env, thinking=self.thinking,
+                              on_session=save_session,
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
             res = await h.call(req, self.on_line_for(role_name, name))
+            self.s.add_cost(res.cost, tid, role_name)
+            if res.session_id:
+                save_session(res.session_id)
             self.mark_session(res.session_id or sid, seen)
             if res.error is None:
-                self.s.add_cost(res.cost, tid, role_name)
-                return res.output, res.session_id or sid
+                return finish(res.output, res.session_id or sid)
             if res.error == "timeout":
                 self.s.notice("timeout", f"{name} passou de {self.cfg.get('time', 'call_timeout')} e foi encerrada.", tid)
-                return None, sid
+                return finish(None, res.session_id or sid)
             if res.error == "session_exists" and not resume:
                 resume = True  # retomada depois de uma queda: a sessão "nova" já existe
                 continue
@@ -209,18 +234,18 @@ class Engine:
                 if waited + wait_s > limit_s:
                     self.s.notice("limit_giveup", f"Limite de uso em {name}; a espera passaria de "
                                   f"{self.cfg.get('time', 'limit_max_wait')}. Chamada abandonada.", tid)
-                    return None, sid
+                    return finish(None, res.session_id or sid)
                 self.s.notice("limit_wait", f"Limite de uso em {name} ({role.harness}); esperando {wait_s // 60} min.", tid)
                 if wait_s >= 1800:
                     self.notify(f"orq {self.queue_name()} · limite de uso", f"{name}: esperando {wait_s // 60} min.")
-                await asyncio.sleep(wait_s)
+                await self.wait_retry(wait_s, t, gate)
                 waited += wait_s
                 if not resume and res.session_id:
                     resume, sid = True, res.session_id
                 continue
             if res.error == "transient" and tries < 5:
                 self.s.log(f"{name}: erro transitório (tentativa {tries}), nova tentativa em {self.retry_delay} s")
-                await asyncio.sleep(self.retry_delay)
+                await self.wait_retry(self.retry_delay, t, gate)
                 if not resume and res.session_id:
                     resume, sid = True, res.session_id
                 continue
@@ -230,7 +255,16 @@ class Engine:
                 prompt_text = "Responda de novo, preenchendo a saída estruturada do schema pedido.\n"
                 continue
             self.s.notice("error", f"{name} falhou ({res.error}): {res.message}", tid)
-            return None, sid
+            return finish(None, res.session_id or sid)
+
+    async def wait_retry(self, seconds: float, t: Task | None, gate: bool) -> None:
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            if gate:
+                await self.checkpoint(t)
+            elif self.control.stop:
+                raise StopRun
+            await asyncio.sleep(min(self.control.poll_interval, max(0, end - time.monotonic())))
 
     # --- fila ---------------------------------------------------------------------------------------
     def queue_name(self) -> str:
@@ -239,10 +273,13 @@ class Engine:
     def notify(self, title: str, message: str, priority: int = 3, actions=()) -> None:
         """notify-send no desktop e, com notify.toml, ntfy no celular. Falha de rede só vai para o log."""
         notify.desktop(f"{title}: {message}")
-        if self.notifier and not notify.publish(self.notifier, title, message, priority, actions=actions):
+        # ntfy.sh é público: o título (só fila, tarefa e palavras fixas) sai; a mensagem, texto livre, fica no desktop
+        external_message = "Consulte o painel para ver o resultado e os detalhes da execução."
+        if self.notifier and not notify.publish(self.notifier, title, external_message, priority, actions=actions):
             self.s.log("aviso: o ntfy não respondeu (a execução segue)")
 
     def start_event(self) -> None:
+        self.s.set_top("config", self.cfg.raw)
         r = self.cfg.roles
         self.s.event("run_start", {
             "queue": self.queue_name(),
@@ -262,6 +299,10 @@ class Engine:
             return True
         finally:
             poller.cancel()
+            jobs = list(self.control.background)
+            for job in jobs:
+                job.cancel()
+            await asyncio.gather(poller, *jobs, return_exceptions=True)
 
     async def _run_queue(self) -> bool:
         failed, stop = 0, False
@@ -295,7 +336,8 @@ class Engine:
         for roles in self.s.cost_by().values():
             for r, v in roles.items():
                 by_role[r] = round(by_role.get(r, 0) + v, 4)
-        self.s.event("run_end", {"result": summary, "cost": cost, "cost_by_role": by_role})
+        self.s.event("run_end", {"result": summary, "cost": cost, "cost_by_role": by_role,
+                                 "cost_unknown": self.s.unknown_costs()})
         self.s.log(f"fim: {summary} · journal: {self.s.journal_path}")
         self.notify(f"orq {self.queue_name()} terminou", summary)
         return failed == 0
@@ -325,11 +367,11 @@ class Engine:
                     "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD")} if base and base != "none" else {}
         if result in ("ok", "ok_takeover", "ok_victor") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
-        self.s.set(t.id, "phase", "done")
-        self.s.set(t.id, "result", result)
+        self.s.update_task(t.id, {"phase": "done", "result": result})
         self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
                                   "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1),
-                                  "cost": self.s.cost_by().get(t.id, {}), "delivery": delivery})
+                                  "cost": self.s.cost_by().get(t.id, {}), "delivery": delivery,
+                                  "cost_unknown": sum(self.s.top("cost_unknown", {}).get(t.id, {}).values())})
         raise TaskEnded
 
     async def _run_task(self, t: Task) -> None:

@@ -162,16 +162,17 @@ class OrqApp(App):
                 added = True
         if added and at_bottom:
             tl.highlighted = tl.option_count - 1
-        rows = model.task_rows(self.store, self.events)
+        state = self.store.state()
+        rows = model.task_rows(self.store, self.events, state=state)
         width = self.query_one("#tasks").size.width or 60
         self.query_one("#tasks", Static).update(Text("\n").join(r.styled(width) for r in rows) if rows
                                                 else Text("(fila vazia)"))
-        ask = self.store.top("open_ask")
+        ask = state.get("open_ask")
         box = self.query_one("#ask", Static)
         box.display = bool(ask)
         if ask:
             box.update(model.ask_text(ask))
-        self.query_one("#header", Static).update(Text(model.header(self.store, self.events, rows)))
+        self.query_one("#header", Static).update(Text(model.header(self.store, self.events, rows, state=state)))
         log = self.query_one("#stream", RichLog)
         for line in self.stream_tail.read():
             log.write(Text(line))
