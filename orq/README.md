@@ -39,7 +39,8 @@ lê a pasta e o repositório, pergunta uma coisa por vez e divide o trabalho em 
 ```
 
 Dividir para conquistar: cada tarefa é uma sessão de 20 a 90 min de agente, autossuficiente ("pronto quando" e
-verificação próprios). O `orq check` avisa quando uma tarefa passa de 6.000 caracteres.
+verificação próprios). O `orq check` avisa quando uma tarefa passa de 6.000 caracteres ou não diz quando está
+pronta, quando a branch das regras não é a atual do repositório e quando não há `[verify] command`.
 
 ## Comandos
 
@@ -122,6 +123,7 @@ Com `[intervene] enabled = true` (padrão), a fila **pausa e pergunta** em vez d
 |---|---|---|
 | Decisão do conselho com 2 ou 2,5 pts | as do conselho; recomendada = a escolhida | depois de `decision_timeout` (1 h), segue com a escolha: **[DECISÃO SEM VICTOR]** |
 | Tarefa bloqueada (árvore suja, executor travado) ou que falhou (chamada, revisão final, verificação depois do takeover, laço de dúvidas) | 3 ou 4, montadas pelo operador (só leitura), uma recomendada | espera; lembrete no ntfy a cada `reminder` (2 h) |
+| Orçamento estourado: `[loop] max_task_time` (tempo ativo da tarefa, 3 h) ou `max_run_cost` (US$ da execução, desligado) | as mesmas; `retry` segue sem perguntar de novo nesta tarefa | espera, como acima |
 
 Cada opção de bloqueio/falha é uma ação: `retry` (refaz a fase com uma nota), `replan` (volta ao plano), `accept`
 (fecha como **ok, aceita pelo Victor**), `skip` (pula) ou `stop` (para; `orq resume` volta à mesma pergunta).
@@ -219,7 +221,8 @@ Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**,
   sem alterar o repositório.
 - Conselho e operador rodam só leitura. Planejador, executor e revisor rodam com as permissões liberadas; o que
   eles podem fazer é o que a tarefa e as regras dizem.
-- Timeout por chamada (`call_timeout`, 4 h). Erro transitório tem nova tentativa. No limite de uso, espera o reset
+- Timeout por chamada (`call_timeout`, 4 h) e orçamento por tarefa e por execução (`[loop] max_task_time`,
+  `max_run_cost`): estourou, a fila pergunta em vez de seguir gastando. Erro transitório tem nova tentativa. No limite de uso, espera o reset
   (até `limit_max_wait`, 8 h) ou troca de conta.
 - `Ctrl-C`/`kill` no motor registram "interrompido"; `orq resume` continua da fase em curso. IDs de sessão são
   persistidos assim que conhecidos (antes da chamada quando o harness permite escolher o ID). A retomada do

@@ -52,6 +52,8 @@ dirs = { "1" = "~/.claude", "2" = "~/.claude2" }
 max_cycles = 3             # execuções revisadas antes de o planejador assumir
 max_decision_rounds = 5    # rodadas de conselho por tarefa (trava contra laço de dúvidas)
 on_fail = "stop"           # stop | continue
+max_task_time = "3h"       # tempo ativo por tarefa (chamadas e verificação); passou, pergunta ao Victor. "0" desliga
+max_run_cost = 0           # US$ estimados da execução inteira; passou, pergunta ao Victor (uma vez por tarefa). 0 desliga
 
 [verify]
 command = ""               # ex. "make test": roda na raiz do repo depois de cada execução; falhou = reprovada (gasta ciclo)

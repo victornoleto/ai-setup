@@ -23,3 +23,5 @@ rules_file = "regras.md"
 # [loop]
 # max_cycles = 3
 # on_fail = "stop"         # stop | continue
+# max_task_time = "3h"     # tempo ativo por tarefa antes de perguntar ao Victor ("0" desliga)
+# max_run_cost = 150       # US$ estimados da execução antes de perguntar ao Victor (0 desliga)

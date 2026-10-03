@@ -18,7 +18,7 @@ from . import context, council, harness as harness_mod, intervene, notify
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
-from .store import RunStore, queue_label
+from .store import RunStore, active_seconds, queue_label
 
 OK_RESULTS = ("ok", "ok_takeover", "ok_victor", "skipped")
 
@@ -402,6 +402,10 @@ class Engine:
             try:
                 t.base_prompt = self.base_prompt(t)  # refeito a cada fase: o PROGRESS muda com a fila
                 s.set(t.id, "phase", phase)
+                over = self.over_budget(t)
+                if over and not s.get(t.id, "budget_asked"):
+                    s.set(t.id, "budget_asked", True)  # pergunta uma vez por tarefa; retry segue sem perguntar de novo
+                    raise Problem("failed", over, phase)
                 cycle = s.get(t.id, "cycle", 1)
                 psid = s.get(t.id, "planner_sid")
 
@@ -544,6 +548,19 @@ class Engine:
         if action == "skip":
             self.end(t, "skipped", f"Pulada pelo Victor. {p.reason}")
         raise StopRun
+
+    def over_budget(self, t: Task) -> str | None:
+        """Motivo, se a tarefa passou do tempo ativo ou a execução do custo configurados em [loop]."""
+        limit = self.cfg.max_task_seconds
+        active = active_seconds(self.s.state()["tasks"].get(t.id, {}))
+        if limit and active > limit:
+            return (f"A tarefa passou do orçamento de tempo ativo ({self.cfg.get('loop', 'max_task_time')}): "
+                    f"{int(active) // 60} min em chamadas e verificações, sem terminar.")
+        cost_limit = self.cfg.max_run_cost
+        if cost_limit and self.s.cost() > cost_limit:
+            return (f"A execução passou do orçamento de custo (US$ {cost_limit:.2f}): US$ {self.s.cost():.2f} "
+                    "estimados até aqui.")
+        return None
 
     def reject(self, t: Task, cycle: int, why_md: str) -> str:
         """Entrega reprovada (revisão ou verificação): próximo ciclo do executor ou, no último, o takeover."""

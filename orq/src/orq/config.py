@@ -24,6 +24,8 @@ _LEGACY = {
     "ORQ_MAX_CYCLES": ("loop", "max_cycles"),
     "ORQ_MAX_DECISION_ROUNDS": ("loop", "max_decision_rounds"),
     "ORQ_ON_FAIL": ("loop", "on_fail"),
+    "ORQ_MAX_TASK_TIME": ("loop", "max_task_time"),
+    "ORQ_MAX_RUN_COST": ("loop", "max_run_cost"),
     "ORQ_CALL_TIMEOUT": ("time", "call_timeout"),
     "ORQ_LIMIT_MAX_WAIT": ("time", "limit_max_wait"),
     "ORQ_LIMIT_POLL": ("time", "limit_poll"),
@@ -85,6 +87,16 @@ class Config:
     @property
     def on_fail(self) -> str:
         return str(self.get("loop", "on_fail", default="stop"))
+
+    @property
+    def max_task_seconds(self) -> int:
+        """Tempo ativo por tarefa antes de perguntar ao Victor; 0 = sem limite."""
+        return parse_duration(self.get("loop", "max_task_time", default="0"))
+
+    @property
+    def max_run_cost(self) -> float:
+        """US$ estimados da execução antes de perguntar ao Victor; 0 = sem limite."""
+        return float(self.get("loop", "max_run_cost", default=0) or 0)
 
     @property
     def voters(self) -> int:
@@ -245,4 +257,6 @@ def from_raw(raw: dict, queue_dir: Path) -> Config:
         raise ConfigError(f"loop.on_fail inválido: {cfg.on_fail}")
     if cfg.voters < 1 or cfg.max_cycles < 1 or cfg.max_decision_rounds < 1:
         raise ConfigError("votantes, ciclos e rodadas devem ser positivos")
+    if cfg.max_task_seconds < 0 or cfg.max_run_cost < 0:
+        raise ConfigError("loop.max_task_time e loop.max_run_cost não podem ser negativos (0 desliga)")
     return cfg

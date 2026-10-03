@@ -216,3 +216,25 @@ async def test_espera_pelo_victor_nao_conta_como_tempo_ativo(tmp_path):
     assert await job
     end = next(x for x in e.s.events() if x["type"] == "task_end")
     assert end["duration_s"] >= 1 and end["active_s"] < end["duration_s"]
+
+
+# --- orçamento ---------------------------------------------------------------------------------------------------------
+async def test_orcamento_de_tempo_pergunta_uma_vez_e_retry_segue(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [{**EXEC_OK, "_sleep": 1.2}], "review": [APPROVED],
+                                "ask": [ASK_OUT]}, intervene="enabled = true", extra_toml='[loop]\nmax_task_time = "1s"\n')
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await until(lambda: e.s.top("open_ask"), n=600)
+    assert "orçamento de tempo" in e.s.top("open_ask")["reason"]
+    e.s.send(f"/answer {e.s.top('open_ask')['id']} 1")
+    assert await job and e.s.get("01-a", "result") == "ok"
+    assert [x["type"] for x in e.s.events()].count("ask") == 1
+
+
+async def test_orcamento_de_custo_sem_intervencao_encerra_falhada(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]},
+                     extra_toml="[loop]\nmax_run_cost = 0.015\n")  # o fake custa US$ 0.01 por chamada
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert end["result"] == "failed" and "orçamento de custo" in end["reason"]

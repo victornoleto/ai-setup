@@ -3,6 +3,7 @@ interativa, com a skill orq-setup. `orq check`: confere a fila antes de rodar.""
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -83,10 +84,15 @@ def inspect(path: Path) -> Report:
             r.warnings.append(f"{t.name} tem {len(body)} caracteres: dividir para conquistar (duas tarefas?)")
         if "<…>" in body:
             r.warnings.append(f"{t.name} ainda tem marcador <…> do modelo")
+        if body.strip() and not re.search(r"pronto quando|verific", body, re.I):
+            r.warnings.append(f"{t.name} não diz quando está pronta: acrescente 'Pronto quando' ou 'Verificar'")
+    rules_branch = ""
     try:
         rules = cfg.rules_text()
         if "<branch>" in rules or "<o que" in rules or "<comandos" in rules:
             r.warnings.append("regras.md ainda tem marcadores <…> do modelo")
+        m = re.search(r"Branch:\s*`([^`<>]+)`", rules)
+        rules_branch = m.group(1).strip() if m else ""
     except config.ConfigError as e:
         r.errors.append(str(e))
     if cfg.verify_command:
@@ -112,6 +118,9 @@ def inspect(path: Path) -> Report:
         branch = subprocess.run(["git", "-C", str(cfg.repo), "branch", "--show-current"], capture_output=True,
                                 text=True).stdout.strip()
         r.info.append(f"repositório {cfg.repo} · branch {branch or '(destacada)'}")
+        if rules_branch and rules_branch != branch:
+            r.warnings.append(f"regras.md pede a branch `{rules_branch}` e o repositório está em `{branch or '(destacada)'}`: "
+                              "troque antes de rodar, ou a primeira sessão vai trocar")
     for name in ("planner", "executor", "reviewer", "voter", "tiebreak"):
         role = cfg.roles[name]
         extra = f" ×{role.count}" if name == "voter" else ""

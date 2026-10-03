@@ -10,6 +10,7 @@ from pathlib import Path
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
+from textual.css.query import NoMatches
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, Footer, Input, Markdown, OptionList, RichLog, Static
@@ -143,7 +144,10 @@ class OrqApp(App):
 
     # --- dados --------------------------------------------------------------------------------------
     def refresh_data(self) -> None:
-        tl = self.query_one("#timeline", OptionList)
+        try:
+            tl = self.query_one("#timeline", OptionList)
+        except NoMatches:  # o timer ainda dispara enquanto o app encerra
+            return
         at_bottom = tl.highlighted is None or tl.highlighted >= tl.option_count - 1
         added = False
         for line in self.ev_tail.read():
@@ -179,7 +183,10 @@ class OrqApp(App):
 
     def local(self, text: str) -> None:
         """Linha só do painel (ajuda, eco do que foi enviado)."""
-        tl = self.query_one("#timeline", OptionList)
+        try:
+            tl = self.query_one("#timeline", OptionList)
+        except NoMatches:
+            return
         tl.add_option(Option(Text(text)))
         tl.highlighted = tl.option_count - 1
 
