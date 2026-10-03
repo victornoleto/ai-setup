@@ -406,3 +406,29 @@ def test_motor_que_nao_sobe_nao_abre_o_painel(tmp_path, monkeypatch, capsys):
     with pytest.raises(SystemExit):
         cli.start(e.s, cfg, Namespace(headless=False, cmd="run", retry=None, account=None, repo=None))
     assert "falta model" in capsys.readouterr().err
+
+
+async def test_registro_de_execucoes_e_comandos_sem_run_dir(tmp_path, capsys):
+    from argparse import Namespace
+    from orq import cli
+    from orq.store import registered_runs
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [APPROVED]})
+    e = engine(tmp_path, cfg)  # create() registra
+    assert [r["run"] for r in registered_runs()] == [str(e.s.dir)]
+    RunStore(tmp_path / "decide").create(cfg.queue_dir, "2", register=False)  # orq decide não polui a lista
+    old = RunStore(tmp_path / "antiga")
+    old.create(cfg.queue_dir, "2")
+    assert [r["run"] for r in registered_runs()] == [str(old.dir), str(e.s.dir)]
+    assert await e.run()
+    assert cli.cmd_runs(Namespace(limit=10)) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[1].startswith("parada") and lines[1].endswith(str(old.dir))
+    assert lines[2].startswith("terminou") and "1/1" in lines[2] and " fila " in lines[2]
+    assert cli.cmd_status(Namespace(run_dir=None)) == 0  # sem run dir: a mais recente (nenhuma viva)
+    out = capsys.readouterr()
+    assert str(old.dir) in out.err and "motor: parado" in out.out
+    (old.dir / "state.json").unlink()  # run dir apagado some da lista
+    assert [r["run"] for r in registered_runs()] == [str(e.s.dir)]
+    assert cli.main(["send", "/pause"]) == 0
+    assert "caixa de entrada" in capsys.readouterr().out
+    assert e.s.take_inbox()[-1]["text"] == "/pause"

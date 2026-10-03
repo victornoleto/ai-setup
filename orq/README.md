@@ -47,14 +47,19 @@ verificação próprios). O `orq check` avisa quando uma tarefa passa de 6.000 c
 orq new <pasta> [--repo DIR]
 orq check <pasta>
 orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
-orq attach <run-dir>
-orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
-orq send <run-dir> "/comando …"
-orq status <run-dir>
+orq runs [-n 10]
+orq attach [run-dir]
+orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
+orq send [run-dir] "/comando …"
+orq status [run-dir]
 orq decide "Pergunta?" --option a="Rótulo: detalhe" --option b="…" [--context "…"]
 orq notify setup | test
 orq selftest
 ```
+
+Toda execução entra num registro fora do repositório (`~/.local/state/orq/runs.jsonl`). `orq runs` lista as
+últimas, com estado (rodando · esperando você · parada · terminou), tarefas feitas/total e o run dir. Sem run dir,
+`attach`, `status` e `send` usam a execução mais recente que está rodando (ou a última); `resume`, a última.
 
 `orq run` aceita a pasta da atividade (com `orq/` dentro) ou a própria fila. A árvore precisa estar limpa no
 começo de cada tarefa; se não estiver, a tarefa fica **bloqueada**. Com `on_fail = "stop"` (padrão), a fila para
