@@ -34,7 +34,12 @@ def test_scaffold_e_check(tmp_path, capsys):
     assert any("02-b.md tem 7000" in w for w in r.warnings)
     assert not any("não é ignorada" in w for w in r.warnings)
     assert any(line.startswith("01-a — Faça A.") for line in r.info)
+    assert any(w.startswith("sem [verify] command") for w in r.warnings)
     assert wizard.check(act) == 0 and "orq run" in capsys.readouterr().out
+    (q / "orq.toml").write_text(ROLES_FAKE + '[run]\nrules_file = "regras.md"\n[verify]\ncommand = "make test"\n')
+    r = wizard.inspect(act)
+    assert not any("[verify]" in w for w in r.warnings)
+    assert any(line.startswith("verificação automática: `make test`") for line in r.info)
 
 
 def test_fila_nao_ignorada_avisa(tmp_path):

@@ -89,6 +89,11 @@ def inspect(path: Path) -> Report:
             r.warnings.append("regras.md ainda tem marcadores <…> do modelo")
     except config.ConfigError as e:
         r.errors.append(str(e))
+    if cfg.verify_command:
+        r.info.append(f"verificação automática: `{cfg.verify_command}` (timeout {cfg.get('verify', 'timeout', default='30m')})")
+    else:
+        r.warnings.append("sem [verify] command: o revisor roda a suíte por conta própria a cada ciclo (caro). No orq.toml "
+                          'da fila: [verify] command = "make test" (ou o comando curto que vale para toda tarefa)')
     for name, role in cfg.roles.items():
         if role.harness in BIN and not shutil.which(BIN[role.harness]):
             (r.errors if name != "wizard" else r.warnings).append(f"papel {name}: `{BIN[role.harness]}` não está no PATH")

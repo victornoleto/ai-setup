@@ -6,7 +6,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from .journal import RESULT_LABEL, current_events
+from .journal import RESULT_LABEL, _clip, current_events
 
 
 def title(f: Path) -> str:
@@ -59,6 +59,9 @@ def progress(events: list[dict], task_files: list[Path], current: str) -> str:
             summary = re.sub(r"\s+", " ", x.get("summary") or e.get("reason") or "").strip()
             commits = " · ".join(f"`{c['hash'][:9]}` {c['message']}" for c in x.get("commits") or [])
             lines.append(f"- `{i}` — {res}. {summary}" + (f" Commits: {commits}" if commits else ""))
+            pend = [_clip(p, 200) for p in (x.get("pending") or [])[:3]]
+            if pend:  # problema de ambiente ou dado que ela esbarrou: a sessão seguinte não precisa redescobrir
+                lines.append("  Pendências que ela deixou: " + " · ".join(pend))
     rest = [f for f in task_files if f.stem not in ends and f.stem != current]
     if rest:
         lines += ["", "Falta depois desta (não adiante):"] + [f"- `{f.stem}` — {title(f)}" for f in rest]
