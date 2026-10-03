@@ -10,5 +10,5 @@
 {"type":"task_start","ts":"2026-09-27T01:17:05-03:00","task":"02-dificil","base":"2222222bbbb","task_file":"/tmp/fila/02-dificil.md"}
 {"type":"decision","ts":"2026-09-27T01:20:00-03:00","task":"02-dificil","source":"executor","qid":"x","question":"Qual lib?","context":"três caminhos","options":[{"id":"a","label":"A","detail":""},{"id":"b","label":"B","detail":""},{"id":"c","label":"C","detail":""}],"votes":[{"voter":1,"option_id":"a","rationale":"r1"},{"voter":2,"option_id":"b","rationale":"r2"},{"voter":3,"option_id":"c","rationale":"r3"}],"choice":"b","label":"B","points":2.5,"tiebreak":"B pesa menos","why":"B pesa menos"}
 {"type":"notice","ts":"2026-09-27T02:00:00-03:00","task":"02-dificil","kind":"limit_wait","text":"Limite de uso na conta 2; esperando 30 min."}
-{"type":"task_end","ts":"2026-09-27T03:00:00-03:00","task":"02-dificil","result":"failed","reason":"Nem o takeover passou.","duration_s":6175,"cycles":4}
+{"type":"task_end","ts":"2026-09-27T03:00:00-03:00","task":"02-dificil","result":"failed","reason":"Nem o takeover passou.","duration_s":6175,"active_s":1800,"cycles":4}
 {"type":"run_end","ts":"2026-09-27T03:00:01-03:00","result":"parada na tarefa que falhou (1 com problema)","cost":"12.3400"}

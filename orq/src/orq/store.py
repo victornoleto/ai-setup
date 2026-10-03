@@ -56,6 +56,13 @@ def read_jsonl(path: Path) -> list[dict]:
     return out
 
 
+def active_seconds(task_state: dict, now: float | None = None) -> float:
+    """Tempo ativo acumulado de uma tarefa, incluindo a chamada em curso."""
+    total = float(task_state.get("active_s") or 0)
+    since = task_state.get("active_since")
+    return total + (max(0.0, (now or time.time()) - float(since)) if since else 0.0)
+
+
 class RunStore:
     def __init__(self, run_dir: Path, echo: bool = False):
         self.dir = Path(run_dir).resolve()
@@ -176,6 +183,22 @@ class RunStore:
     def set_top(self, key: str, value) -> None:
         st = self.state()
         st[key] = value
+        self._save(st)
+
+    # --- tempo ativo ---------------------------------------------------------------------------------
+    # Parede ≠ trabalho: a espera pelo Victor e o motor parado não contam. Ativo = chamadas e verificações.
+    def active_start(self, task: str) -> None:
+        if task:
+            self.update_task(task, {"active_since": time.time()})
+
+    def active_stop(self, task: str) -> None:
+        if not task:
+            return
+        st = self.state()
+        t = st["tasks"].setdefault(task, {})
+        since = t.pop("active_since", None)
+        if since:
+            t["active_s"] = round(float(t.get("active_s") or 0) + max(0.0, time.time() - float(since)), 1)
         self._save(st)
 
     def drop_task(self, task: str) -> None:

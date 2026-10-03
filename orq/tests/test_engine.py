@@ -407,3 +407,13 @@ async def test_retry_do_takeover_leva_o_parecer_do_revisor_final(tmp_path):
     takeover = (e.s.dir / "01-a" / "takeover.prompt.md").read_text()
     assert "faltou-o-b" in takeover and "revisor final reprovou" in takeover
     assert "[alta] a.txt: x" not in takeover  # a reprovação do executor (ciclo 3) não é mais a última
+
+
+async def test_tempo_ativo_no_task_end(tmp_path):
+    """A2: active_s soma só as chamadas (aqui, a execução dorme 1,1 s) e nunca passa da parede."""
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [{**EXEC_OK, "_sleep": 1.1}], "review": [APPROVED]})
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert 1 <= end["active_s"] <= end["duration_s"]
+    assert e.s.get("01-a", "active_since") is None

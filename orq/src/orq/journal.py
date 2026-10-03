@@ -56,6 +56,15 @@ def dur(s) -> str:
     return f"{s} s" if s < 60 else f"{s // 60} min"
 
 
+def dur_both(e: dict) -> str:
+    """Duração de parede e, quando difere (espera pelo Victor, motor parado), a ativa entre parênteses."""
+    d, a = e.get("duration_s"), e.get("active_s")
+    out = dur(d)
+    if d is not None and a is not None and a < d - 60:
+        out += f" (ativa {dur(a)})"
+    return out
+
+
 def result_label(r) -> str:
     return "em andamento" if r is None else RESULT_LABEL.get(r, r)
 
@@ -202,7 +211,7 @@ def render(ev: list[dict]) -> str:
         d = [e.get("points") for e in ev if e["type"] == "decision" and e.get("task") == t]
         nc = len({c["hash"] for e in ev if e["type"] == "exec" and e.get("task") == t for c in e.get("commits") or []})
         lines.append(f"| {i + 1} | {name(t)} | {result_label(end.get('result'))} | {cycles} | "
-                     f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} | "
+                     f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur_both(end)} | "
                      + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
     if re_ and re_.get("cost_unknown"):
@@ -216,7 +225,7 @@ def render(ev: list[dict]) -> str:
         last = next((e for e in reversed(last_exec) if e.get("task") == t), {})
         review = next((e for e in reversed(last_review) if e.get("task") == t), {})
         stat = ((end.get("delivery") or {}).get("stat") or "").splitlines()
-        facts = [dur(end.get("duration_s")) if end else "em andamento"]
+        facts = [dur_both(end) if end else "em andamento"]
         if end.get("cost"):
             facts.append(f"US$ {sum(end['cost'].values()):.2f}")
         if end.get("delivery"):
@@ -241,7 +250,7 @@ def render_task(ev: list[dict], t: str) -> str:
              "[← resumo da execução](../journal.md)", ""]
     if start:
         lines += [f"Início {start['ts'][11:16]} · base `{start['base'][0:9]}` · tarefa: `{start['task_file']}`"
-                  + (f" · duração {dur(end.get('duration_s'))}" if end else ""), ""]
+                  + (f" · duração {dur_both(end)}" if end else ""), ""]
     # as seções usam caminhos relativos ao run dir; o report mora dentro da pasta da tarefa
     lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
               if (sec := _section(e)) is not None]
@@ -273,7 +282,7 @@ def event_line(e: dict) -> str | None:
     if t == "task_end":
         glyph = {"ok": "✓", "ok_takeover": "✓", "ok_victor": "✓", "skipped": "⊘"}.get(e["result"], "✗")
         return f"{glyph} {task} terminou: {RESULT_LABEL.get(e['result'], e['result']).replace('**', '')} " \
-               f"({dur(e.get('duration_s'))}, {e.get('cycles', 1)} ciclo(s)) — {_clip(e.get('reason', ''), 160)}"
+               f"({dur_both(e)}, {e.get('cycles', 1)} ciclo(s)) — {_clip(e.get('reason', ''), 160)}"
     if t == "plan":
         return f"[PLANO] {task}: {_clip(e['summary'], 300)}"
     if t == "exec":

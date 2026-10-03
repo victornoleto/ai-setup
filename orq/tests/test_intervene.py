@@ -203,3 +203,16 @@ async def test_texto_livre_suficiente_no_conselho(tmp_path):
     await answer_when_open(e, "vai de C, é mais simples")
     assert await job
     assert [x for x in e.s.events() if x["type"] == "decision"][-1]["choice"] == "c"
+
+
+async def test_espera_pelo_victor_nao_conta_como_tempo_ativo(tmp_path):
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED, EXEC_OK], "review": [APPROVED],
+                                "ask": [ASK_OUT]}, intervene="enabled = true")
+    e = engine(tmp_path, cfg)
+    job = asyncio.create_task(e.run())
+    await until(lambda: e.s.top("open_ask"))
+    await asyncio.sleep(1.3)  # o Victor demora
+    e.s.send(f"/answer {e.s.top('open_ask')['id']} 1")
+    assert await job
+    end = next(x for x in e.s.events() if x["type"] == "task_end")
+    assert end["duration_s"] >= 1 and end["active_s"] < end["duration_s"]

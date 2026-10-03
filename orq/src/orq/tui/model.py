@@ -10,7 +10,7 @@ from rich.text import Text
 
 from ..context import title
 from ..journal import cost_parts, current_events, event_line
-from ..store import RunStore
+from ..store import RunStore, active_seconds
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
                "exec": "executando", "exec_answers": "executando", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
@@ -81,14 +81,14 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None, sta
         res, phase = t.get("result"), t.get("phase")
         if res in RESULT:
             glyph, status = RESULT[res]
-            extra = fmt_hms(ends[f.stem]["duration_s"]) if f.stem in ends else ""
+            extra = fmt_hms(ends[f.stem].get("active_s", ends[f.stem]["duration_s"])) if f.stem in ends else ""
         elif phase and phase != "done":
             glyph = "⏸" if is_paused else "▶"
             status = PHASE_LABEL.get(phase, phase)
             cycle = t.get("cycle", 1)
             if phase in ("exec", "exec_answers", "verify", "review") and cycle:
                 status += f" c{cycle}"
-            extra = fmt_hms(now - t["started"]) if t.get("started") else ""
+            extra = fmt_hms(active_seconds(t, now)) if t.get("started") else ""  # ativo: a espera não corre
         else:
             glyph, status, extra = "·", "pendente", ""
         if f.stem == waiting:
@@ -105,16 +105,16 @@ def timeline_line(e: dict) -> str | None:
     return f"{e['ts'][11:16]} {line}" if line else None
 
 
-def eta(events: list[dict], rows: list[TaskRow], now: float) -> float | None:
-    """Horário previsto de término: média das tarefas terminadas × o que falta (a em curso conta o que sobra)."""
-    durs = [e["duration_s"] for e in events if e["type"] == "task_end" and e["result"] != "skipped"]
+def eta(events: list[dict], rows: list[TaskRow], now: float, tasks: dict | None = None) -> float | None:
+    """Horário previsto de término: média do tempo ativo das tarefas terminadas × o que falta (a em curso conta o
+    que sobra). Tempo ativo, não de parede: a espera pelo Victor não entra na média nem no que já correu."""
+    durs = [e.get("active_s", e["duration_s"]) for e in events if e["type"] == "task_end" and e["result"] != "skipped"]
     pending = sum(1 for r in rows if r.glyph == "·")
-    running = [e for e in events if e["type"] == "task_start" and not any(
-        x["type"] == "task_end" and x["task"] == e["task"] for x in events)]
+    running = [r.id for r in rows if r.glyph in "▶⏸"]
     if not durs or not (pending or running):
         return None
     avg = sum(durs) / len(durs)
-    left = avg * pending + sum(max(0.0, avg - (now - _epoch(e["ts"]))) for e in running[-1:])
+    left = avg * pending + sum(max(0.0, avg - active_seconds((tasks or {}).get(t, {}), now)) for t in running[-1:])
     return now + left
 
 
@@ -132,7 +132,7 @@ def header(store: RunStore, events: list[dict], rows: list[TaskRow], now: float 
     if ask and not re_:
         motor = f"⏸ esperando você · {fmt_hms(now - ask['opened'])}"
     clock = fmt_hms((_epoch(re_["ts"]) if re_ else now) - _epoch(rs["ts"])) if rs else ""
-    end = eta(events, rows, now) if not re_ else None
+    end = eta(events, rows, now, st.get("tasks", {})) if not re_ else None
     return (f"orq · {rs.get('queue', '?')} · {done}/{len(rows)} tarefas · motor {motor} · {clock}"
             + (f" · termina ~{datetime.fromtimestamp(end):%H:%M}" if end else "")
             + f" · US$ {float(st.get('cost') or 0):.2f} estimado" + (" (parcial)" if st.get("cost_unknown") else ""))

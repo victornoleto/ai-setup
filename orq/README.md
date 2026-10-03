@@ -196,7 +196,9 @@ pelo planejador no fim, só leitura) e uma linha por tarefa com link para o repo
 | `NN-tarefa/verify-<ciclo>.log` | a saída completa da verificação automática |
 | `NN-tarefa/calls/*` | prompt, stream cru e resposta de cada chamada |
 
-O journal e o painel mostram a tentativa atual; `events.jsonl` mantém o histórico completo. Depois de `--retry`,
+A duração de cada tarefa é a de parede; quando difere, a **ativa** (só chamadas e verificações: sem a espera pelo
+Victor nem o tempo com o motor parado) aparece entre parênteses. A lista do painel e a previsão de término usam a
+ativa. O journal e o painel mostram a tentativa atual; `events.jsonl` mantém o histórico completo. Depois de `--retry`,
 o journal aponta também para o relatório arquivado. Custos incluem tentativas com erro quando o harness informa
 o consumo. Sem informação de custo (por exemplo, no adaptador Codex), o total aparece como **parcial**; zero
 informado e custo desconhecido são situações distintas. O detalhamento está em `/cost` e nos relatórios finais.

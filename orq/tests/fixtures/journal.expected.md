@@ -17,7 +17,7 @@ Repositório `/tmp/repo` · conta 2 · planejador/revisor claude-opus-5-5 high �
 | # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração | Custo |
 |---|---|---|---|---|---|---|---|
 | 1 | [01-hello](01-hello/report.md) | ok | 2 | 0 / 0 / 1 | 2 | 16 min | — |
-| 2 | [02-dificil](02-dificil/report.md) | **FALHOU** | 0 | 0 / 1 / 0 | 0 | 102 min | — |
+| 2 | [02-dificil](02-dificil/report.md) | **FALHOU** | 0 | 0 / 1 / 0 | 0 | 102 min (ativa 30 min) | — |
 
 ### [01-hello](01-hello/report.md) — ok
 
@@ -33,5 +33,5 @@ Destaques da revisão:
 
 ### [02-dificil](02-dificil/report.md) — **FALHOU**
 
-102 min
+102 min (ativa 30 min)
 
