@@ -161,14 +161,18 @@ def render(ev: list[dict]) -> str:
            for e in ev if e["type"] == "decision" and e.get("points") is not None and e["points"] < 3]
         + [f"- **[DECISÃO DO VICTOR]** {link(e['task'])} — {esc(e['question'])} → `{e['choice']}` {esc(e['label'])}"
            for e in ev if e["type"] == "decision" and e.get("source") == "victor"]
-        + [f"- **[PENDENTE]** {link(e['task'])} — {esc(p)}" for e in last_exec for p in e.get("pending") or []]
-        + [f"- **[DESTAQUE]** {link(e['task'])} — {esc(h)}" for e in last_review for h in e.get("highlights") or []]
         + [f"- **[INTERVENÇÃO]** {link(e['task'])} — {esc(e['question'])} → {e.get('action')}"
            + (f": {esc(e['note'])}" if e.get("note") else "")
            for e in ev if e["type"] == "ask_answer" and e.get("kind") != "council"]
         + [f"- **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** " + (f"{link(e['task'])} — " if e.get("task") else "") + esc(e["text"])
            for e in ev if e["type"] == "notice"]
     )
+    # pendências e destaques são leitura por tarefa (nas seções abaixo), não ação: aqui só a contagem
+    n_pend = sum(len(e.get("pending") or []) for e in last_exec)
+    n_high = sum(len(e.get("highlights") or []) for e in last_review)
+    if n_pend or n_high:
+        attn.append(f"- **[PENDÊNCIAS]** {n_pend} pendência(s) e {n_high} destaque(s) da revisão: na seção de cada "
+                    "tarefa, abaixo.")
 
     lines = [
         f"# orq — {rs.get('queue')} — {_hm(rs.get('ts', ''))}",
@@ -210,6 +214,7 @@ def render(ev: list[dict]) -> str:
     for t in order:
         end = ends.get(t, {})
         last = next((e for e in reversed(last_exec) if e.get("task") == t), {})
+        review = next((e for e in reversed(last_review) if e.get("task") == t), {})
         stat = ((end.get("delivery") or {}).get("stat") or "").splitlines()
         facts = [dur(end.get("duration_s")) if end else "em andamento"]
         if end.get("cost"):
@@ -220,6 +225,10 @@ def render(ev: list[dict]) -> str:
                   " · ".join(facts), ""]
         if last.get("summary"):
             lines += [esc(_clip(last["summary"], 400)), ""]
+        if last.get("pending"):
+            lines += ["Pendente:", *(f"- {esc(p)}" for p in last["pending"]), ""]
+        if review.get("highlights"):
+            lines += ["Destaques da revisão:", *(f"- {esc(h)}" for h in review["highlights"]), ""]
     return "\n".join(lines) + "\n"
 
 

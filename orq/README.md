@@ -202,8 +202,8 @@ o consumo. Sem informação de custo (por exemplo, no adaptador Codex), o total 
 informado e custo desconhecido são situações distintas. O detalhamento está em `/cost` e nos relatórios finais.
 
 Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**, **[DECISÃO SEM VICTOR]**, **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
-**[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDENTE]**,
-**[DESTAQUE]**, **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
+**[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO VICTOR]**, **[PENDÊNCIAS]**
+(só a contagem: o texto de cada pendência e destaque fica na seção da tarefa), **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
 **[AJUSTE]**, **[OPERADOR]**, **[ÁRVORE SUJA]**, **[SEM COMMIT]** (terminou ok sem commit: confira).
 
 ## Proteções

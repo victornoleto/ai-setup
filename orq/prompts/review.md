@@ -14,7 +14,8 @@ O plano está em `{{PLAN_FILE}}`; as decisões, em `{{DECISIONS_FILE}}` (se exis
 </verificacao>
 
 1. Leia `git log --oneline {{BASE_SHA}}..HEAD`, `git diff {{BASE_SHA}}..HEAD` e `git status`.
-2. Confira contra o plano, as decisões, a tarefa e as regras. Rode os comandos de verificação do plano.
+2. Confira contra o plano, as decisões, a tarefa e as regras. Rode os comandos de verificação do plano, **menos**
+   os que `<verificacao>` mostra que já rodaram e passaram: não repita esses; rode só o que o plano pede além deles.
 3. **Não altere o repositório.**
 
 - `verdict = approved` só se o critério de pronto foi atingido e não sobra problema de severidade alta ou média.

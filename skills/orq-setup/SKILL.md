@@ -30,7 +30,9 @@ numeradas e a sua recomendação primeiro. Nesta ordem, e só o que faltar:
 1. **Escopo**: o que entra e o que fica de fora desta fila.
 2. **Branch** e se a fila pode criar branch, fazer squash ou merge.
 3. **Proibições** além do `git push` (já bloqueado): banco compartilhado, comando destrutivo, serviço externo.
-4. **Verificação**: quais testes, lint e build valem, e se suítes longas estão liberadas.
+4. **Verificação**: quais testes, lint e build valem, e se suítes longas estão liberadas. Proponha o comando curto
+   que vale para toda tarefa como `[verify] command` no `orq.toml`: o motor o roda antes de cada revisão e, se
+   falhar, devolve ao executor sem gastar a revisão (que é a parte cara).
 5. **Registro**: onde cada tarefa anota o que fez (TODO, journal, doc).
 6. **Harness e modelos**: pergunte só se o Victor quer mudar o padrão (mostre o padrão do `orq.toml` global).
 
@@ -59,7 +61,7 @@ Em `<fila>`:
 - `NN-slug.md`, uma por tarefa (`01-`, `02-`…, na ordem de execução), em pt-BR, como um prompt de sessão;
 - `regras.md`: preencha o modelo (troque os `<…>`, apague o que não se aplica) com o que vale para **toda**
   tarefa: branch, proibições, verificação, registro;
-- `orq.toml`: só o que difere do global (harness e modelo por papel, conta, `on_fail`).
+- `orq.toml`: só o que difere do global (harness e modelo por papel, conta, `on_fail`) e o `[verify] command`.
 
 Mostre ao Victor a lista final (número, título, "pronto quando" em uma linha) e ajuste até ele aprovar.
 
