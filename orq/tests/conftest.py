@@ -14,6 +14,12 @@ def _clean_env(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _registro_de_runs_isolado(tmp_path, monkeypatch):
+    """Nenhum teste escreve no ~/.local/state/orq/runs.jsonl de verdade."""
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+
+
+@pytest.fixture(autouse=True)
 def _sem_ntfy_real(tmp_path, monkeypatch):
     """Nenhum teste lê o ~/.config/orq/notify.toml de verdade (nem manda notificação)."""
     from orq import notify

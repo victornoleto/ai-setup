@@ -13,22 +13,25 @@ from pathlib import Path
 from . import config
 from .engine import Engine, Task
 from .harness.base import kill_all
-from .store import RunStore
+from . import journal
+from .store import RunStore, queue_label, register_run, registered_runs
 
 USAGE = """\
 Uso:
   orq new <pasta> [--repo DIR]   cria <pasta>/orq/ e abre o wizard (sessão interativa com a skill orq-setup)
   orq check <pasta>              confere a fila antes de rodar
   orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
-  orq resume <run-dir> [--account N] [--retry NN-tarefa]... [--headless]
-  orq attach <run-dir>          reabre o painel (q desanexa; a execução continua)
-  orq status <run-dir>
-  orq send <run-dir> "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
+  orq runs [-n 10]               as últimas execuções: estado, tarefas feitas/total, fila e run dir
+  orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
+  orq attach [run-dir]           reabre o painel (q desanexa; a execução continua)
+  orq status [run-dir]
+  orq send [run-dir] "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
   orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
   orq notify setup | test         ntfy no celular: cria o tópico (~/.config/orq/notify.toml) / manda um teste
   orq selftest
 
 Sem --headless (e num terminal), o motor roda em segundo plano e o painel abre por cima.
+Sem run dir, attach/status/send usam a execução mais recente que está rodando (ou a última); resume, a última.
 <pasta>: a pasta da atividade (com orq/ dentro) ou a própria fila (NN-nome.md + orq.toml ou queue.conf).
 """
 
@@ -92,6 +95,7 @@ def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -
                                        "text": f"Tarefa {tid} recomeça do zero (orq resume --retry)."})
             store.set_top("config", cfg.raw)
             if resumed:
+                register_run(store.dir, Path(store.top("queue")))  # sobe na lista do orq runs
                 store.set_top("control", {"paused": False, "stop": False})
                 store.event("run_resume")
             store.pid_path.write_text(str(os.getpid()))
@@ -148,11 +152,47 @@ def attach(store: RunStore) -> int:
     return 0
 
 
+def pick_run(arg: str | None, prefer_alive: bool = True) -> RunStore:
+    """O run dir informado ou, sem ele, o mais recente do registro (o que estiver rodando, se preferido)."""
+    if arg:
+        store = RunStore(Path(arg))
+        if not store.exists():
+            die(f"não é um run dir: {arg}")
+        return store
+    runs = registered_runs()
+    if not runs:
+        die("nenhuma execução registrada: informe o run dir (orq runs lista as conhecidas)")
+    alive = [r for r in runs if RunStore(Path(r["run"])).engine_alive()] if prefer_alive else []
+    chosen = (alive or runs)[0]["run"]
+    print(f"orq: {chosen}", file=sys.stderr)
+    return RunStore(Path(chosen))
+
+
+def run_state(store: RunStore) -> str:
+    if store.engine_alive():
+        return "esperando você" if store.top("open_ask") else "rodando"
+    if any(e["type"] == "run_end" for e in journal.current_events(store.events())):
+        return "terminou"
+    return "parada"  # interrompida ou /stop: orq resume continua
+
+
+def cmd_runs(args) -> int:
+    runs = registered_runs(args.limit)
+    if not runs:
+        print("nenhuma execução registrada")
+        return 0
+    print(f"{'estado':<15} {'feitas':>6}  {'fila':<28} run dir")
+    for r in runs:
+        store = RunStore(Path(r["run"]))
+        q = Path(store.top("queue") or r["queue"])
+        done = sum(1 for t in store.state()["tasks"].values() if t.get("result"))
+        total = len(list(q.glob("[0-9]*.md")))
+        print(f"{run_state(store):<15} {f'{done}/{total}':>6}  {queue_label(q)[:28]:<28} {r['run']}")
+    return 0
+
+
 def cmd_attach(args) -> int:
-    store = RunStore(Path(args.run_dir))
-    if not store.exists():
-        die(f"não é um run dir: {args.run_dir}")
-    return attach(store)
+    return attach(pick_run(args.run_dir))
 
 
 def cmd_engine(args) -> int:
@@ -182,9 +222,7 @@ def cmd_run(args) -> int:
 
 
 def cmd_resume(args) -> int:
-    store = RunStore(Path(args.run_dir))
-    if not store.exists():
-        die(f"não é um run dir: {args.run_dir}")
+    store = pick_run(args.run_dir, prefer_alive=False)
     if store.engine_alive():
         die(f"o motor desta execução ainda está rodando; use orq attach {store.dir}")
     cfg = load_run_cfg(store, args)
@@ -202,9 +240,7 @@ def task_status_rows(store: RunStore, queue_dir: Path) -> list[tuple[str, str, s
 
 
 def cmd_status(args) -> int:
-    store = RunStore(Path(args.run_dir))
-    if not store.exists():
-        die(f"não é um run dir: {args.run_dir}")
+    store = pick_run(args.run_dir)
     rows = task_status_rows(store, Path(store.top("queue")))
     w = max((len(r[0]) for r in rows), default=0)
     for tid, res, cyc in rows:
@@ -217,10 +253,11 @@ def cmd_status(args) -> int:
 
 def cmd_send(args) -> int:
     import time
-    store = RunStore(Path(args.run_dir))
-    if not store.exists():
-        die(f"não é um run dir: {args.run_dir}")
-    cmd = store.send(args.text, source="orq send")
+    if len(args.args) > 2:
+        die('uso: orq send [run-dir] "/comando …" (o comando entre aspas)')
+    run_dir, text = (args.args if len(args.args) == 2 else (None, args.args[0]))
+    store = pick_run(run_dir)
+    cmd = store.send(text, source="orq send")
     if not store.engine_alive():
         print("motor parado: o comando fica na caixa de entrada e vale no próximo orq resume")
         return 0
@@ -239,7 +276,7 @@ def cmd_decide(args) -> int:
         die('uso: orq decide "<pergunta>" --option a="…" --option b="…"')
     cfg = load_cfg(Path.cwd(), args)
     store = RunStore(Path(tempfile.mkdtemp(prefix="orq-decide-")))
-    store.create(Path.cwd(), str(cfg.get("accounts", "claude", "default")))
+    store.create(Path.cwd(), str(cfg.get("accounts", "claude", "default")), register=False)
     options = []
     for o in args.option:
         oid, _, rest = o.partition("=")
@@ -306,13 +343,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--account")
     r.add_argument("--run-dir")
     r.add_argument("--headless", action="store_true")
+    rn = sub.add_parser("runs")
+    rn.add_argument("-n", "--limit", type=int, default=10)
     rs = sub.add_parser("resume")
-    rs.add_argument("run_dir")
+    rs.add_argument("run_dir", nargs="?")
     rs.add_argument("--account")
     rs.add_argument("--retry", action="append")
     rs.add_argument("--headless", action="store_true")
     at = sub.add_parser("attach")
-    at.add_argument("run_dir")
+    at.add_argument("run_dir", nargs="?")
     en = sub.add_parser("_engine")
     en.add_argument("run_dir")
     en.add_argument("--account")
@@ -320,7 +359,7 @@ def main(argv: list[str] | None = None) -> int:
     en.add_argument("--retry", action="append")
     en.add_argument("--resumed", action="store_true")
     st = sub.add_parser("status")
-    st.add_argument("run_dir")
+    st.add_argument("run_dir", nargs="?")
     d = sub.add_parser("decide")
     d.add_argument("question")
     d.add_argument("--option", action="append", default=[])
@@ -328,8 +367,7 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--repo")
     d.add_argument("--account")
     se = sub.add_parser("send")
-    se.add_argument("run_dir")
-    se.add_argument("text")
+    se.add_argument("args", nargs="+", metavar="[run-dir] texto")
     nw = sub.add_parser("new")
     nw.add_argument("activity")
     nw.add_argument("--repo")
@@ -339,7 +377,7 @@ def main(argv: list[str] | None = None) -> int:
     nt.add_argument("action", choices=["setup", "test"])
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
+    handlers = {"run": cmd_run, "runs": cmd_runs, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")

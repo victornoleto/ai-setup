@@ -56,6 +56,39 @@ def read_jsonl(path: Path) -> list[dict]:
     return out
 
 
+def queue_label(queue_dir: Path) -> str:
+    q = Path(queue_dir)
+    return q.parent.name if q.name == "orq" else q.name
+
+
+def runs_file() -> Path:
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "orq" / "runs.jsonl"
+
+
+def register_run(run_dir: Path, queue_dir: Path) -> None:
+    """Registro das execuções, fora do repositório: `orq runs` e os comandos sem run dir leem daqui."""
+    try:
+        f = runs_file()
+        f.parent.mkdir(parents=True, exist_ok=True)
+        with open(f, "a") as fh:
+            fh.write(json.dumps({"run": str(Path(run_dir).resolve()), "queue": str(queue_dir), "ts": now_iso()}) + "\n")
+    except OSError:
+        pass  # conveniência: nunca derruba a execução
+
+
+def registered_runs(limit: int = 10) -> list[dict]:
+    """As últimas execuções, a mais recente (criada ou retomada) primeiro, sem repetição e só as que ainda existem."""
+    seen, out = set(), []
+    for rec in reversed(read_jsonl(runs_file())):
+        if rec.get("run") in seen or not (Path(rec.get("run", "")) / "state.json").is_file():
+            continue
+        seen.add(rec["run"])
+        out.append(rec)
+        if len(out) >= limit:
+            break
+    return out
+
+
 def active_seconds(task_state: dict, now: float | None = None) -> float:
     """Tempo ativo acumulado de uma tarefa, incluindo a chamada em curso."""
     total = float(task_state.get("active_s") or 0)
@@ -83,13 +116,15 @@ class RunStore:
         self._event_cache = []
 
     # --- criação ---------------------------------------------------------------------------------
-    def create(self, queue_dir: Path, account: str) -> None:
+    def create(self, queue_dir: Path, account: str, register: bool = True) -> None:
         self.dir.mkdir(parents=True, exist_ok=True)
         if self.state_path.exists():
             raise FileExistsError(f"{self.dir} já tem uma execução; use orq resume")
         write_atomic(self.state_path, json.dumps(
             {"queue": str(queue_dir), "account": account, "tasks": {}, "inbox_offset": 0, "cost": 0.0}, indent=1))
         self.events_path.write_text("")
+        if register:
+            register_run(self.dir, queue_dir)
 
     def exists(self) -> bool:
         return self.state_path.is_file()

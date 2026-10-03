@@ -18,7 +18,7 @@ from . import context, council, harness as harness_mod, intervene, notify
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
-from .store import RunStore
+from .store import RunStore, queue_label
 
 OK_RESULTS = ("ok", "ok_takeover", "ok_victor", "skipped")
 
@@ -277,7 +277,7 @@ class Engine:
 
     # --- fila ---------------------------------------------------------------------------------------
     def queue_name(self) -> str:
-        return self.cfg.queue_dir.parent.name if self.cfg.queue_dir.name == "orq" else self.cfg.queue_dir.name
+        return queue_label(self.cfg.queue_dir)
 
     def notify(self, title: str, message: str, priority: int = 3, actions=()) -> None:
         """notify-send no desktop e, com notify.toml, ntfy no celular. Falha de rede só vai para o log."""
