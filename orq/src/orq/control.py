@@ -192,11 +192,15 @@ class Control:
                 if st.get("phase"):
                     return False, f"{f.stem} já começou ({st.get('result') or st.get('phase')}); só tarefa pendente é pulada"
                 self.s.update_task(f.stem, {"phase": "done", "result": "skipped"})
+                # evento como o de qualquer fim de tarefa: o journal e o resumo final passam a vê-la
+                self.s.event("task_end", {"task": f.stem, "result": "skipped", "reason": "Pulada pelo painel.",
+                                          "duration_s": 0, "cycles": 0, "cost": {}, "delivery": {}, "cost_unknown": 0})
                 return True, f"{f.stem} será pulada"
             if st.get("result") != "skipped":
                 return False, f"{f.stem} não está pulada"
             self.s.drop_task(f.stem)
             self.eng.handled.discard(f.stem)
+            self.s.notice("control", f"{f.stem} voltou para a fila (/unskip).", f.stem)
             return True, f"{f.stem} volta para a fila"
         if cmd == "note":
             if not rest:

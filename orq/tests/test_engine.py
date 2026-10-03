@@ -393,3 +393,17 @@ async def test_subagent_em_background_morto_duas_vezes_falha(tmp_path):
     assert not await e.run()
     assert e.s.get("01-a", "result") == "failed"
     assert len([c for c in e.harness("fake").calls if c.name.startswith("exec-")]) == 2
+
+
+async def test_retry_do_takeover_leva_o_parecer_do_revisor_final(tmp_path):
+    """A1: reprovado na revisão independente, o prompt do takeover seguinte traz esse parecer, não o antigo."""
+    final = {**CHANGES, "summary": "revisor final reprovou",
+             "issues": [{"severity": "alta", "where": "b.txt", "what": "faltou-o-b", "fix": "crie b"}]}
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "planner:review": [CHANGES],
+                                "reviewer:review": [final]})
+    e = engine(tmp_path, cfg)
+    assert not await e.run()
+    assert e.s.get("01-a", "result") == "failed"
+    takeover = (e.s.dir / "01-a" / "takeover.prompt.md").read_text()
+    assert "faltou-o-b" in takeover and "revisor final reprovou" in takeover
+    assert "[alta] a.txt: x" not in takeover  # a reprovação do executor (ciclo 3) não é mais a última

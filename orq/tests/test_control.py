@@ -107,3 +107,27 @@ async def test_operador_propoe_sem_aplicar(tmp_path):
     assert call.read_only and "pula a segunda" in call.prompt and "`01-a` pendente" in call.prompt
     e.s.send("/stop")
     await asyncio.wait_for(run, 5)
+
+
+async def test_tarefa_pulada_aparece_no_journal_e_no_resumo(tmp_path):
+    """A3: /skip emite task_end; o journal lista a pulada e o fim da fila a conta à parte."""
+    e, c = ctl(tmp_path, tasks=("01-a", "02-b"))
+    assert c.apply("/skip 02")[0]
+    ends = [x for x in e.s.events() if x["type"] == "task_end"]
+    assert [(x["task"], x["result"]) for x in ends] == [("02-b", "skipped")]
+    assert await e.run()
+    journal = e.s.journal_path.read_text()
+    assert "| 2 | `02-b` | pulada |" in journal
+    assert "| 1 | [01-a](01-a/report.md) | ok |" in journal
+    run_end = next(x for x in e.s.events() if x["type"] == "run_end")
+    assert run_end["result"] == "1 tarefa(s) ok, 1 pulada(s)"
+
+
+async def test_unskip_depois_de_skip_vale_o_ultimo_fim(tmp_path):
+    e, c = ctl(tmp_path, tasks=("01-a", "02-b"))
+    assert c.apply("/skip 02")[0] and c.apply("/unskip 02")[0]
+    assert await e.run()
+    journal = e.s.journal_path.read_text()
+    assert "| 2 | [02-b](02-b/report.md) | ok |" in journal and "pulada" not in journal.split("## Resumo")[1]
+    assert "[AJUSTE] 02-b voltou para a fila" in e.s.journal_path.read_text() or any(
+        x["type"] == "notice" and x["kind"] == "control" for x in e.s.events())

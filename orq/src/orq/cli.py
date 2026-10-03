@@ -99,7 +99,7 @@ def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -
                 return asyncio.run(main())
             finally:
                 store.pid_path.unlink(missing_ok=True)
-    except RuntimeError as exc:
+    except (RuntimeError, config.ConfigError) as exc:
         die(str(exc))
 
 
@@ -129,6 +129,12 @@ def start(store: RunStore, cfg: config.Config, args) -> int:
         if store.engine_alive():
             break
         time.sleep(0.1)
+    else:
+        ended = any(e["type"] == "run_end" or (e["type"] == "notice" and e.get("kind") in ("stopped", "interrupted"))
+                    for e in store.events())
+        if not ended:  # morreu ao subir (configuração, regras…): o erro está no engine.out, não no painel
+            tail = (store.dir / "engine.out").read_text(errors="replace").strip().splitlines()[-8:]
+            die("o motor não subiu" + (":\n  " + "\n  ".join(tail) if tail else f" (ver {store.dir / 'engine.out'})"))
     return attach(store)
 
 
@@ -160,6 +166,10 @@ def cmd_run(args) -> int:
         die("informe a pasta da fila")
     queue_dir = config.resolve_queue_dir(args.queue)
     cfg = load_cfg(queue_dir, args)
+    try:
+        cfg.rules_text()  # falha aqui, antes de criar o run dir
+    except config.ConfigError as e:
+        die(str(e))
     run_dir = Path(args.run_dir) if args.run_dir else queue_dir / "runs" / datetime.now().strftime("%Y-%m-%d-%H%M")
     store = RunStore(run_dir)
     try:
