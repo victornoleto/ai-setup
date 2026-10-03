@@ -149,3 +149,17 @@ async def test_bloco_da_pergunta_e_resposta(tmp_path):
         e.s.set_top("open_ask", None)
         await pilot.pause(0.6)
         assert not app.query_one("#ask").display
+
+
+async def test_tempo_ativo_na_lista_e_na_previsao(tmp_path):
+    e = await finished_run(tmp_path)
+    ev = [x for x in e.s.events() if x["type"] != "run_end" and not (x["type"] == "task_end" and x["task"] == "03-c")]
+    now = time.time()
+    e.s.update_task("03-c", {"result": None, "phase": "exec", "started": now - 3600, "active_s": 10,
+                             "active_since": now - 5})
+    rows = model.task_rows(e.s, ev, now=now)
+    assert rows[2].extra.startswith("00:00:15")  # ativo (15 s), não a hora de parede
+    with_wait = model.eta(ev, rows, now, e.s.state()["tasks"])
+    e.s.update_task("03-c", {"active_s": 0, "active_since": None})
+    without = model.eta(ev, rows, now, e.s.state()["tasks"])
+    assert with_wait is not None and without is not None and with_wait <= without

@@ -209,7 +209,11 @@ class Engine:
                               env=self.git_env, thinking=self.thinking,
                               on_session=save_session,
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
-            res = await h.call(req, self.on_line_for(role_name, name))
+            self.s.active_start(tid)
+            try:
+                res = await h.call(req, self.on_line_for(role_name, name))
+            finally:
+                self.s.active_stop(tid)
             self.s.add_cost(res.cost, tid, role_name)
             if res.session_id:
                 save_session(res.session_id)
@@ -378,6 +382,7 @@ class Engine:
         self.s.update_task(t.id, {"phase": "done", "result": result})
         self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
                                   "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1),
+                                  "active_s": int(self.s.get(t.id, "active_s", 0) or 0),
                                   "cost": self.s.cost_by().get(t.id, {}), "delivery": delivery,
                                   "cost_unknown": sum(self.s.top("cost_unknown", {}).get(t.id, {}).values())})
         raise TaskEnded
@@ -388,6 +393,8 @@ class Engine:
         phase = s.get(t.id, "phase", "start")
         if phase == "done":
             return
+        if s.get(t.id, "active_since"):  # queda no meio de uma chamada: o tempo até aqui não foi trabalho
+            s.set(t.id, "active_since", None)
         while True:
             open_ = s.top("open_ask") or {}
             if open_.get("task") == t.id and open_.get("kind") in ("failed", "blocked"):  # resume: mesma pergunta
@@ -579,8 +586,12 @@ class Engine:
         await self.checkpoint(t)
         log = t.dir / f"verify-{cycle}.log"
         started = time.time()
-        rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.cfg.repo, self.git_env,
-                                             self.cfg.verify_timeout, log, lambda _: None)
+        self.s.active_start(t.id)
+        try:
+            rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.cfg.repo, self.git_env,
+                                                 self.cfg.verify_timeout, log, lambda _: None)
+        finally:
+            self.s.active_stop(t.id)
         log.with_suffix(".err").unlink(missing_ok=True)  # stderr já vai junto no log
         ok, secs = rc == 0 and not timed_out, int(time.time() - started)
         self.s.event("verify", {"task": t.id, "cycle": cycle, "command": cmd, "ok": ok, "exit": rc,
