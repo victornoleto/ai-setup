@@ -374,3 +374,35 @@ def test_lock_do_motor_tolera_a_checagem_do_painel(tmp_path):
     threading.Thread(target=lambda: (time.sleep(0.2), fh.close()), daemon=True).start()
     with s.engine_lock(tmp_path / "repo"):
         assert s.engine_alive()
+
+
+def test_run_sem_arquivo_de_regras_falha_antes_de_criar_o_run_dir(tmp_path):
+    from argparse import Namespace
+    from orq import cli
+    cfg = make_queue(tmp_path, {"plan": [PLAN]})
+    toml = cfg.queue_dir / "orq.toml"
+    toml.write_text(toml.read_text().replace("[run]\n", '[run]\nrules_file = "nao-existe.md"\n'))
+    run = tmp_path / "run-x"
+    with pytest.raises(SystemExit):
+        cli.cmd_run(Namespace(queue=str(cfg.queue_dir), repo=None, account=None, run_dir=str(run), headless=True))
+    assert not run.exists()
+
+
+def test_motor_que_nao_sobe_nao_abre_o_painel(tmp_path, monkeypatch, capsys):
+    import subprocess
+    from argparse import Namespace
+    from orq import cli
+    cfg = make_queue(tmp_path, {"plan": [PLAN]})
+    e = engine(tmp_path, cfg)
+    (e.s.dir / "engine.out").write_text("Traceback…\norq.config.ConfigError: papel executor: falta model\n")
+
+    class Dead:  # o motor "sobe" e morre antes de pegar o lock
+        def __init__(self, *a, **k):
+            pass
+    monkeypatch.setattr(subprocess, "Popen", Dead)
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
+    monkeypatch.setattr(cli.time, "sleep", lambda s: None) if hasattr(cli, "time") else None
+    monkeypatch.setattr(cli, "attach", lambda store: pytest.fail("abriu o painel sobre motor morto"))
+    with pytest.raises(SystemExit):
+        cli.start(e.s, cfg, Namespace(headless=False, cmd="run", retry=None, account=None, repo=None))
+    assert "falta model" in capsys.readouterr().err

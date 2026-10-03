@@ -145,6 +145,10 @@ def render(ev: list[dict]) -> str:
     re_ = next((e for e in ev if e["type"] == "run_end"), None)
     ts = [e for e in ev if e["type"] == "task_start"]
     te = [e for e in ev if e["type"] == "task_end"]
+    order = sorted({e["task"] for e in ev if e["type"] in ("task_start", "task_end")})  # ordem da fila (NN-)
+    started = {e["task"] for e in ts}
+    ends = {e["task"]: e for e in te}  # o último vale: pulada e devolvida (/unskip) depois roda de verdade
+    name = lambda t: link(t) if t in started else f"`{t}`"  # noqa: E731  (pulada não tem report.md)
     last_exec = _last_per_task([e for e in ev if e["type"] == "exec"])
     last_review = _last_per_task([e for e in ev if e["type"] == "review"])
 
@@ -188,13 +192,12 @@ def render(ev: list[dict]) -> str:
         "| # | Tarefa | Resultado | Ciclos | Decisões (3 / 2,5 / 2 pts) | Commits | Duração | Custo |",
         "|---|---|---|---|---|---|---|---|",
     ]
-    for i, s in enumerate(ts):
-        t = s["task"]
-        end = next((e for e in te if e["task"] == t), {})
+    for i, t in enumerate(order):
+        end = ends.get(t, {})
         cycles = max([e["cycle"] for e in ev if e["type"] == "exec" and e.get("task") == t], default=0)
         d = [e.get("points") for e in ev if e["type"] == "decision" and e.get("task") == t]
         nc = len({c["hash"] for e in ev if e["type"] == "exec" and e.get("task") == t for c in e.get("commits") or []})
-        lines.append(f"| {i + 1} | {link(t)} | {result_label(end.get('result'))} | {cycles} | "
+        lines.append(f"| {i + 1} | {name(t)} | {result_label(end.get('result'))} | {cycles} | "
                      f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur(end.get('duration_s'))} | "
                      + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
@@ -204,9 +207,8 @@ def render(ev: list[dict]) -> str:
     if archives:
         lines += ["Tentativas anteriores: " + " · ".join(
             f"[{e['task']}]({e['archive']}/report.md)" for e in archives), ""]
-    for s in ts:
-        t = s["task"]
-        end = next((e for e in te if e["task"] == t), {})
+    for t in order:
+        end = ends.get(t, {})
         last = next((e for e in reversed(last_exec) if e.get("task") == t), {})
         stat = ((end.get("delivery") or {}).get("stat") or "").splitlines()
         facts = [dur(end.get("duration_s")) if end else "em andamento"]
@@ -214,7 +216,7 @@ def render(ev: list[dict]) -> str:
             facts.append(f"US$ {sum(end['cost'].values()):.2f}")
         if end.get("delivery"):
             facts.append(f"{len(end['delivery']['commits'])} commit(s)" + (f", {stat[-1].strip()}" if stat else ""))
-        lines += [f"### {link(t)} — {result_label(end.get('result')) if end else 'em andamento'}", "",
+        lines += [f"### {name(t)} — {result_label(end.get('result')) if end else 'em andamento'}", "",
                   " · ".join(facts), ""]
         if last.get("summary"):
             lines += [esc(_clip(last["summary"], 400)), ""]
@@ -225,7 +227,7 @@ def render_task(ev: list[dict], t: str) -> str:
     """O report.md de uma tarefa: início, cada evento dela em ordem e, no fim, a entrega (commits e arquivos)."""
     ev = current_events(ev)
     start = next((e for e in ev if e["type"] == "task_start" and e["task"] == t), None)
-    end = next((e for e in ev if e["type"] == "task_end" and e["task"] == t), None)
+    end = next((e for e in reversed(ev) if e["type"] == "task_end" and e["task"] == t), None)
     lines = [f"# {t} — {result_label(end['result']) if end else 'em andamento'}", "",
              "[← resumo da execução](../journal.md)", ""]
     if start:

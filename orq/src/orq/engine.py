@@ -166,7 +166,7 @@ class Engine:
         role = self.cfg.roles[role_name]
         h = self.harness(role.harness)
         account = role.account
-        calls_dir = (t.dir if t else self.s.dir / "operator") / "calls"
+        calls_dir = (t.dir if t else self.s.dir / role_name) / "calls"
         calls_dir.mkdir(parents=True, exist_ok=True)
         (calls_dir / f"{name}.prompt.md").write_text(prompt_text)
         tid = t.id if t else ""
@@ -194,10 +194,8 @@ class Engine:
         save_session(sid, resume)
         waited, tries, asked_again = 0, 0, False
         limit_s = self.cfg.seconds("limit_max_wait")
-        if gate:  # o operador responde mesmo com a execução pausada
-            await self.checkpoint(t)
         while True:
-            if gate:
+            if gate:  # o operador (gate=False) responde mesmo com a execução pausada
                 await self.checkpoint(t)
             tries += 1
             seen = len(self.s.events())
@@ -330,10 +328,13 @@ class Engine:
                     self.s.log("on_fail = stop: a fila para aqui")
         self.control.drain()
         n = len(self.task_files())
+        skipped = sum(1 for f in self.task_files() if self.s.get(f.stem, "result") == "skipped")
         if stop:
             summary = f"parada na tarefa que falhou ({failed} com problema)"
         elif failed:
             summary = f"{failed} tarefa(s) com problema"
+        elif skipped:
+            summary = f"{n - skipped} tarefa(s) ok, {skipped} pulada(s)"
         else:
             summary = f"todas as {n} tarefas ok"
         if self.cfg.get("report", "llm_summary", default=True) and any(e["type"] == "task_end" for e in self.s.events()):
@@ -492,8 +493,9 @@ class Engine:
                     phase = "final_verify"
 
                 elif phase == "final_verify":
-                    ok, _ = await self.verify(t, cycle + 1)
+                    ok, verify_md = await self.verify(t, cycle + 1)
                     if not ok:
+                        self.retake(t, verify_md)
                         raise Problem("failed", "A verificação automática falhou depois de o planejador assumir "
                                                 f"(ver {t.id}/verify-{cycle + 1}.log).", "takeover")
                     phase = "final_review"
@@ -501,11 +503,12 @@ class Engine:
                 elif phase == "final_review":
                     rsid = s.get(t.id, "final_review_sid")
                     report = _read(t.dir / "takeover.out.json", "{}")
-                    verdict, _ = await self.review(t, "reviewer", rsid, bool(rsid), report,
-                                                   "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
+                    verdict, review_md = await self.review(t, "reviewer", rsid, bool(rsid), report,
+                                                           "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
                     if verdict == "approved":
                         self.end(t, "ok_takeover", f"O executor não passou em {self.cfg.max_cycles} ciclos; "
                                                    "o planejador assumiu e um revisor novo aprovou.")
+                    self.retake(t, review_md)
                     raise Problem("failed", "Nem o takeover do planejador passou na revisão independente.", "takeover")
                 else:
                     raise RuntimeError(f"fase desconhecida: {phase}")
@@ -543,8 +546,13 @@ class Engine:
             p.write_text(prompt("fix", CYCLE=cycle, MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
             self.s.set(t.id, "next_exec_prompt", str(p))
             return "exec"
-        (t.dir / "takeover.prompt.md").write_text(prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
+        self.retake(t, why_md)
         return "takeover"
+
+    def retake(self, t: Task, why_md: str) -> None:
+        """O prompt do (próximo) takeover leva sempre a última reprovação: a do executor ou, depois de o planejador
+        assumir, a da verificação ou do revisor independente (um `retry` do Victor refaz com esse parecer)."""
+        (t.dir / "takeover.prompt.md").write_text(prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
 
     async def clean(self, t: Task, cycle: int, role: str, sid: str | None) -> None:
         """Árvore suja depois da execução: quem executou tem uma chance de arrumar (sem gastar ciclo); senão, bloqueia."""
