@@ -81,7 +81,8 @@ quatro ferramentas.
 - **Regras de saída para TDAH** ([i-have-adhd](https://github.com/ayghri/i-have-adhd)) e a
   **escada do mínimo** ([ponytail](https://github.com/DietrichGebert/ponytail)): versões compactas
   no `GLOBAL.md`. Os plugins saíram.
-- **brainstorming, systematic-debugging, writing-plans, test-driven-development**: copiadas do
+- **brainstorming, systematic-debugging, writing-plans, test-driven-development,
+  verification-before-completion, receiving-code-review**: copiadas do
   [superpowers](https://github.com/obra/superpowers) para `skills/`. A seção "Skills" do
   `GLOBAL.md` diz quando carregar cada uma. **Revisar a cada 90 dias** conforme
   `skills/UPSTREAM.md`; o `doctor.sh` avisa.
@@ -90,6 +91,10 @@ quatro ferramentas.
   Mesmo regime de revisão. Por padrão é *guidance mode* — responde pergunta de segurança sem
   escrever arquivo; a auditoria completa só roda quando você pede auditoria ou pen test, e as
   três edições locais estão em `skills/UPSTREAM.md`.
+- **impeccable**: copiada do [pbakaus/impeccable](https://github.com/pbakaus/impeccable)
+  (Apache-2.0) só como skill, sem o plugin. O upstream gera uma variante por harness:
+  `skills/impeccable` vai para `~/.agents/skills`, `skills/impeccable-claude` para o Claude. Baixa
+  o motor em `~/.impeccable/bin/` no primeiro uso; o hook detector só liga por projeto.
 - **Plugins que ficam no Claude:** só `commit-commands`. O `security-guidance` foi desligado em
   2026-09-20: só existia no Claude, e a `security-audit` cobre o mesmo nas quatro ferramentas.
 - **Skills próprias:** `entrega` (relatório do que uma branch entregou) e `handoff` (`/handoff`:

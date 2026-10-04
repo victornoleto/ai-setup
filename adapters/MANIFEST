@@ -33,8 +33,15 @@ link	../skills/writing-plans	.claude/skills/writing-plans
 link	../skills/writing-plans	.agents/skills/writing-plans
 link	../skills/test-driven-development	.claude/skills/test-driven-development
 link	../skills/test-driven-development	.agents/skills/test-driven-development
+link	../skills/verification-before-completion	.claude/skills/verification-before-completion
+link	../skills/verification-before-completion	.agents/skills/verification-before-completion
+link	../skills/receiving-code-review	.claude/skills/receiving-code-review
+link	../skills/receiving-code-review	.agents/skills/receiving-code-review
 link	../skills/security-audit	.claude/skills/security-audit
 link	../skills/security-audit	.agents/skills/security-audit
+# impeccable: o upstream gera uma variante por harness (caminhos e `/` vs `$` diferem).
+link	../skills/impeccable-claude	.claude/skills/impeccable
+link	../skills/impeccable	.agents/skills/impeccable
 link	../skills/entrega	.claude/skills/entrega
 link	../skills/entrega	.agents/skills/entrega
 link	../skills/handoff	.claude/skills/handoff
