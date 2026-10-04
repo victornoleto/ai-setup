@@ -163,3 +163,13 @@ async def test_tempo_ativo_na_lista_e_na_previsao(tmp_path):
     e.s.update_task("03-c", {"active_s": 0, "active_since": None})
     without = model.eta(ev, rows, now, e.s.state()["tasks"])
     assert with_wait is not None and without is not None and with_wait <= without
+
+
+async def test_tarefas_rolam_e_cabecalho_fica(tmp_path):
+    e = await finished_run(tmp_path)
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 10)) as pilot:
+        await pilot.pause()
+        assert app.query_one("#tasks-box").max_scroll_y > 0
+        assert "tarefas" in str(app.query_one("#header", Static).render())
+        await pilot.press("q")

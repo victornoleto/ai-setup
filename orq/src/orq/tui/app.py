@@ -86,7 +86,8 @@ class OrqApp(App):
     #left, #right { width: 1fr; }
     #right { border-left: vkey $foreground 30%; }
     .title { height: 1; padding: 0 1; text-style: bold reverse; }
-    #tasks { height: auto; max-height: 45%; padding: 0 1; }
+    #tasks-box { height: auto; max-height: 45%; }
+    #tasks { height: auto; padding: 0 1; }
     #timeline { height: 1fr; border: none; }
     #chat { dock: bottom; }
     #ask { height: auto; max-height: 60%; border: heavy $warning; padding: 0 1; display: none; }
@@ -122,7 +123,8 @@ class OrqApp(App):
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 yield Static("TAREFAS", classes="title")
-                yield Static(id="tasks")
+                with VerticalScroll(id="tasks-box"):
+                    yield Static(id="tasks")
                 yield Static("TIMELINE  (enter: detalhe)", classes="title")
                 yield OptionList(id="timeline")
                 yield Static(id="ask")
