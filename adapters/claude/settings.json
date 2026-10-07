@@ -146,12 +146,11 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "security-guidance@claude-plugins-official": false,
     "commit-commands@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
-  "effortLevel": "medium",
+  "effortLevel": "high",
   "modelSettings": {
     "claude-sonnet-5": {
       "effortLevel": "high"
@@ -163,6 +162,12 @@
       "effortLevel": "medium"
     },
     "claude-fable-5-1": {
+      "effortLevel": "high"
+    },
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
       "effortLevel": "high"
     }
   },

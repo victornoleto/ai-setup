@@ -128,8 +128,8 @@ jq -e '.entries[]?.path | select(startswith("/"))' "$HOME/.gemini/config/skills.
 	&& ok "agy lê ~/.agents/skills" \
 	|| bad "~/.gemini/config/skills.json ausente ou com caminho relativo (o agy não aceita ~)"
 
-if jq -e '.enabledPlugins | to_entries[] | select(.key|test("^(playwright|superpowers|ponytail)@")) | select(.value)' "$HOME/.claude/settings.json" >/dev/null 2>&1
-then bad "plugin substituído voltou a ligar no Claude (playwright/superpowers/ponytail)"
+if jq -e '.enabledPlugins | to_entries[] | select(.key|test("^(playwright|superpowers|ponytail|frontend-design|code-review|code-simplifier|claude-md-management|security-guidance)@")) | select(.value)' "$HOME/.claude/settings.json" >/dev/null 2>&1
+then bad "plugin substituído voltou a ligar no Claude (veja a regex acima)"
 else ok "sem MCP do Playwright nem plugins substituídos no Claude"; fi
 
 grep -Eq '^\[projects\."/home(/victor)?"\]' "$HOME/.codex/config.toml" \
