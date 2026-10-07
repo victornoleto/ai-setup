@@ -96,7 +96,11 @@ quatro ferramentas.
   `skills/impeccable` vai para `~/.agents/skills`, `skills/impeccable-claude` para o Claude. Baixa
   o motor em `~/.impeccable/bin/` no primeiro uso; o hook detector só liga por projeto.
 - **Plugins que ficam no Claude:** só `commit-commands`. O `security-guidance` foi desligado em
-  2026-09-20: só existia no Claude, e a `security-audit` cobre o mesmo nas quatro ferramentas.
+  2026-09-20 e desinstalado em 2026-10-07: só existia no Claude, e a `security-audit` cobre o
+  mesmo nas quatro ferramentas. Também desinstalados em 2026-10-07, por repetirem o que já existe:
+  `superpowers` (skills copiadas), `frontend-design` (`impeccable`), `code-review` e
+  `code-simplifier` (`/code-review` e `/simplify` nativos), `claude-md-management` (regra mora no
+  `GLOBAL.md`, fato no ai-memory). O `doctor.sh` acusa se algum voltar a ligar.
 - **Skills próprias:** `entrega` (relatório do que uma branch entregou) e `handoff` (`/handoff`:
   gera o handoff detalhado da sessão, imprime, copia para o clipboard e salva em
   `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%).
