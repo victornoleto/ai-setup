@@ -1,0 +1,4 @@
+#!/bin/sh
+# memory-ui — GUI web somente leitura do ai-memory. Documentação: ~/.ai-setup/memory-ui/docs/specs/
+dir=$(dirname "$(readlink -f "$0")")
+exec python3 "$dir/../memory-ui/server.py" "$@"
