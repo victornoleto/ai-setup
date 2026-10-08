@@ -1,15 +1,17 @@
 """O que o painel mostra, lido do run dir (sem Textual: testável). Nada depende de cor: estado por glifo e texto."""
 from __future__ import annotations
 
+import re
+import subprocess
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 from rich.text import Text
 
 from ..context import title
-from ..journal import cost_parts, current_events, event_line
+from ..journal import _section, cost_parts, current_events, event_line
 from ..store import RunStore, active_seconds
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
@@ -187,6 +189,89 @@ def cost_lines(store: RunStore, ref: str = "") -> list[str]:
     if missing:
         lines.append(f"total parcial: custo não informado em {missing} tentativa(s)")
     return lines or [f"✗ /cost: nenhuma tarefa '{ref}' com custo"]
+
+
+@dataclass
+class Diff:
+    """+/- de código de uma tarefa. `files` vazio: run antiga, só o total (do `git diff --stat`)."""
+    add: int
+    rem: int
+    nfiles: int
+    files: list[tuple[int, int, str]] = field(default_factory=list)
+
+    @classmethod
+    def from_numstat(cls, text: str) -> "Diff":
+        files = []
+        for line in (text or "").splitlines():
+            parts = line.split("\t", 2)
+            if len(parts) == 3:  # binário vem como "-\t-"
+                files.append((int(parts[0]) if parts[0].isdigit() else 0, int(parts[1]) if parts[1].isdigit() else 0,
+                              parts[2]))
+        return cls(sum(f[0] for f in files), sum(f[1] for f in files), len(files), files)
+
+    @classmethod
+    def from_stat(cls, text: str) -> "Diff | None":
+        m = re.search(r"(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?", text or "")
+        return cls(int(m[2] or 0), int(m[3] or 0), int(m[1])) if m else None
+
+    def summary(self) -> str:
+        return f"+{self.add} −{self.rem} · {self.nfiles} arq"
+
+
+def task_diff(st: dict, events: list[dict], tid: str) -> Diff | None:
+    """Terminada: a entrega gravada no task_end. Em curso: `git diff --numstat <base>` ao vivo (inclui o não
+    commitado; arquivo novo não rastreado só entra depois do commit)."""
+    events = current_events(events)
+    end = next((e for e in reversed(events) if e["type"] == "task_end" and e["task"] == tid), None)
+    if end:
+        d = end.get("delivery") or {}
+        return Diff.from_numstat(d["numstat"]) if "numstat" in d else Diff.from_stat(d.get("stat", ""))
+    start = next((e for e in reversed(events) if e["type"] == "task_start" and e["task"] == tid), None)
+    repo = ((st.get("config") or {}).get("run") or {}).get("repo")
+    if not start or start.get("base") in (None, "none") or not repo:
+        return None
+    r = subprocess.run(["git", "-C", repo, "diff", "--numstat", start["base"]], capture_output=True, text=True)
+    return Diff.from_numstat(r.stdout) if r.returncode == 0 else None
+
+
+def task_head(row: TaskRow | None, diff: Diff | None) -> Text:
+    """Topo do modal da tarefa: estado e o +/- por arquivo (maior mudança primeiro)."""
+    t = Text()
+    if row:
+        t.append(row.text(200) + "\n", style="bold")
+    if diff is None:
+        t.append("código: nenhuma entrega registrada", style="dim")
+        return t
+    t.append(f"código: {diff.summary()}\n", style="bold")
+    for a, r, path in sorted(diff.files, key=lambda f: -(f[0] + f[1])):
+        t.append(f"  +{a:<5} −{r:<5} {path}\n")
+    if not diff.files and diff.nfiles:
+        t.append("  (run antiga: sem detalhe por arquivo)", style="dim")
+    return t
+
+
+def task_history(store: RunStore, events: list[dict], tid: str) -> list[tuple[str, Text]]:
+    """O fluxo de uma tarefa → [(horário, texto)]: eventos (com o detalhe do journal, horário vazio na continuação)
+    e o activity.log (stream e início de cada chamada), cada linha depois dos eventos que já existiam ao gravá-la."""
+    cur = {id(e) for e in current_events(events)}
+    items = [((i, 0), e["ts"], Text(line, style=line_style(e)), _section(e) if e["type"] != "task_start" else None)
+             for i, e in enumerate(events) if id(e) in cur and e.get("task") == tid and (line := event_line(e))]
+    try:
+        act = (store.dir / tid / "activity.log").read_text().splitlines()
+    except FileNotFoundError:
+        act = []
+    for a in act:
+        ts, n, line = (a.split("\t", 2) + ["", ""])[:3]
+        if n.isdigit():
+            items.append(((int(n) - 1, 1), ts, Text(line.strip()), None))
+    items.sort(key=lambda x: x[0])
+    out = []
+    for _, ts, text, body in items:
+        out.append((f"{datetime.fromisoformat(ts):%d/%m %H:%M:%S}", text))
+        for line in (body or "").splitlines()[2:]:  # sem o título "### …", que repete a linha
+            if line.strip():
+                out.append(("", Text(line, style="dim")))
+    return out
 
 
 class Tail:

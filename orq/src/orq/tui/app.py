@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
+import time
 from pathlib import Path
 
+from rich.table import Table
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -25,7 +28,7 @@ HELP_LINES = [
     "/cost [NN] mostra o custo estimado por papel (total e por tarefa). "
     "/edit NN abre a tarefa pendente no $EDITOR. Texto sem barra vai ao operador (LLM), que propõe comandos.",
     "Teclas fora do chat: q desanexa · p pausa/continua · f segue o stream · ctrl+t troca tarefas ⇄ stream (tela estreita) · "
-    "enter na timeline abre o detalhe · esc sai do chat.",
+    "enter na timeline abre o detalhe · enter/clique numa tarefa abre o histórico dela · esc sai do chat.",
 ]
 
 
@@ -53,6 +56,51 @@ class DetailScreen(ModalScreen[str | None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id or ""
         self.dismiss(bid[4:] if bid.startswith("opt-") else None)
+
+
+class TaskScreen(ModalScreen[None]):
+    """Histórico de uma tarefa: estado, +/- por arquivo e o fluxo (eventos + stream), ao vivo. Lê o store direto:
+    com o modal na frente, o refresh do painel não alcança os widgets dele."""
+
+    BINDINGS = [Binding("escape", "dismiss(None)", "fechar")]
+
+    def __init__(self, store: RunStore, tid: str):
+        super().__init__()
+        self.store, self.tid = store, tid
+        self.shown, self.diff_at, self.diff = 0, 0.0, None
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="detail"):
+            with VerticalScroll(id="task-head-box"):
+                yield Static(id="task-head")
+            yield RichLog(id="task-log", wrap=True)
+            with Horizontal(id="detail-buttons"):
+                yield Button("Fechar", id="close", variant="primary")
+
+    def on_mount(self) -> None:
+        self.refresh_task()
+        self.set_interval(1.0, self.refresh_task)
+
+    def refresh_task(self) -> None:
+        evs, st = self.store.events(), self.store.state()
+        row = next((r for r in model.task_rows(self.store, evs, state=st) if r.id == self.tid), None)
+        now = time.time()
+        if now - self.diff_at >= 5:  # em curso, o diff é um git ao vivo: no máximo a cada 5 s
+            self.diff, self.diff_at = model.task_diff(st, evs, self.tid), now
+        self.query_one("#task-head", Static).update(model.task_head(row, self.diff))
+        hist = model.task_history(self.store, evs, self.tid)
+        log = self.query_one("#task-log", RichLog)
+        for when, text in hist[self.shown:]:  # grade: o texto quebra na própria coluna, sem cair sob o horário
+            row = Table.grid(padding=(0, 1))
+            row.add_column(width=14, style="dim")
+            row.add_column(width=1, style="dim")
+            row.add_column(ratio=1)
+            row.add_row(when, "│", text)
+            log.write(row, expand=True)
+        self.shown = len(hist)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(None)
 
 
 class ConfirmScreen(ModalScreen[bool]):
@@ -86,8 +134,7 @@ class OrqApp(App):
     #left, #right { width: 1fr; }
     #right { border-left: vkey $foreground 30%; }
     .title { height: 1; padding: 0 1; text-style: bold reverse; }
-    #tasks-box { height: auto; max-height: 45%; }
-    #tasks { height: auto; padding: 0 1; }
+    #tasks-box { height: auto; max-height: 45%; border: none; }
     #timeline { height: 1fr; border: none; }
     #chat { dock: bottom; }
     #ask { height: auto; max-height: 60%; border: heavy $warning; padding: 0 1; display: none; }
@@ -95,7 +142,9 @@ class OrqApp(App):
     Screen.narrow #right { display: none; }
     Screen.narrow.show-right #left { display: none; }
     Screen.narrow.show-right #right { display: block; border-left: none; }
-    DetailScreen, ConfirmScreen { align: center middle; }
+    DetailScreen, ConfirmScreen, TaskScreen { align: center middle; }
+    #task-head-box { height: auto; max-height: 40%; }
+    #task-log { height: 1fr; }
     #detail { width: 90%; height: 80%; border: thick $foreground 50%; background: $surface; padding: 1; }
     #detail-buttons { height: 3; }
     #detail-buttons Button { margin-right: 1; }
@@ -117,14 +166,16 @@ class OrqApp(App):
         self.ev_tail = model.Tail(self.store.events_path)
         self.stream_tail = model.Tail(self.store.stream_path)
         self.pending_ops: set[str] = set()  # ids de /ask aguardando o operador
+        self.task_ids: list[str] | None = None
+        self.task_texts: list[str] = []
+        self.diffs: dict[str, tuple[float, bool, model.Diff | None]] = {}  # tarefa → (quando, final?, diff)
 
     def compose(self) -> ComposeResult:
         yield Static(id="header")
         with Horizontal(id="main"):
             with Vertical(id="left"):
-                yield Static("TAREFAS", classes="title")
-                with VerticalScroll(id="tasks-box"):
-                    yield Static(id="tasks")
+                yield Static("TAREFAS  (enter/clique: histórico)", classes="title")
+                yield OptionList(id="tasks-box")
                 yield Static("TIMELINE  (enter: detalhe)", classes="title")
                 yield OptionList(id="timeline")
                 yield Static(id="ask")
@@ -170,9 +221,8 @@ class OrqApp(App):
             tl.highlighted = tl.option_count - 1
         state = self.store.state()
         rows = model.task_rows(self.store, self.events, state=state)
-        width = self.query_one("#tasks").size.width or 60
-        self.query_one("#tasks", Static).update(Text("\n").join(r.styled(width) for r in rows) if rows
-                                                else Text("(fila vazia)"))
+        self.add_diffs(rows, state)
+        self.show_tasks(rows)
         ask = state.get("open_ask")
         box = self.query_one("#ask", Static)
         box.display = bool(ask)
@@ -181,7 +231,42 @@ class OrqApp(App):
         self.query_one("#header", Static).update(Text(model.header(self.store, self.events, rows, state=state)))
         log = self.query_one("#stream", RichLog)
         for line in self.stream_tail.read():
-            log.write(Text(line))
+            if re.match(r"\d\d:\d\d:\d\d ", line):  # hora apagada, o texto em destaque
+                log.write(Text.assemble((line[:8], "dim"), line[8:]))
+            else:
+                log.write(Text(line, style="dim" if line.startswith("── ") else ""))
+
+    def add_diffs(self, rows: list[model.TaskRow], state: dict) -> None:
+        """+/- de código na linha da tarefa. Terminada: calcula uma vez; em curso (git ao vivo): a cada 5 s."""
+        now = time.time()
+        for r in rows:
+            if r.glyph == "·":
+                continue
+            final = r.glyph in "✓✗⊘"
+            hit = self.diffs.get(r.id)
+            if not hit or not (hit[1] if final else now - hit[0] < 5):
+                hit = self.diffs[r.id] = (now, final, model.task_diff(state, self.events, r.id))
+            if hit[2]:
+                r.extra += (" · " if r.extra else "") + hit[2].summary()
+
+    def show_tasks(self, rows: list[model.TaskRow]) -> None:
+        """Uma opção por tarefa. Mesma lista: troca só o texto que mudou, sem perder o destaque."""
+        tasks = self.query_one("#tasks-box", OptionList)
+        width = tasks.content_size.width or 60
+        ids, prompts = [r.id for r in rows], [r.styled(width) for r in rows]
+        texts = [p.plain for p in prompts]
+        if ids != self.task_ids:
+            hl = tasks.highlighted
+            tasks.set_options([Option(p, id=i) for i, p in zip(ids, prompts)]
+                              or [Option(Text("(fila vazia)"), disabled=True)])
+            if hl is not None and ids:
+                tasks.highlighted = min(hl, len(ids) - 1)
+            self.task_ids = ids
+        else:
+            for i, p, old, new in zip(ids, prompts, self.task_texts, texts):
+                if old != new:
+                    tasks.replace_option_prompt(i, p)
+        self.task_texts = texts
 
     def local(self, text: str) -> None:
         """Linha só do painel (ajuda, eco do que foi enviado)."""
@@ -255,6 +340,9 @@ class OrqApp(App):
     # --- timeline -----------------------------------------------------------------------------------
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         if event.option.id is None:
+            return
+        if event.option_list.id == "tasks-box":
+            self.push_screen(TaskScreen(self.store, event.option.id))
             return
         ev = self.events[int(event.option.id)]
 

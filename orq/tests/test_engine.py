@@ -349,6 +349,8 @@ async def test_relatorio_por_tarefa_e_journal_como_resumo(tmp_path):
     assert "(plan.md)" in rep and "(01-a/plan.md)" not in rep  # link relativo à pasta da tarefa
     end = next(x for x in e.s.events() if x["type"] == "task_end")
     assert len(end["delivery"]["commits"]) == 1
+    assert end["delivery"]["numstat"].endswith("\ta.txt")  # +/- por arquivo, para o painel
+    assert (e.s.dir / "01-a" / "activity.log").read_text().count("\t") >= 1  # o histórico da tarefa
     md = e.s.journal_path.read_text()
     assert "(01-a/report.md)" in md and "(02-b/report.md)" in md
     assert "### Plano" not in md  # o detalhe fica no report

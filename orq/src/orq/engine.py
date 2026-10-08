@@ -154,11 +154,11 @@ class Engine:
         """Ponto seguro entre duas chamadas: pausa e parada pedidas pelo painel valem aqui."""
         await self.control.checkpoint()
 
-    def on_line_for(self, role: str, name: str):
+    def on_line_for(self, role: str, name: str, task: str = ""):
         silent = self.stream_mode == "none" or (self.stream_mode == "main" and role in ("voter", "tiebreak"))
         if silent:
             return lambda line: None
-        return lambda line: self.s.stream(f"  [{name}] {shorten_paths(line, self.cfg.repo, self.s.dir)}")
+        return lambda line: self.s.stream(f"  [{name}] {shorten_paths(line, self.cfg.repo, self.s.dir)}", task)
 
     async def call(self, t: Task | None, role_name: str, name: str, schema_name: str, prompt_text: str,
                    sid: str | None = None, resume: bool = False, gate: bool = True, read_only: bool = False) -> tuple[dict | None, str | None]:
@@ -202,7 +202,7 @@ class Engine:
             full_prompt = self.with_inbox(t, sid, resume, prompt_text)
             acc = f" · conta {account}" if role.harness == "claude" else ""
             self.s.log(f"{name}: {role.harness}{acc} · {role.model} · effort {role.effort} · "
-                       f"{'resume' if resume else 'new'} {(sid or '-')[:8]}")
+                       f"{'resume' if resume else 'new'} {(sid or '-')[:8]}", tid)
             req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.cfg.repo,
                               calls_dir=calls_dir, read_only=read_only or role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
@@ -211,7 +211,7 @@ class Engine:
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
             self.s.active_start(tid)
             try:
-                res = await h.call(req, self.on_line_for(role_name, name))
+                res = await h.call(req, self.on_line_for(role_name, name, tid))
             finally:
                 self.s.active_stop(tid)
             self.s.add_cost(res.cost, tid, role_name)
@@ -376,7 +376,8 @@ class Engine:
         started = self.s.get(t.id, "started", int(time.time()))
         base = self.s.get(t.id, "base")
         delivery = {"commits": git(self.cfg.repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
-                    "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD")} if base and base != "none" else {}
+                    "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD"),
+                    "numstat": git(self.cfg.repo, "diff", "--numstat", f"{base}..HEAD")} if base and base != "none" else {}
         if result in ("ok", "ok_takeover", "ok_victor") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.update_task(t.id, {"phase": "done", "result": result})

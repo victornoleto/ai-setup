@@ -129,3 +129,23 @@ def test_linhas_da_intervencao():
     assert "- **[INTERVENÇÃO]** [04-x](04-x/report.md) — E agora? → retry: use Y" in md
     task = journal.render_task([ask, rep, ans], "04-x")
     assert "### Pergunta ao Victor" in task and "**← recomendada**" in task and "**Resposta do Victor:** 1" in task
+
+
+def test_stream_com_horario_e_historico_da_tarefa(tmp_path):
+    import re
+    s = RunStore(tmp_path / "run")
+    s.create(tmp_path, "2")
+    s.stream("  [plan] › $ ls")
+    s.stream("  [exec-1] texto", task="01-a")
+    s.log("exec-1: claude · m", task="01-a")
+    lines = s.stream_path.read_text().splitlines()
+    assert re.fullmatch(r"── \d\d/\d\d/\d{4} ──", lines[0])  # 1ª linha do processo: a data
+    assert re.fullmatch(r"\d\d:\d\d:\d\d   \[plan\] › \$ ls", lines[1]) and len(lines) == 3
+    assert re.search(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d   \[exec-1\] texto$", s.log_path.read_text(), re.M)
+    act = (s.dir / "01-a" / "activity.log").read_text().splitlines()
+    assert [a.split("\t", 2)[1:] for a in act] == [["0", "  [exec-1] texto"], ["0", "exec-1: claude · m"]]
+    s.event("task_start", {"task": "01-a", "base": "abc", "task_file": "f"})
+    s.stream("  [exec-1] depois", task="01-a")
+    assert (s.dir / "01-a" / "activity.log").read_text().splitlines()[-1].split("\t")[1] == "1"
+    assert act[0].split("\t")[0][:4].isdigit() and "T" in act[0].split("\t")[0]
+    assert not (s.dir / "plan").exists()

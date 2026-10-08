@@ -2,7 +2,8 @@
 
   events.jsonl  motor → painel: um evento por linha (fonte do journal.md e da timeline)
   state.json    fase, ciclo e sessões de cada tarefa (o que o `resume` lê)
-  stream.log    o stream normalizado dos harnesses (metade direita do painel)
+  stream.log    o stream normalizado dos harnesses (metade direita do painel), com hora
+  <tarefa>/activity.log  o histórico da tarefa (stream e chamadas dela): ts ISO, nº de eventos, linha
   orq.log       o log corrido: linhas de evento + stream
   inbox.jsonl   painel → motor: um comando por linha
   engine.pid    pid do motor enquanto roda
@@ -114,6 +115,8 @@ class RunStore:
         self._event_stamp = None
         self._event_pos = 0
         self._event_cache = []
+        self._stream_day = None
+        self._n_events: int | None = None  # eventos já gravados: posição das linhas do activity.log
 
     # --- criação ---------------------------------------------------------------------------------
     def create(self, queue_dir: Path, account: str, register: bool = True) -> None:
@@ -130,20 +133,37 @@ class RunStore:
         return self.state_path.is_file()
 
     # --- log e stream -----------------------------------------------------------------------------
-    def log(self, msg: str) -> None:
+    def log(self, msg: str, task: str = "") -> None:
         line = f"{datetime.now():%F %T} {msg}"
         if self.echo:
             print(line, file=sys.stderr, flush=True)
         with open(self.log_path, "a") as fh:
             fh.write(line + "\n")
+        self._activity(task, msg)
 
-    def stream(self, line: str) -> None:
+    def stream(self, line: str, task: str = "") -> None:
+        now = datetime.now()
         if self.echo:
             print(line, file=sys.stderr, flush=True)
         with open(self.stream_path, "a") as fh:
-            fh.write(line + "\n")
+            if f"{now:%d/%m/%Y}" != self._stream_day:  # o stream só tem a hora: a data entra quando muda
+                self._stream_day = f"{now:%d/%m/%Y}"
+                fh.write(f"── {self._stream_day} ──\n")
+            fh.write(f"{now:%T} {line}\n")
         with open(self.log_path, "a") as fh:
-            fh.write(line + "\n")
+            fh.write(f"{now:%F %T} {line}\n")
+        self._activity(task, line)
+
+    def _activity(self, task: str, line: str) -> None:
+        """Histórico de uma tarefa (modal do painel): `ts ISO<tab>eventos já gravados<tab>linha`. A contagem põe a
+        linha entre os eventos certos mesmo quando os dois caem no mesmo segundo."""
+        if not task:
+            return
+        if self._n_events is None:
+            self._n_events = len(self.events())
+        (self.dir / task).mkdir(exist_ok=True)
+        with open(self.dir / task / "activity.log", "a") as fh:
+            fh.write(f"{now_iso()}\t{self._n_events}\t{line}\n")
 
     # --- eventos ----------------------------------------------------------------------------------
     def event(self, type_: str, data: dict | None = None) -> dict:
@@ -156,6 +176,7 @@ class RunStore:
                 fh.write(json.dumps(ev, ensure_ascii=False) + "\n")
             try:
                 evs = self.events()
+                self._n_events = len(evs)
                 write_atomic(self.journal_path, journal.render(evs))
                 if ev.get("task") and (self.dir / ev["task"]).is_dir():
                     write_atomic(self.dir / ev["task"] / "report.md", journal.render_task(evs, ev["task"]))

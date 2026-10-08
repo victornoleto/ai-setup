@@ -4,7 +4,7 @@ import time
 from textual.widgets import Input, OptionList, RichLog, Static
 
 from orq.tui import model
-from orq.tui.app import DetailScreen, OrqApp
+from orq.tui.app import DetailScreen, OrqApp, TaskScreen
 
 from .test_engine import APPROVED, EXEC_OK, PLAN, Q, engine, make_queue, vote
 
@@ -34,7 +34,9 @@ async def test_painel(tmp_path):
     app = OrqApp(e.s.dir)
     async with app.run_test(size=(160, 40)) as pilot:
         await pilot.pause()
-        assert "✓ 01-a  ok" in str(app.query_one("#tasks", Static).render())
+        tasks = app.query_one("#tasks-box", OptionList)
+        assert "✓ 01-a  ok · " in str(tasks.get_option_at_index(0).prompt)
+        assert re.search(r"\+\d+ −\d+ · 1 arq", str(tasks.get_option_at_index(0).prompt))
         tl = app.query_one("#timeline", OptionList)
         texts = [str(tl.get_option_at_index(i).prompt) for i in range(tl.option_count)]
         assert any("[DECISÃO 2 pts]" in t for t in texts)
@@ -172,4 +174,50 @@ async def test_tarefas_rolam_e_cabecalho_fica(tmp_path):
         await pilot.pause()
         assert app.query_one("#tasks-box").max_scroll_y > 0
         assert "tarefas" in str(app.query_one("#header", Static).render())
+        await pilot.press("q")
+
+
+def test_diff_por_numstat_e_por_stat_antigo():
+    d = model.Diff.from_numstat("10\t2\tsrc/a.py\n-\t-\timg.png\n0\t5\tb.md\n")
+    assert (d.add, d.rem, d.nfiles) == (10, 7, 3) and d.files[1] == (0, 0, "img.png")
+    assert d.summary() == "+10 −7 · 3 arq"
+    old = model.Diff.from_stat(" a.py | 3 ++-\n b.py | 1 -\n 2 files changed, 2 insertions(+), 2 deletions(-)")
+    assert (old.add, old.rem, old.nfiles, old.files) == (2, 2, 2, [])
+    assert model.Diff.from_stat(" 1 file changed, 4 insertions(+)").rem == 0
+    assert model.Diff.from_stat("") is None
+
+
+async def test_diff_e_historico_da_tarefa(tmp_path):
+    e = await finished_run(tmp_path)
+    st, evs = e.s.state(), e.s.events()
+    d = model.task_diff(st, evs, "01-a")
+    assert d.add >= 1 and d.files and d.files[0][2].endswith(".txt")
+    assert model.task_diff(st, evs, "03-c") is None  # pulada: sem entrega
+    start = next(x for x in evs if x["type"] == "task_start" and x["task"] == "01-a")
+    n_start = evs.index(start) + 1  # a linha foi gravada logo depois do task_start, no mesmo segundo do plano
+    (e.s.dir / "01-a" / "activity.log").write_text(f"{start['ts']}\t{n_start}\t  [exec-1] › $ ls\n")
+    hist = [(when, str(t)) for when, t in model.task_history(e.s, evs, "01-a")]
+    assert re.fullmatch(r"\d\d/\d\d \d\d:\d\d:\d\d", hist[0][0]) and hist[0][1] == "▶ 01-a começou"
+    assert hist[1][1] == "[exec-1] › $ ls" and "[PLANO]" in hist[2][1]  # entre os eventos, pela contagem
+    assert any(when == "" for when, _ in hist)  # o detalhe do evento continua sem horário
+    assert not any("02-b" in t for _, t in hist)
+
+
+async def test_modal_da_tarefa(tmp_path):
+    e = await finished_run(tmp_path)
+    e.s.stream("  [exec-1] › $ ls", task="01-a")
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        await pilot.pause()
+        assert re.match(r"\d\d:\d\d:\d\d   \[exec-1\]", str(app.query_one("#stream", RichLog).lines[-1].text))
+        await pilot.click("#tasks-box", offset=(3, 0))  # clique na 1ª tarefa
+        await pilot.pause()
+        assert isinstance(app.screen, TaskScreen)
+        head = str(app.screen.query_one("#task-head", Static).render())
+        assert "01-a" in head and re.search(r"\+\d+ +−\d+ +\S+\.txt", head)
+        lines = [str(x.text) for x in app.screen.query_one("#task-log", RichLog).lines]
+        assert any("│ ▶ 01-a começou" in x for x in lines) and any("[exec-1] › $ ls" in x for x in lines)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not isinstance(app.screen, TaskScreen)
         await pilot.press("q")
