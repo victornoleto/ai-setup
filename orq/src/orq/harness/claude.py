@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
 
 
 # nega subagent em background: ver no_background_agent.py
@@ -37,11 +37,7 @@ class ClaudeHarness(Harness):
                 req.on_session(ev["session_id"])
             if ev.get("type") == "result":
                 result = ev
-            try:
-                lines = render_event(ev, req.thinking)
-            except Exception as exc:  # o render é cosmético: nunca derruba a chamada
-                lines = [f"✗ render falhou ({type(exc).__name__}): " + clip(json.dumps(ev, ensure_ascii=False), 200)]
-            for line in lines:
+            for line in safe_render(render_event, ev, req.thinking):
                 on_line(line)
 
         raw = req.calls_dir / f"{req.name}.stream.jsonl"

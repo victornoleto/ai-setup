@@ -75,6 +75,14 @@ def clip(s, n: int) -> str:
     return s if len(s) <= n else s[: n - 1] + "…"
 
 
+def safe_render(render: Callable[[dict, bool], list[str]], ev: dict, thinking: bool = False) -> list[str]:
+    """O render é cosmético: um evento inesperado vira uma linha de aviso, nunca derruba a chamada."""
+    try:
+        return render(ev, thinking)
+    except Exception as exc:
+        return [f"✗ render falhou ({type(exc).__name__}): " + clip(json.dumps(ev, ensure_ascii=False), 200)]
+
+
 def shorten_paths(s: str, cwd: Path, run_dir: Path | None) -> str:
     if run_dir:
         s = s.replace(str(run_dir) + "/", "run/")

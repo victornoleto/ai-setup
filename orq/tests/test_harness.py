@@ -101,3 +101,12 @@ def test_claude_render_system_em_texto():
     shown = claude.render_event(ev)
     assert len(shown) == 1 and shown[0].startswith("✗ permission_denied: Dangerous rm operation detected")
     assert claude.render_event({"type": "system", "subtype": "init", "session_id": "s1"}) == []
+
+
+def test_render_que_quebra_nao_derruba_a_chamada():
+    from orq.harness.base import safe_render
+
+    def quebra(ev, thinking=False):
+        raise KeyError("x")
+    assert safe_render(quebra, {"type": "y"}) == ['✗ render falhou (KeyError): {"type": "y"}']
+    assert safe_render(codex.render_event, {"type": "turn.failed", "error": "texto"})[0].startswith("✗ render falhou")
