@@ -37,7 +37,11 @@ class ClaudeHarness(Harness):
                 req.on_session(ev["session_id"])
             if ev.get("type") == "result":
                 result = ev
-            for line in render_event(ev, req.thinking):
+            try:
+                lines = render_event(ev, req.thinking)
+            except Exception as exc:  # o render é cosmético: nunca derruba a chamada
+                lines = [f"✗ render falhou ({type(exc).__name__}): " + clip(json.dumps(ev, ensure_ascii=False), 200)]
+            for line in lines:
                 on_line(line)
 
         raw = req.calls_dir / f"{req.name}.stream.jsonl"
@@ -68,7 +72,8 @@ def render_event(e: dict, thinking: bool = False) -> list[str]:
     """Evento do stream-json → linhas legíveis (texto do modelo, ferramentas, erros de ferramenta)."""
     out = []
     t = e.get("type")
-    content = (e.get("message") or {}).get("content") or []
+    msg = e.get("message")  # dict em assistant/user; texto em alguns system (permission_denied)
+    content = (msg.get("content") or []) if isinstance(msg, dict) else []
     if t == "assistant":
         for c in content:
             if c.get("type") == "text":
@@ -86,4 +91,6 @@ def render_event(e: dict, thinking: bool = False) -> list[str]:
                 if isinstance(body, list):
                     body = " ".join(x.get("text", "") for x in body if isinstance(x, dict))
                 out.append("✗ " + clip(body, 200))
+    elif t == "system" and e.get("subtype") == "permission_denied" and isinstance(msg, str):
+        out.append("✗ " + clip(f"{e['subtype']}: {msg}", 200))
     return out

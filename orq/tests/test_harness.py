@@ -93,3 +93,11 @@ async def test_claude_subagent_morto_no_fim_nao_vale_como_saida(tmp_path, monkey
                       calls_dir=tmp_path, read_only=False, session_id="s1", resume=False, timeout=10)
     res = await claude.ClaudeHarness().call(req, lambda line: None)
     assert res.error == "background_killed" and res.output is None and res.session_id == "s1" and res.cost == 1.5
+
+
+def test_claude_render_system_em_texto():
+    ev = {"type": "system", "subtype": "permission_denied", "session_id": "s1",
+          "message": "Dangerous rm operation detected: 'x'\n\nThis command changes directories before the removal"}
+    shown = claude.render_event(ev)
+    assert len(shown) == 1 and shown[0].startswith("✗ permission_denied: Dangerous rm operation detected")
+    assert claude.render_event({"type": "system", "subtype": "init", "session_id": "s1"}) == []
