@@ -42,15 +42,20 @@ def call(tool: str, args: dict, url: str = URL) -> dict:
             "ai-memory fora do ar em 127.0.0.1:49374 → docker start ai-memory"
         ) from e
 
-    payload = json.loads(raw)
+    try:
+        payload = json.loads(raw)
 
-    if "error" in payload:
-        message = payload["error"]["message"]
-        raise McpError(f"ai-memory {tool}: {message} → confira os argumentos")
+        if "error" in payload:
+            message = payload["error"]["message"]
+            raise McpError(f"ai-memory {tool}: {message} → confira os argumentos")
 
-    result = payload["result"]
-    if result.get("isError"):
-        text = "".join(item["text"] for item in result["content"])
-        raise McpError(f"ai-memory {tool}: {text} → confira os argumentos")
+        result = payload["result"]
+        if result.get("isError"):
+            text = "".join(item["text"] for item in result["content"])
+            raise McpError(f"ai-memory {tool}: {text} → confira os argumentos")
 
-    return json.loads(result["content"][0]["text"])
+        return json.loads(result["content"][0]["text"])
+    except (ValueError, KeyError, IndexError) as e:
+        raise McpError(
+            f"ai-memory {tool}: resposta inesperada → confira a versão do ai-memory"
+        ) from e
