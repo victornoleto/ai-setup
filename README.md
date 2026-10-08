@@ -153,6 +153,10 @@ Orca, tamanho do `GLOBAL.md` e idade das skills copiadas.
 vão a um conselho de 3 votantes. Escreve um journal por execução. Uso e formato da fila em
 [`orq/README.md`](orq/README.md); no PATH por `~/.local/bin/orq`.
 
+**`bin/memory-ui`** abre no navegador, só para leitura, o que o ai-memory guardou: projetos, todas
+as páginas da wiki, busca e handoffs abertos. Uso e de onde vem cada dado em
+[`memory-ui/README.md`](memory-ui/README.md).
+
 ## Máquina nova
 
 1. Clonar este repositório em `~/.ai-setup` e trazer o `sync/`.
