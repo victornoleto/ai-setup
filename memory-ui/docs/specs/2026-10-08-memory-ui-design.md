@@ -114,7 +114,7 @@ Tela única, três colunas em desktop; em largura de celular, uma coluna por vez
 
 ## Testes
 
-`python3 -m unittest discover memory-ui/tests`, sem dependência:
+`python3 -m unittest discover -s memory-ui/tests -t memory-ui`, sem dependência:
 
 - parse da saída de `list_projects` e `list_pages` (fixtures de texto), incluindo página sem `title`;
 - rejeição de nome de projeto inválido;
