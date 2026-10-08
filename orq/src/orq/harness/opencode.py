@@ -9,7 +9,7 @@ import re
 import jsonschema
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
 
 SCHEMA_NOTE = """
 
@@ -60,7 +60,7 @@ class OpencodeHarness(Harness):
                 msg = data.get("message") or err.get("name") or "erro"
                 errors.append(msg + (" (transient)" if data.get("isRetryable") else "")
                               + (" rate limit" if data.get("statusCode") == 429 else ""))
-            for line in render_event(ev, req.thinking):
+            for line in safe_render(render_event, ev, req.thinking):
                 on_line(line)
 
         rc, timed_out, err = await run_process(self.argv(req, prompt), None, req.cwd, req.env, req.timeout,

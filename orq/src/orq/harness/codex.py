@@ -5,7 +5,7 @@ import json
 import re
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
 
 
 class CodexHarness(Harness):
@@ -43,7 +43,7 @@ class CodexHarness(Harness):
                 errors.append(str((ev.get("error") or {}).get("message", "")))
             elif t == "item.completed" and (ev.get("item") or {}).get("type") == "agent_message":
                 last_msg = ev["item"].get("text", "")
-            for line in render_event(ev, req.thinking):
+            for line in safe_render(render_event, ev, req.thinking):
                 on_line(line)
 
         rc, timed_out, err = await run_process(self.argv(req, str(schema_file)), req.prompt, req.cwd, req.env,
