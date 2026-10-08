@@ -42,6 +42,8 @@ class TestServer(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "text/html; charset=utf-8")
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
         self.assertIn(b"memory-ui", body)
+        self.assertIn(b"marked/12.0.2/marked.min.js", body)
+        self.assertIn(b"dompurify/3.1.6/purify.min.js", body)
 
     def test_projects(self):
         with patch("wiki.list_projects", return_value=[{"name": "hoobot", "pages": 3}]) as call:

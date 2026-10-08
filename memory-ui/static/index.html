@@ -1,1 +1,430 @@
-<!doctype html><meta charset="utf-8"><title>memory-ui</title><p>memory-ui: interface em construção.</p>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>memory-ui</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #595959;
+    --border: #cccccc;
+    --accent: #0552b5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --fg: #f0f0f0;
+      --muted: #b3b3b3;
+      --border: #4d4d4d;
+      --accent: #6fb1ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, sans-serif;
+  }
+  a { color: var(--accent); }
+  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 1.1rem; margin: 0; }
+  header input, header select { font: inherit; }
+
+  #error {
+    margin: .5rem 1rem;
+    padding: .5rem .75rem;
+    border: 2px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, var(--bg));
+    border-radius: 4px;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 16rem 22rem minmax(0, 1fr);
+    height: calc(100vh - 3rem);
+  }
+  #app > section {
+    overflow-y: auto;
+    padding: .75rem 1rem;
+    border-right: 1px solid var(--border);
+  }
+  #app > section:last-child { border-right: none; }
+  #app .back { display: none; }
+
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { margin: 0 0 .15rem 0; }
+  h2 { font-size: 1rem; margin: 0 0 .5rem 0; }
+  h3 { font-size: .85rem; color: var(--muted); margin: .75rem 0 .25rem 0; }
+
+  #projects a, #pages a {
+    display: block;
+    padding: .3rem .5rem;
+    text-decoration: none;
+    color: var(--fg);
+    border-left: 4px solid transparent;
+  }
+  #projects a::before, #pages a::before { content: ""; }
+  #projects a[aria-current="page"], #pages a[aria-current="page"] {
+    border-left: 4px solid var(--accent);
+    font-weight: bold;
+  }
+  #projects a[aria-current="page"]::before, #pages a[aria-current="page"]::before {
+    content: "▸ ";
+  }
+  #projects a .count { color: var(--muted); font-weight: normal; }
+
+  .tabs { display: flex; gap: .5rem; margin-bottom: .5rem; }
+  .tabs button { font: inherit; border: 1px solid var(--border); background: var(--bg); color: var(--fg); padding: .25rem .6rem; border-radius: 4px; }
+  .tabs button[aria-pressed="true"] { border-color: var(--accent); font-weight: bold; }
+
+  #reader-frontmatter { border-collapse: collapse; margin-bottom: 1rem; max-width: 100%; display: block; overflow-x: auto; }
+  #reader-frontmatter th, #reader-frontmatter td { border: 1px solid var(--border); padding: .25rem .5rem; text-align: left; vertical-align: top; }
+
+  #reader-body { overflow-wrap: anywhere; }
+  #reader-body pre, #reader-body table { overflow-x: auto; max-width: 100%; }
+  #reader-body img { max-width: 100%; }
+
+  @media (max-width: 719px) {
+    header { padding: .5rem 16px; flex-wrap: wrap; }
+    #app { display: block; height: auto; }
+    #app > section { padding: 0 16px; border-right: none; }
+    #app .back { display: inline-block; margin: .5rem 0; }
+    #error { margin: .5rem 16px; }
+
+    #app[data-view="projects"] #col-pages,
+    #app[data-view="projects"] #col-reader { display: none; }
+    #app[data-view="pages"] #col-projects,
+    #app[data-view="pages"] #col-reader { display: none; }
+    #app[data-view="reader"] #col-projects,
+    #app[data-view="reader"] #col-pages { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>memory-ui</h1>
+  <input type="search" id="search" disabled placeholder="Busca (em breve)" aria-label="Buscar">
+  <select id="search-scope" disabled>
+    <option>este projeto</option>
+    <option>todos</option>
+  </select>
+</header>
+<div id="error" role="alert" hidden></div>
+<main id="app" data-view="projects">
+  <section id="col-projects">
+    <h2>Projetos</h2>
+    <ul id="projects"><li>Carregando…</li></ul>
+  </section>
+  <section id="col-pages">
+    <a class="back" href="#/">← Voltar</a>
+    <h2 id="pages-title">Páginas</h2>
+    <div class="tabs">
+      <button type="button" aria-pressed="true">Páginas</button>
+      <button type="button" disabled>Handoffs</button>
+    </div>
+    <div id="pages">Escolha um projeto.</div>
+  </section>
+  <section id="col-reader">
+    <a class="back" href="#/">← Voltar</a>
+    <h2 id="reader-title">Escolha uma página.</h2>
+    <table id="reader-frontmatter"></table>
+    <article id="reader-body"></article>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js" integrity="sha512-xeUh+KxNyTufZOje++oQHstlMQ8/rpyzPuM+gjMFYK3z5ILJGE7l2NvYL+XfliKURMpBIKKp1XoPN/qswlSMFA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js" integrity="sha512-jB0TkTBeQC9ZSkBqDhdmfTv1qdfbWpGE72yJ/01Srq6hEzZIz2xkz1e57p9ai7IeHMwEG7HpzG6NdptChif5Pg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(function () {
+  "use strict";
+
+  var app = document.getElementById("app");
+  var errorBox = document.getElementById("error");
+  var projectsEl = document.getElementById("projects");
+  var pagesEl = document.getElementById("pages");
+  var pagesTitleEl = document.getElementById("pages-title");
+  var readerTitleEl = document.getElementById("reader-title");
+  var frontmatterEl = document.getElementById("reader-frontmatter");
+  var bodyEl = document.getElementById("reader-body");
+
+  var projectsCache = null;
+  var pagesCache = { project: null, pages: null };
+
+  function showError(msg) {
+    errorBox.textContent = "Erro: " + msg;
+    errorBox.hidden = false;
+  }
+
+  function clearError() {
+    errorBox.hidden = true;
+    errorBox.textContent = "";
+  }
+
+  function api(url) {
+    return fetch(url)
+      .catch(function () {
+        throw new Error("servidor memory-ui fora do ar → rode bin/memory-ui");
+      })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) {
+            throw new Error((data && data.error) || ("HTTP " + res.status));
+          }
+          return data;
+        });
+      });
+  }
+
+  function parseHash() {
+    var hash = location.hash;
+    if (hash.indexOf("#/") !== 0) {
+      return { project: null, path: null };
+    }
+    var rest = hash.slice(2);
+    if (rest === "") {
+      return { project: null, path: null };
+    }
+    var slash = rest.indexOf("/");
+    var projectPart = slash === -1 ? rest : rest.slice(0, slash);
+    var pathPart = slash === -1 ? null : rest.slice(slash + 1);
+    var project = decodeURIComponent(projectPart);
+    var path = null;
+    if (pathPart) {
+      path = pathPart
+        .split("/")
+        .map(decodeURIComponent)
+        .join("/");
+    }
+    return { project: project, path: path };
+  }
+
+  function projectHref(project) {
+    return "#/" + encodeURIComponent(project);
+  }
+
+  function pageHref(project, path) {
+    var segments = path.split("/").map(encodeURIComponent).join("/");
+    return "#/" + encodeURIComponent(project) + "/" + segments;
+  }
+
+  function clearChildren(el) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+  }
+
+  function showLoading(el) {
+    clearChildren(el);
+    var li = document.createElement("li");
+    li.textContent = "Carregando…";
+    el.appendChild(li);
+  }
+
+  function renderProjects(projects, current) {
+    clearChildren(projectsEl);
+    projects.forEach(function (p) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = projectHref(p.name);
+      a.appendChild(document.createTextNode(p.name + " "));
+      var count = document.createElement("span");
+      count.className = "count";
+      count.textContent = "(" + p.pages + ")";
+      a.appendChild(count);
+      if (p.name === current) {
+        a.setAttribute("aria-current", "page");
+      }
+      li.appendChild(a);
+      projectsEl.appendChild(li);
+    });
+  }
+
+  function sortPages(pages) {
+    var groups = {};
+    pages.forEach(function (p) {
+      (groups[p.group] = groups[p.group] || []).push(p);
+    });
+    var groupNames = Object.keys(groups).sort(function (a, b) {
+      return a.localeCompare(b);
+    });
+    groupNames.forEach(function (name) {
+      if (name === "sessions") {
+        groups[name].sort(function (a, b) {
+          return b.path.localeCompare(a.path);
+        });
+      } else {
+        groups[name].sort(function (a, b) {
+          return a.title.localeCompare(b.title);
+        });
+      }
+    });
+    return groupNames.map(function (name) {
+      return { name: name, pages: groups[name] };
+    });
+  }
+
+  function renderPages(project, pages, currentPath) {
+    clearChildren(pagesEl);
+    if (pages.length === 0) {
+      pagesEl.textContent = "Nenhuma página.";
+      return;
+    }
+    sortPages(pages).forEach(function (group) {
+      var h3 = document.createElement("h3");
+      h3.textContent = group.name;
+      pagesEl.appendChild(h3);
+      var ul = document.createElement("ul");
+      group.pages.forEach(function (p) {
+        var li = document.createElement("li");
+        var a = document.createElement("a");
+        a.href = pageHref(project, p.path);
+        a.textContent = p.title;
+        if (p.path === currentPath) {
+          a.setAttribute("aria-current", "page");
+        }
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+      pagesEl.appendChild(ul);
+    });
+  }
+
+  function renderFrontmatter(frontmatter) {
+    clearChildren(frontmatterEl);
+    Object.keys(frontmatter).forEach(function (key) {
+      var value = frontmatter[key];
+      var tr = document.createElement("tr");
+      var th = document.createElement("th");
+      th.textContent = key;
+      var td = document.createElement("td");
+      td.textContent = typeof value === "string" ? value : JSON.stringify(value);
+      tr.appendChild(th);
+      tr.appendChild(td);
+      frontmatterEl.appendChild(tr);
+    });
+  }
+
+  function renderBody(body) {
+    if (window.marked && window.DOMPurify) {
+      bodyEl.innerHTML = DOMPurify.sanitize(marked.parse(body));
+    } else {
+      showError("marked/DOMPurify não carregaram de cdnjs → confira a rede");
+      clearChildren(bodyEl);
+      var pre = document.createElement("pre");
+      pre.textContent = body;
+      bodyEl.appendChild(pre);
+    }
+  }
+
+  function route() {
+    clearError();
+    var state = parseHash();
+    var view = state.project === null ? "projects" : (state.path === null ? "pages" : "reader");
+    app.dataset.view = view;
+
+    var projectsPromise = projectsCache
+      ? Promise.resolve(projectsCache)
+      : (function () {
+          showLoading(projectsEl);
+          return api("/api/projects").then(function (projects) {
+            projectsCache = projects;
+            return projects;
+          });
+        })();
+
+    projectsPromise
+      .then(function (projects) {
+        if (parseHash().project !== state.project && view !== "projects") {
+          return;
+        }
+        renderProjects(projects, state.project);
+      })
+      .catch(function (e) {
+        showError(e.message);
+        projectsEl.textContent = e.message;
+      });
+
+    if (state.project === null) {
+      clearChildren(pagesEl);
+      pagesEl.textContent = "Escolha um projeto.";
+      readerTitleEl.textContent = "Escolha uma página.";
+      clearChildren(frontmatterEl);
+      clearChildren(bodyEl);
+      document.title = "memory-ui";
+      return;
+    }
+
+    var pagesPromise;
+    if (pagesCache.project === state.project) {
+      pagesPromise = Promise.resolve(pagesCache.pages);
+    } else {
+      pagesTitleEl.textContent = state.project;
+      showLoading(pagesEl);
+      pagesPromise = api("/api/pages?project=" + encodeURIComponent(state.project)).then(function (pages) {
+        pagesCache = { project: state.project, pages: pages };
+        return pages;
+      });
+    }
+
+    pagesPromise
+      .then(function (pages) {
+        if (parseHash().project !== state.project) {
+          return;
+        }
+        pagesTitleEl.textContent = state.project;
+        renderPages(state.project, pages, state.path);
+      })
+      .catch(function (e) {
+        showError(e.message);
+        clearChildren(pagesEl);
+        pagesEl.textContent = e.message;
+      });
+
+    if (state.path === null) {
+      readerTitleEl.textContent = "Escolha uma página.";
+      clearChildren(frontmatterEl);
+      clearChildren(bodyEl);
+      document.title = "memory-ui";
+      return;
+    }
+
+    readerTitleEl.textContent = "Carregando…";
+    clearChildren(frontmatterEl);
+    clearChildren(bodyEl);
+
+    var url = "/api/page?project=" + encodeURIComponent(state.project) + "&path=" + encodeURIComponent(state.path);
+    api(url)
+      .then(function (page) {
+        var current = parseHash();
+        if (current.project !== state.project || current.path !== state.path) {
+          return;
+        }
+        readerTitleEl.textContent = page.title;
+        renderFrontmatter(page.frontmatter || {});
+        renderBody(page.body || "");
+        document.title = page.title + " — memory-ui";
+      })
+      .catch(function (e) {
+        showError(e.message);
+        readerTitleEl.textContent = e.message;
+      });
+  }
+
+  window.addEventListener("hashchange", route);
+  route();
+})();
+</script>
+</body>
+</html>
