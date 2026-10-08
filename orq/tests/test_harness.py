@@ -110,3 +110,18 @@ def test_render_que_quebra_nao_derruba_a_chamada():
         raise KeyError("x")
     assert safe_render(quebra, {"type": "y"}) == ['✗ render falhou (KeyError): {"type": "y"}']
     assert safe_render(codex.render_event, {"type": "turn.failed", "error": "texto"})[0].startswith("✗ render falhou")
+
+
+async def test_codex_turn_failed_com_error_em_texto(tmp_path, monkeypatch):
+    from orq.config import Role
+    from orq.harness.base import CallRequest
+    ev = {"type": "turn.failed", "error": "falhou em texto"}
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "codex").write_text(f"#!/bin/sh\ncat >/dev/null\necho '{json.dumps(ev)}'\nexit 1\n")
+    (bin_dir / "codex").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    req = CallRequest(role=Role("executor", "codex", "m", "low"), name="n", prompt="p", schema={}, cwd=tmp_path,
+                      calls_dir=tmp_path, read_only=False, session_id=None, resume=False, timeout=10)
+    res = await codex.CodexHarness().call(req, lambda line: None)
+    assert res.error == "fatal" and "falhou em texto" in res.message

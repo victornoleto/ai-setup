@@ -40,7 +40,8 @@ class CodexHarness(Harness):
             elif t == "error":
                 errors.append(str(ev.get("message", "")))
             elif t == "turn.failed":
-                errors.append(str((ev.get("error") or {}).get("message", "")))
+                e = ev.get("error")
+                errors.append(str(e.get("message", "") if isinstance(e, dict) else e or ""))
             elif t == "item.completed" and (ev.get("item") or {}).get("type") == "agent_message":
                 last_msg = ev["item"].get("text", "")
             for line in safe_render(render_event, ev, req.thinking):
