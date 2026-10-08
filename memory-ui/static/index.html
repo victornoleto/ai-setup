@@ -90,7 +90,7 @@
   .tabs button[aria-pressed="true"] { border-color: var(--accent); font-weight: bold; }
 
   #reader-frontmatter { border-collapse: collapse; margin-bottom: 1rem; max-width: 100%; display: block; overflow-x: auto; }
-  #reader-frontmatter th, #reader-frontmatter td { border: 1px solid var(--border); padding: .25rem .5rem; text-align: left; vertical-align: top; }
+  #reader-frontmatter th, #reader-frontmatter td { border: 1px solid var(--border); padding: .25rem .5rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
 
   #reader-body { overflow-wrap: anywhere; }
   #reader-body pre, #reader-body table { overflow-x: auto; max-width: 100%; }
@@ -137,7 +137,7 @@
     <div id="pages">Escolha um projeto.</div>
   </section>
   <section id="col-reader">
-    <a class="back" href="#/">← Voltar</a>
+    <a class="back" id="reader-back" href="#/">← Voltar</a>
     <h2 id="reader-title">Escolha uma página.</h2>
     <table id="reader-frontmatter"></table>
     <article id="reader-body"></article>
@@ -158,6 +158,7 @@
   var readerTitleEl = document.getElementById("reader-title");
   var frontmatterEl = document.getElementById("reader-frontmatter");
   var bodyEl = document.getElementById("reader-body");
+  var readerBackEl = document.getElementById("reader-back");
 
   var projectsCache = null;
   var pagesCache = { project: null, pages: null };
@@ -366,12 +367,15 @@
       return;
     }
 
+    readerBackEl.href = projectHref(state.project);
+
     var pagesPromise;
     if (pagesCache.project === state.project) {
       pagesPromise = Promise.resolve(pagesCache.pages);
     } else {
       pagesTitleEl.textContent = state.project;
-      showLoading(pagesEl);
+      clearChildren(pagesEl);
+      pagesEl.textContent = "Carregando…";
       pagesPromise = api("/api/pages?project=" + encodeURIComponent(state.project)).then(function (pages) {
         pagesCache = { project: state.project, pages: pages };
         return pages;
