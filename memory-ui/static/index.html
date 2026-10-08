@@ -40,7 +40,9 @@
     border-bottom: 1px solid var(--border);
   }
   header h1 { font-size: 1.1rem; margin: 0; }
-  header input, header select { font: inherit; }
+  header input, header select, header button { font: inherit; }
+  #search-form { display: flex; gap: .5rem; flex: 1; min-width: 0; flex-wrap: wrap; }
+  #search { flex: 1; min-width: 8rem; }
 
   #error {
     margin: .5rem 1rem;
@@ -85,9 +87,19 @@
   }
   #projects a .count { color: var(--muted); font-weight: normal; }
 
+  #search-results a { display: block; padding: .3rem .5rem; text-decoration: none; color: var(--fg); border-left: 4px solid transparent; }
+
   .tabs { display: flex; gap: .5rem; margin-bottom: .5rem; }
   .tabs button { font: inherit; border: 1px solid var(--border); background: var(--bg); color: var(--fg); padding: .25rem .6rem; border-radius: 4px; }
   .tabs button[aria-pressed="true"] { border-color: var(--accent); font-weight: bold; }
+
+  .result-loc { display: block; font-weight: bold; overflow-wrap: anywhere; }
+  .snippet { color: var(--fg); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; }
+  mark { font-weight: bold; text-decoration: underline; }
+  #search-results li { margin-bottom: .5rem; }
+
+  #handoffs li { border: 1px solid var(--border); padding: .5rem; margin-bottom: .5rem; overflow-wrap: anywhere; }
+  .handoff-summary { white-space: pre-wrap; }
 
   #reader-frontmatter { border-collapse: collapse; margin-bottom: 1rem; max-width: 100%; display: block; overflow-x: auto; }
   #reader-frontmatter th, #reader-frontmatter td { border: 1px solid var(--border); padding: .25rem .5rem; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
@@ -115,11 +127,14 @@
 <body>
 <header>
   <h1>memory-ui</h1>
-  <input type="search" id="search" disabled placeholder="Busca (em breve)" aria-label="Buscar">
-  <select id="search-scope" disabled>
-    <option>este projeto</option>
-    <option>todos</option>
-  </select>
+  <form id="search-form" role="search">
+    <input type="search" id="search" required placeholder="Buscar" aria-label="Buscar">
+    <select id="search-scope" aria-label="Onde buscar">
+      <option value="project">este projeto</option>
+      <option value="all">todos</option>
+    </select>
+    <button type="submit">Buscar</button>
+  </form>
 </header>
 <div id="error" role="alert" hidden></div>
 <main id="app" data-view="projects">
@@ -128,13 +143,22 @@
     <ul id="projects"><li>Carregando…</li></ul>
   </section>
   <section id="col-pages">
-    <a class="back" href="#/">← Voltar</a>
-    <h2 id="pages-title">Páginas</h2>
-    <div class="tabs">
-      <button type="button" aria-pressed="true">Páginas</button>
-      <button type="button" disabled>Handoffs</button>
+    <div id="pages-view">
+      <a class="back" href="#/">← Voltar</a>
+      <h2 id="pages-title">Páginas</h2>
+      <div class="tabs">
+        <button type="button" id="tab-pages" aria-pressed="true">Páginas</button>
+        <button type="button" id="tab-handoffs" aria-pressed="false" disabled>Handoffs</button>
+      </div>
+      <div id="pages">Escolha um projeto.</div>
+      <div id="handoffs" hidden></div>
     </div>
-    <div id="pages">Escolha um projeto.</div>
+    <div id="search-view" hidden>
+      <h2 id="search-title"></h2>
+      <button type="button" id="search-clear">Limpar</button>
+      <p id="search-status"></p>
+      <ul id="search-results"></ul>
+    </div>
   </section>
   <section id="col-reader">
     <a class="back" id="reader-back" href="#/">← Voltar</a>
@@ -160,8 +184,27 @@
   var bodyEl = document.getElementById("reader-body");
   var readerBackEl = document.getElementById("reader-back");
 
+  var searchForm = document.getElementById("search-form");
+  var searchInput = document.getElementById("search");
+  var searchScope = document.getElementById("search-scope");
+  var searchScopeProjectOption = searchScope.querySelector('option[value="project"]');
+  var pagesViewEl = document.getElementById("pages-view");
+  var searchViewEl = document.getElementById("search-view");
+  var searchTitleEl = document.getElementById("search-title");
+  var searchStatusEl = document.getElementById("search-status");
+  var searchResultsEl = document.getElementById("search-results");
+  var searchClearEl = document.getElementById("search-clear");
+  var tabPagesEl = document.getElementById("tab-pages");
+  var tabHandoffsEl = document.getElementById("tab-handoffs");
+  var handoffsEl = document.getElementById("handoffs");
+
   var projectsCache = null;
   var pagesCache = { project: null, pages: null };
+  var searchState = null;
+  var searchSeq = 0;
+  var tab = "pages";
+  var handoffsProject = null;
+  var handoffsSeq = 0;
 
   function showError(msg) {
     errorBox.textContent = "Erro: " + msg;
@@ -329,11 +372,188 @@
     }
   }
 
+  function updateScope(project) {
+    searchScopeProjectOption.disabled = project === null;
+    if (project === null && searchScope.value === "project") {
+      searchScope.value = "all";
+    }
+  }
+
+  function showSearch(active) {
+    pagesViewEl.hidden = active;
+    searchViewEl.hidden = !active;
+    if (active && app.dataset.view === "projects") {
+      app.dataset.view = "pages";
+    }
+  }
+
+  function renderSearchResults(hits) {
+    clearChildren(searchResultsEl);
+    hits.forEach(function (hit) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = pageHref(hit.project, hit.path);
+      var loc = document.createElement("span");
+      loc.className = "result-loc";
+      loc.textContent = hit.project + " · " + hit.path;
+      a.appendChild(loc);
+      var snippet = document.createElement("div");
+      snippet.className = "snippet";
+      if (window.DOMPurify) {
+        snippet.innerHTML = DOMPurify.sanitize(hit.snippet, { ALLOWED_TAGS: ["mark"] });
+      } else {
+        showError("marked/DOMPurify não carregaram de cdnjs → confira a rede");
+        snippet.textContent = hit.snippet;
+      }
+      a.appendChild(snippet);
+      li.appendChild(a);
+      searchResultsEl.appendChild(li);
+    });
+    searchStatusEl.textContent = hits.length === 0
+      ? "Nenhum resultado"
+      : hits.length + " resultado" + (hits.length === 1 ? "" : "s");
+  }
+
+  function runSearch(q, project) {
+    searchState = { q: q, project: project };
+    searchSeq += 1;
+    var seq = searchSeq;
+    showSearch(true);
+    searchTitleEl.textContent = 'Resultados para "' + q + '"';
+    searchStatusEl.textContent = "Carregando…";
+    clearChildren(searchResultsEl);
+    clearError();
+
+    var url = "/api/search?q=" + encodeURIComponent(q) +
+      (project ? "&project=" + encodeURIComponent(project) : "");
+    api(url)
+      .then(function (hits) {
+        if (seq !== searchSeq) {
+          return;
+        }
+        renderSearchResults(hits);
+      })
+      .catch(function (e) {
+        if (seq !== searchSeq) {
+          return;
+        }
+        showError(e.message);
+        searchStatusEl.textContent = e.message;
+      });
+  }
+
+  searchForm.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var q = searchInput.value.trim();
+    if (q === "") {
+      return;
+    }
+    var project = searchScope.value === "project" ? parseHash().project : null;
+    runSearch(q, project);
+  });
+
+  searchClearEl.addEventListener("click", function () {
+    searchSeq += 1;
+    searchState = null;
+    searchInput.value = "";
+    showSearch(false);
+    route();
+  });
+
+  function setTab(name) {
+    tab = name;
+    tabPagesEl.setAttribute("aria-pressed", name === "pages" ? "true" : "false");
+    tabHandoffsEl.setAttribute("aria-pressed", name === "handoffs" ? "true" : "false");
+    pagesEl.hidden = name !== "pages";
+    handoffsEl.hidden = name !== "handoffs";
+  }
+
+  function renderHandoffs(handoffs) {
+    clearChildren(handoffsEl);
+    var open = handoffs.filter(function (h) {
+      return !h.state || h.state === "open";
+    });
+    if (open.length === 0) {
+      handoffsEl.textContent = "Nenhum handoff aberto";
+      return;
+    }
+    var ul = document.createElement("ul");
+    open.forEach(function (h) {
+      var li = document.createElement("li");
+
+      var date = document.createElement("div");
+      var parsed = new Date(h.created_at);
+      date.textContent = isNaN(parsed.getTime()) ? h.created_at : parsed.toLocaleString("pt-BR");
+      li.appendChild(date);
+
+      var summary = document.createElement("div");
+      summary.className = "handoff-summary";
+      summary.textContent = h.summary || "";
+      li.appendChild(summary);
+
+      if (h.next_steps && h.next_steps.length > 0) {
+        var stepsTitle = document.createElement("h3");
+        stepsTitle.textContent = "Próximos passos";
+        li.appendChild(stepsTitle);
+        var stepsList = document.createElement("ul");
+        h.next_steps.forEach(function (step) {
+          var stepLi = document.createElement("li");
+          stepLi.textContent = step;
+          stepsList.appendChild(stepLi);
+        });
+        li.appendChild(stepsList);
+      }
+
+      ul.appendChild(li);
+    });
+    handoffsEl.appendChild(ul);
+  }
+
+  function loadHandoffs(project) {
+    handoffsProject = project;
+    handoffsSeq += 1;
+    var seq = handoffsSeq;
+    handoffsEl.textContent = "Carregando…";
+    api("/api/handoffs?project=" + encodeURIComponent(project))
+      .then(function (data) {
+        if (seq !== handoffsSeq) {
+          return;
+        }
+        var handoffs = Array.isArray(data) ? data : (data.handoffs || []);
+        renderHandoffs(handoffs);
+      })
+      .catch(function (e) {
+        if (seq !== handoffsSeq) {
+          return;
+        }
+        showError(e.message);
+        handoffsEl.textContent = e.message;
+      });
+  }
+
+  tabPagesEl.addEventListener("click", function () {
+    setTab("pages");
+  });
+
+  tabHandoffsEl.addEventListener("click", function () {
+    setTab("handoffs");
+    loadHandoffs(parseHash().project);
+  });
+
   function route() {
     clearError();
     var state = parseHash();
     var view = state.project === null ? "projects" : (state.path === null ? "pages" : "reader");
+    if (searchState && view === "projects") {
+      view = "pages";
+    }
     app.dataset.view = view;
+
+    updateScope(state.project);
+    tabHandoffsEl.disabled = state.project === null;
+    if (tab === "handoffs" && state.project !== handoffsProject) {
+      setTab("pages");
+    }
 
     var projectsPromise = projectsCache
       ? Promise.resolve(projectsCache)
