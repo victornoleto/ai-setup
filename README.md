@@ -95,15 +95,20 @@ quatro ferramentas.
   (Apache-2.0) só como skill, sem o plugin. O upstream gera uma variante por harness:
   `skills/impeccable` vai para `~/.agents/skills`, `skills/impeccable-claude` para o Claude. Baixa
   o motor em `~/.impeccable/bin/` no primeiro uso; o hook detector só liga por projeto.
+- **writing-for-agents, wizard, retro**: copiadas do
+  [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Mesmo regime de revisão.
+  `retro` é só por comando (`/retro`) e leva cinco edições locais, listadas em `skills/UPSTREAM.md`.
 - **Plugins que ficam no Claude:** só `commit-commands`. O `security-guidance` foi desligado em
   2026-09-20 e desinstalado em 2026-10-07: só existia no Claude, e a `security-audit` cobre o
   mesmo nas quatro ferramentas. Também desinstalados em 2026-10-07, por repetirem o que já existe:
   `superpowers` (skills copiadas), `frontend-design` (`impeccable`), `code-review` e
   `code-simplifier` (`/code-review` e `/simplify` nativos), `claude-md-management` (regra mora no
   `GLOBAL.md`, fato no ai-memory). O `doctor.sh` acusa se algum voltar a ligar.
-- **Skills próprias:** `entrega` (relatório do que uma branch entregou) e `handoff` (`/handoff`:
+- **Skills próprias:** `entrega` (relatório do que uma branch entregou), `handoff` (`/handoff`:
   gera o handoff detalhado da sessão, imprime, copia para o clipboard e salva em
-  `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%).
+  `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%) e
+  `spec-review` (`/spec-review <ponto>`: confere o diff contra a issue, o plano ou o card que o
+  pediu; é o eixo Spec do `code-review` do mattpocock/skills, ao lado do `/code-review` nativo).
 
 Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenCode em
 `~/.agents/skills`, agy pelo `~/.gemini/config/skills.json`. Skill de terceiro instalada por
