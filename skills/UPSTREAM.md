@@ -13,8 +13,11 @@ a data abaixo passa disso.
 | receiving-code-review | idem | 6.4.2 (8ca22db) | 2026-10-04 |
 | impeccable (+ `impeccable-claude`) | github.com/pbakaus/impeccable (Apache-2.0, `LICENSE.impeccable`) | 4.5.0 (e103efe) | 2026-10-04 |
 | security-audit | github.com/cloudflare/security-audit-skill (MIT, `LICENSE.cloudflare-security-audit`) | c1c8a8c | 2026-09-20 |
+| writing-for-agents | github.com/mattpocock/skills (MIT, `LICENSE.mattpocock`) | 49dd158 | 2026-10-09 |
+| wizard | idem | 49dd158 | 2026-10-09 |
+| retro | idem | 49dd158 | 2026-10-09 |
 
-copiado-em: 2026-10-04
+copiado-em: 2026-10-09
 
 ## Por que cópia e não plugin
 
@@ -46,6 +49,10 @@ skill antes de qualquer resposta. A cópia chega aos quatro harnesses, e quem ro
      call, análise só de fonte é o caminho normal, e o resto vira `needs_validation`.
    - Em **Cost budget**, o parágrafo *Local cap*: 2 subagents em paralelo, salvo pedido
      explícito de auditoria completa com o `budget` registrado.
+5. `retro/SKILL.md`: cinco trechos marcados `(ai-setup)` trocam o ambiente do Matt pelo nosso:
+   onde ficam os logs de sessão, `.ai/README.md` no lugar de `CODING_STANDARDS.md`, `GLOBAL.md` e
+   `machine.md` como escopo global, e skills em `~/.ai-setup/skills/` ligadas pelo `MANIFEST`.
+   `writing-for-agents` e `wizard`: nenhuma.
 
 ## Como atualizar
 
@@ -62,6 +69,11 @@ diff -ru "$c/skills/security-audit" ~/.ai-setup/skills/security-audit
 i=$(mktemp -d) && git clone --depth 1 https://github.com/pbakaus/impeccable "$i"
 diff -ru "$i/.agents/skills/impeccable" ~/.ai-setup/skills/impeccable
 diff -ru "$i/.claude/skills/impeccable" ~/.ai-setup/skills/impeccable-claude
+
+m=$(mktemp -d) && git clone --depth 1 https://github.com/mattpocock/skills "$m"
+diff -ru "$m/skills/productivity/writing-for-agents" ~/.ai-setup/skills/writing-for-agents
+diff -ru "$m/skills/engineering/wizard" ~/.ai-setup/skills/wizard
+diff -ru "$m/skills/engineering/retro" ~/.ai-setup/skills/retro
 ```
 
 1. Leia o diff. O que não estiver na lista de edições locais é novidade do upstream: traga.
