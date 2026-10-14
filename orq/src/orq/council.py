@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from collections import Counter
 from datetime import datetime
 from typing import TYPE_CHECKING
+
+from .store import now_iso
 
 if TYPE_CHECKING:
     from .engine import Engine, Task
@@ -49,6 +52,7 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     vote_prompt = prompt("vote", **common)
     (d / "vote.md").write_text(vote_prompt)
     eng.s.log(f"conselho: {qid} ({n} votantes)")
+    t0, started_iso = time.time(), now_iso()
 
     async def one(i: int, suffix: str = "") -> dict | None:
         out, _ = await eng.call(t, "voter", f"vote-{qid}-{i}{suffix}", "vote", vote_prompt)
@@ -86,6 +90,8 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
             return None
         (d / "tiebreak.json").write_text(json.dumps(tb, ensure_ascii=False))
         choice, points, tb_rationale = tb["option_id"], 2.5, tb["rationale"]
+    eng.s.event("step", {"task": t.id, "role": "council", "call": f"council-{qid}", "qid": qid, "voters": n,
+                         "started": started_iso, "duration_s": round(time.time() - t0, 1)})
     return record(eng, t, source, q, votes, choice, points, tb_rationale)
 
 

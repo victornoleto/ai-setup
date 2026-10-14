@@ -419,3 +419,32 @@ async def test_tempo_ativo_no_task_end(tmp_path):
     end = next(x for x in e.s.events() if x["type"] == "task_end")
     assert 1 <= end["active_s"] <= end["duration_s"]
     assert e.s.get("01-a", "active_since") is None
+
+
+# --- tempo por etapa ---------------------------------------------------------------------------------------------------
+async def test_etapas_gravadas_em_ordem_com_duracao(tmp_path):
+    from orq.journal import steps
+    cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [EXEC_OK], "review": [CHANGES, APPROVED]},
+                     extra_toml='[verify]\ncommand = "true"\n')
+    e = engine(tmp_path, cfg)
+    assert await e.run()
+    st = steps(e.s.events(), "01-a")
+    assert [s["label"] for s in st] == ["plano", "exec c1", "verif c1", "revisão c1", "exec c2", "verif c2", "revisão c2"]
+    assert [s["ok"] for s in st if s["kind"] == "review"] == [False, True]
+    assert all(s["dur"] >= 0 and s["start"] for s in st)
+    step = next(x for x in e.s.events() if x["type"] == "step")
+    assert step["call"] == "plan" and step["role"] == "planner" and event_line(step) is None
+    report = (e.s.dir / "01-a" / "report.md").read_text()
+    assert "## Tempo por etapa" in report and "plano → exec c1 → verif c1 ✓ → revisão c1 ✗" in report
+    assert "exec " in e.s.journal_path.read_text().split("### ")[1]  # o resumo por tipo de etapa no journal
+
+
+async def test_conselho_vira_uma_etapa_so(tmp_path):
+    from orq.journal import steps
+    script = {"plan": [{"summary": "s", "questions": [Q]}, PLAN], "execute": [EXEC_OK], "review": [APPROVED],
+              "voter:vote": [vote("a"), vote("a"), vote("b")]}
+    e = engine(tmp_path, make_queue(tmp_path, script))
+    assert await e.run()
+    assert [s["label"] for s in steps(e.s.events(), "01-a")] == [
+        "plano", "conselho", "plano (atualização)", "exec c1", "revisão c1"]
+    assert not any(x["type"] == "step" and x["role"] == "voter" for x in e.s.events())

@@ -18,7 +18,7 @@ from . import context, council, harness as harness_mod, intervene, notify
 from .config import ORQ_HOME, Config
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
-from .store import RunStore, active_seconds, queue_label
+from .store import RunStore, active_seconds, now_iso, queue_label
 
 OK_RESULTS = ("ok", "ok_takeover", "ok_victor", "skipped")
 
@@ -189,9 +189,14 @@ class Engine:
             calls = self.s.top("active_calls", {})
             calls.pop(key, None)
             self.s.set_top("active_calls", calls)
+            if tid and role_name not in ("voter", "tiebreak"):  # o conselho grava uma etapa só (council.decide)
+                self.s.event("step", {"task": tid, "role": role_name, "call": name, "started": started_iso,
+                                      "duration_s": round(time.time() - t0, 1), "waited_s": waited + retried,
+                                      "tries": tries, "cost": round(cost_sum, 4), "ok": output is not None})
             return output, result_sid
 
         save_session(sid, resume)
+        t0, started_iso, retried, cost_sum = time.time(), now_iso(), 0, 0.0
         waited, tries, asked_again = 0, 0, False
         limit_s = self.cfg.seconds("limit_max_wait")
         while True:
@@ -215,6 +220,7 @@ class Engine:
             finally:
                 self.s.active_stop(tid)
             self.s.add_cost(res.cost, tid, role_name)
+            cost_sum += res.cost or 0
             if res.session_id:
                 save_session(res.session_id)
             self.mark_session(res.session_id or sid, seen)
@@ -248,6 +254,7 @@ class Engine:
             if res.error == "transient" and tries < 5:
                 self.s.log(f"{name}: erro transitório (tentativa {tries}), nova tentativa em {self.retry_delay} s")
                 await self.wait_retry(self.retry_delay, t, gate)
+                retried += self.retry_delay
                 if not resume and res.session_id:
                     resume, sid = True, res.session_id
                 continue
@@ -603,7 +610,7 @@ class Engine:
             return True, ""
         await self.checkpoint(t)
         log = t.dir / f"verify-{cycle}.log"
-        started = time.time()
+        started, started_iso = time.time(), now_iso()
         self.s.active_start(t.id)
         try:
             rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.cfg.repo, self.git_env,
@@ -612,7 +619,7 @@ class Engine:
             self.s.active_stop(t.id)
         log.with_suffix(".err").unlink(missing_ok=True)  # stderr já vai junto no log
         ok, secs = rc == 0 and not timed_out, int(time.time() - started)
-        self.s.event("verify", {"task": t.id, "cycle": cycle, "command": cmd, "ok": ok, "exit": rc,
+        self.s.event("verify", {"task": t.id, "cycle": cycle, "started": started_iso, "command": cmd, "ok": ok, "exit": rc,
                                 "timed_out": timed_out, "duration_s": secs, "log_rel": f"{t.id}/verify-{cycle}.log"})
         status = "passou" if ok else "estourou o timeout" if timed_out else f"falhou (código de saída {rc})"
         tail = log.read_text(errors="replace").splitlines()[-(30 if ok else 80):]

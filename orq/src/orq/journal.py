@@ -3,6 +3,7 @@ usada no orq.log e na timeline do painel. Etiquetas em texto e negrito: nada dep
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 RESULT_LABEL = {"ok": "ok", "ok_takeover": "**ok (assumida pelo planejador)**", "failed": "**FALHOU**",
                 "blocked": "**BLOQUEADA**", "skipped": "pulada", "ok_victor": "**ok (aceita pelo Victor)**"}
@@ -214,6 +215,8 @@ def render(ev: list[dict]) -> str:
                      f"{d.count(3)} / {d.count(2.5)} / {d.count(2)} | {nc} | {dur_both(end)} | "
                      + (f"US$ {sum(end['cost'].values()):.2f} |" if end.get("cost") else "— |"))
     lines.append("")
+    if all_steps := [x for t in order for x in steps(ev, t)]:
+        lines += [f"Tempo por tipo de etapa, somando as tarefas: {steps_summary(all_steps)}.", ""]
     if re_ and re_.get("cost_unknown"):
         lines += [f"Total parcial: custo não informado em {re_['cost_unknown']} tentativa(s).", ""]
     archives = [e for e in history if e.get("archive")]
@@ -232,6 +235,8 @@ def render(ev: list[dict]) -> str:
             facts.append(f"{len(end['delivery']['commits'])} commit(s)" + (f", {stat[-1].strip()}" if stat else ""))
         lines += [f"### {name(t)} — {result_label(end.get('result')) if end else 'em andamento'}", "",
                   " · ".join(facts), ""]
+        if st := steps(ev, t):
+            lines += [f"Tempo: {steps_summary(st)}", ""]
         if last.get("summary"):
             lines += [esc(_clip(last["summary"], 400)), ""]
         if last.get("pending"):
@@ -254,12 +259,95 @@ def render_task(ev: list[dict], t: str) -> str:
     # as seções usam caminhos relativos ao run dir; o report mora dentro da pasta da tarefa
     lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
               if (sec := _section(e)) is not None]
+    lines += steps_md(steps(ev, t))
     d = (end or {}).get("delivery")
     if d:
         lines += ["## Entrega", "", *([f"- `{c}`" for c in d["commits"]] or ["Nenhum commit."]), ""]
         if d.get("stat"):
             lines += ["```", d["stat"], "```", ""]
     return "\n".join(lines) + "\n"
+
+
+# --- tempo por etapa -----------------------------------------------------------------------------------------------
+KIND_LABEL = {"plan": "plano", "plan-update": "plano (atualização)", "clean": "arrumação", "takeover": "takeover",
+              "council": "conselho", "intervene": "diagnóstico", "resolve": "operador"}
+GROUP = {"plan": "plano", "plan-update": "plano", "exec": "exec", "clean": "exec", "verify": "verif",
+         "review": "revisão", "takeover": "takeover", "council": "conselho", "wait": "espera"}
+
+
+def call_kind(name: str) -> tuple[str, int | None]:
+    """Nome da chamada → (tipo, ciclo): "exec-2-101500" → ("exec", 2), "plan-update-101500" → ("plan-update", None)."""
+    base = re.sub(r"-\d{6}$", "", name)
+    m = re.fullmatch(r"(exec|review)-(\d+)", base)
+    if m:
+        return m[1], int(m[2])
+    if base.startswith(("vote-", "tiebreak-", "council-")):
+        return "council", None
+    return base, None
+
+
+def step_label(kind: str, cycle: int | None) -> str:
+    if kind in ("exec", "review", "verify"):
+        return f"{ {'exec': 'exec', 'review': 'revisão', 'verify': 'verif'}[kind]} c{cycle}"
+    return KIND_LABEL.get(kind, kind)
+
+
+def _epoch(ts: str) -> float:
+    return datetime.fromisoformat(ts).timestamp()
+
+
+def steps(ev: list[dict], t: str) -> list[dict]:
+    """As etapas de uma tarefa, em ordem: chamadas (evento step), verificações e esperas pelo Victor (ask →
+    ask_answer). → [{label, kind, cycle, start, dur, ok, call}]; ok None = não se aplica."""
+    ev = [e for e in current_events(ev) if e.get("task") == t]
+    verdicts = {e["cycle"]: e.get("verdict") == "approved" for e in ev if e["type"] == "review"}
+    out, asks = [], {}
+    for e in ev:
+        if e["type"] == "step":
+            kind, cycle = ("council", None) if e.get("role") == "council" else call_kind(e["call"])
+            out.append({"label": step_label(kind, cycle), "kind": kind, "cycle": cycle, "start": _epoch(e["started"]),
+                        "dur": float(e["duration_s"]), "call": e["call"], "waited": e.get("waited_s", 0),
+                        "ok": verdicts.get(cycle) if kind == "review" else None if e.get("ok", True) else False})
+        elif e["type"] == "verify":
+            start = _epoch(e["started"]) if e.get("started") else _epoch(e["ts"]) - e["duration_s"]
+            out.append({"label": step_label("verify", e["cycle"]), "kind": "verify", "cycle": e["cycle"],
+                        "start": start, "dur": float(e["duration_s"]), "ok": e["ok"]})
+        elif e["type"] == "ask":
+            asks[e["id"]] = e
+        elif e["type"] == "ask_answer" and e.get("id") in asks:
+            start = _epoch(asks.pop(e["id"])["ts"])
+            out.append({"label": "esperando você", "kind": "wait", "start": start, "dur": _epoch(e["ts"]) - start,
+                        "ok": None})
+    for a in asks.values():  # pergunta ainda aberta
+        out.append({"label": "esperando você", "kind": "wait", "start": _epoch(a["ts"]), "dur": None, "ok": None,
+                    "open": True})
+    return sorted(out, key=lambda x: x["start"])
+
+
+def mark(s: dict) -> str:
+    return {True: " ✓", False: " ✗"}.get(s.get("ok"), "")
+
+
+def flow(st: list[dict]) -> str:
+    return " → ".join(s["label"] + mark(s) for s in st)
+
+
+def steps_summary(st: list[dict]) -> str:
+    """"plano 6 min · exec 43 min (2×) · verif 34 s (2×) · espera 13 min": soma por tipo de etapa."""
+    tot: dict[str, list] = {}
+    for s in st:
+        g = tot.setdefault(GROUP.get(s["kind"], s["kind"]), [0.0, 0])
+        g[0] += s["dur"] or 0
+        g[1] += 1
+    return " · ".join(f"{k} {dur(int(v))}" + (f" ({n}×)" if n > 1 else "") for k, (v, n) in tot.items())
+
+
+def steps_md(st: list[dict]) -> list[str]:
+    if not st:
+        return []
+    return ["## Tempo por etapa", "", flow(st), "", "| Etapa | Duração | Espera no limite |", "|---|---|---|",
+            *(f"| {s['label']}{mark(s)} | {dur(int(s['dur'])) if s['dur'] is not None else 'em curso'} | "
+              f"{dur(int(s['waited'])) if s.get('waited') else '—'} |" for s in st), "", steps_summary(st), ""]
 
 
 def _clip(s: str, n: int) -> str:

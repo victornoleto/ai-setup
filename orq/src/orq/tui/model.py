@@ -1,6 +1,7 @@
 """O que o painel mostra, lido do run dir (sem Textual: testável). Nada depende de cor: estado por glifo e texto."""
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import time
@@ -11,7 +12,7 @@ from pathlib import Path
 from rich.text import Text
 
 from ..context import title
-from ..journal import _section, cost_parts, current_events, event_line
+from ..journal import _section, call_kind, cost_parts, current_events, event_line, flow, mark, step_label, steps
 from ..store import RunStore, active_seconds
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
@@ -291,3 +292,140 @@ class Tail:
         cut = data.rfind(b"\n") + 1  # só linhas completas
         self.pos += cut
         return data[:cut].decode(errors="replace").splitlines()
+
+
+# --- tempo por etapa ------------------------------------------------------------------------------------------------
+BUILD_RE = re.compile(r"\bng (build|test)\b|vitest|\bnpm\b|\bnpx\b|\bmake\b|pytest|verify\.sh")
+_split_cache: dict[tuple[str, int], dict[str, int]] = {}
+
+
+def _tool_cat(name: str, inp: dict) -> str:
+    if name == "Bash":
+        cmd = inp.get("command") or ""
+        return "playwright" if "playwright" in cmd else "build/test" if BUILD_RE.search(cmd) else "outros comandos"
+    if name in ("Read", "Write", "Edit", "MultiEdit", "Grep", "Glob", "NotebookEdit"):
+        return "leitura/edição"
+    return "subagente" if name in ("Agent", "Task") else name
+
+
+def tool_split(path: Path) -> dict[str, int]:
+    """Segundos por ferramenta numa chamada do claude, pelo `timestamp` de cada tool_use e do tool_result; "modelo"
+    é o resto (gerando). Sem arquivo ou sem timestamp (codex, opencode): {}."""
+    try:
+        key = (str(path), path.stat().st_mtime_ns)
+    except FileNotFoundError:
+        return {}
+    if key in _split_cache:
+        return _split_cache[key]
+    pend, tools, first, last = {}, {}, None, None
+    for line in path.read_text(errors="replace").splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(e, dict) or not e.get("timestamp"):
+            continue
+        ts = datetime.fromisoformat(e["timestamp"].replace("Z", "+00:00")).timestamp()
+        first, last = first if first is not None else ts, ts
+        msg = e.get("message")
+        for c in (msg.get("content") or []) if isinstance(msg, dict) else []:
+            if not isinstance(c, dict):
+                continue
+            if c.get("type") == "tool_use":
+                pend[c.get("id")] = (ts, _tool_cat(c.get("name", ""), c.get("input") or {}))
+            elif c.get("type") == "tool_result" and c.get("tool_use_id") in pend:
+                t0, cat = pend.pop(c["tool_use_id"])
+                tools[cat] = tools.get(cat, 0) + ts - t0
+    out = {}
+    if first is not None:
+        out = {"modelo": round(last - first - sum(tools.values()))}
+        out.update({k: round(v) for k, v in sorted(tools.items(), key=lambda x: -x[1])})
+    _split_cache[key] = out
+    return out
+
+
+def _steps_from_calls(calls: Path) -> list[dict]:
+    """Run sem evento step: uma etapa por calls/<nome>.json (fim = mtime, duração = duration_ms); votos e desempate
+    do mesmo qid viram um conselho."""
+    out, councils = [], {}
+    for f in calls.glob("*.json"):
+        try:
+            ms = json.loads(f.read_text()).get("duration_ms")
+        except (ValueError, OSError, AttributeError):
+            continue
+        if not ms:
+            continue
+        end = f.stat().st_mtime
+        kind, cycle = call_kind(f.stem)
+        if kind == "council":
+            qid = re.sub(r"^(vote|tiebreak)-|-\d+(-b)?$|-b$", "", f.stem)
+            c = councils.setdefault(qid, {"label": "conselho", "kind": "council", "cycle": None, "start": end, "end": 0,
+                                          "ok": None})
+            c["start"], c["end"] = min(c["start"], end - ms / 1000), max(c["end"], end)
+            continue
+        out.append({"label": step_label(kind, cycle), "kind": kind, "cycle": cycle, "start": end - ms / 1000,
+                    "dur": ms / 1000, "call": f.stem, "ok": None})
+    for c in councils.values():
+        c["dur"] = c.pop("end") - c["start"]
+        out.append(c)
+    return out
+
+
+def task_steps(store: RunStore, events: list[dict], tid: str, now: float | None = None) -> list[dict]:
+    """Etapas da tarefa para o modal: os eventos (ou, em run antiga, os calls/), a divisão por ferramenta de cada
+    chamada e a etapa em curso, com o relógio correndo."""
+    now = now or time.time()
+    st = steps(events, tid)
+    if not any(s.get("call") for s in st):
+        st = sorted(_steps_from_calls(store.dir / tid / "calls") + [s for s in st if s["kind"] in ("verify", "wait")],
+                    key=lambda x: x["start"])
+    verdicts = {e["cycle"]: e.get("verdict") == "approved" for e in events if e["type"] == "review" and e.get("task") == tid}
+    for s in st:
+        if s["kind"] == "review" and s.get("cycle") in verdicts:
+            s["ok"] = verdicts[s["cycle"]]
+        if s.get("call"):
+            s["tools"] = tool_split(store.dir / tid / "calls" / f"{s['call']}.stream.jsonl")
+        if s.get("open"):
+            s["dur"] = now - s["start"]
+    t = store.state()["tasks"].get(tid, {})
+    if t.get("active_since") and t.get("phase") not in (None, "done"):
+        phase, cycle = t["phase"], t.get("cycle", 1)
+        st.append({"label": PHASE_LABEL.get(phase, phase) + (f" c{cycle}" if phase in ("exec", "verify", "review") else ""),
+                   "kind": "running", "start": float(t["active_since"]), "dur": now - float(t["active_since"]),
+                   "ok": None, "running": True})
+    return st
+
+
+def _bar(frac: float, width: int = 24) -> str:
+    eighths = round(max(0.0, min(1.0, frac)) * width * 8)
+    full, rest = divmod(eighths, 8)
+    return "█" * full + ("▏▎▍▌▋▊▉"[rest - 1] if rest else "") or "▏"
+
+
+def steps_text(st: list[dict]) -> Text:
+    """Fluxo e uma linha por etapa: duração, barra proporcional ao tempo ativo e a divisão por ferramenta. Estado
+    por glifo e texto (✓ ✗ ▶), nada por cor."""
+    t = Text()
+    if not st:
+        t.append("etapas: nenhuma registrada ainda", style="dim")
+        return t
+    work = [s for s in st if s["kind"] != "wait"]
+    total = sum(s["dur"] or 0 for s in work) or 1
+    wait = sum(s["dur"] or 0 for s in st if s["kind"] == "wait")
+    t.append("fluxo: " + flow(st) + "\n", style="bold")
+    t.append(f"ativo {fmt_dur(total)}" + (f" · espera {fmt_dur(wait)}" if wait else "") + "\n")
+    for s in st:
+        lead = "▶ " if s.get("running") or s.get("open") else "  "
+        label = f"{lead}{s['label']}{mark(s)}"[:22].ljust(22)
+        when = (fmt_hms(s["dur"]) if s.get("running") else fmt_dur(s["dur"])).rjust(8)
+        if s["kind"] == "wait":
+            t.append(f"{label} {when}  (fora do ativo)\n", style="dim")
+            continue
+        frac = (s["dur"] or 0) / total
+        tools = " · ".join(f"{k} {fmt_dur(v)}" for k, v in (s.get("tools") or {}).items() if v >= 1)
+        extra = "  em curso" if s.get("running") else (f"  {tools}" if tools else "")
+        if s.get("waited"):
+            extra += f" · limite/erro {fmt_dur(s['waited'])}"
+        t.append(f"{label} {when}  {_bar(frac).ljust(25)} {round(frac * 100):>3}%{extra}\n",
+                 style="bold" if s.get("running") else "")
+    return t
