@@ -221,3 +221,71 @@ async def test_modal_da_tarefa(tmp_path):
         await pilot.pause()
         assert not isinstance(app.screen, TaskScreen)
         await pilot.press("q")
+
+
+def _stream(path, items):
+    """Stream do claude: (segundos desde 0, evento)."""
+    import json as _j
+    lines = []
+    for sec, ev in items:
+        lines.append(_j.dumps({**ev, "timestamp": f"2026-10-14T00:00:{sec:02d}.000Z"}))
+    path.write_text("\n".join(lines) + "\n")
+
+
+def _use(i, cmd):
+    return {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": i, "name": "Bash",
+                                                          "input": {"command": cmd}}]}}
+
+
+def _res(i):
+    return {"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": i}]}}
+
+
+def test_divisao_do_tempo_por_ferramenta(tmp_path):
+    p = tmp_path / "exec-1-000000.stream.jsonl"
+    _stream(p, [(0, {"type": "assistant", "message": {"content": [{"type": "text", "text": "oi"}]}}),
+                (10, _use("a", "playwright-cli -s x screenshot")), (25, _res("a")),
+                (30, _use("b", "cd web && npx ng test")), (50, _res("b")),
+                (59, {"type": "assistant", "message": {"content": [{"type": "text", "text": "fim"}]}})])
+    assert model.tool_split(p) == {"modelo": 24, "playwright": 15, "build/test": 20}
+    assert model.tool_split(tmp_path / "nao-existe.jsonl") == {}
+
+
+def test_etapas_sem_evento_step_vem_dos_calls(tmp_path):
+    """Run antiga (sem evento step): uma etapa por calls/*.json; os votos do mesmo qid viram um conselho."""
+    import json as _j
+    import os
+    from orq.store import RunStore
+    s = RunStore(tmp_path / "run")
+    s.create(tmp_path, "1", register=False)
+    calls = s.dir / "01-a" / "calls"
+    calls.mkdir(parents=True)
+    for name, end, ms in [("plan", 100, 60_000), ("vote-nome-1", 130, 20_000), ("vote-nome-2", 135, 30_000),
+                          ("exec-1-120000", 400, 240_000), ("review-1-120500", 460, 50_000)]:
+        f = calls / f"{name}.json"
+        f.write_text(_j.dumps({"duration_ms": ms}))
+        os.utime(f, (1_000_000 + end, 1_000_000 + end))
+    review = {"type": "review", "task": "01-a", "cycle": 1, "verdict": "changes", "ts": "2026-10-14T00:00:00-03:00"}
+    st = model.task_steps(s, [review], "01-a", now=1_000_500)
+    assert st[-1]["ok"] is False  # o veredito da revisão vem do evento review
+    assert [x["label"] for x in st] == ["plano", "conselho", "exec c1", "revisão c1"]
+    assert [round(x["dur"]) for x in st] == [60, 30, 240, 50]  # conselho: do 1º início (105) ao último fim (135)
+
+
+async def test_etapas_no_modal_da_tarefa(tmp_path):
+    e = await finished_run(tmp_path)
+    text = str(model.steps_text(model.task_steps(e.s, e.s.events(), "01-a")))
+    assert "fluxo: plano → conselho → plano (atualização) → exec c1 → revisão c1 ✓" in text
+    assert "█" in text or "▏" in text
+    app = OrqApp(e.s.dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        await pilot.pause()
+        await pilot.click("#tasks-box", offset=(3, 0))
+        await pilot.pause()
+        steps = app.screen.query_one("#task-steps", Static)
+        assert "fluxo: plano" in str(steps.render())
+        await pilot.press("t")
+        await pilot.pause()
+        assert not steps.display
+        await pilot.press("escape")
+        await pilot.press("q")

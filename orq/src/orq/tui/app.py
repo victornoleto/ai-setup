@@ -28,7 +28,7 @@ HELP_LINES = [
     "/cost [NN] mostra o custo estimado por papel (total e por tarefa). "
     "/edit NN abre a tarefa pendente no $EDITOR. Texto sem barra vai ao operador (LLM), que propõe comandos.",
     "Teclas fora do chat: q desanexa · p pausa/continua · f segue o stream · ctrl+t troca tarefas ⇄ stream (tela estreita) · "
-    "enter na timeline abre o detalhe · enter/clique numa tarefa abre o histórico dela · esc sai do chat.",
+    "enter na timeline abre o detalhe · enter/clique numa tarefa abre o histórico dela (t: tempo por etapa) · esc sai do chat.",
 ]
 
 
@@ -59,10 +59,10 @@ class DetailScreen(ModalScreen[str | None]):
 
 
 class TaskScreen(ModalScreen[None]):
-    """Histórico de uma tarefa: estado, +/- por arquivo e o fluxo (eventos + stream), ao vivo. Lê o store direto:
-    com o modal na frente, o refresh do painel não alcança os widgets dele."""
+    """Histórico de uma tarefa: estado, +/- por arquivo, tempo por etapa e o fluxo (eventos + stream), ao vivo. Lê o
+    store direto: com o modal na frente, o refresh do painel não alcança os widgets dele."""
 
-    BINDINGS = [Binding("escape", "dismiss(None)", "fechar")]
+    BINDINGS = [Binding("escape", "dismiss(None)", "fechar"), Binding("t", "toggle_steps", "etapas")]
 
     def __init__(self, store: RunStore, tid: str):
         super().__init__()
@@ -73,6 +73,8 @@ class TaskScreen(ModalScreen[None]):
         with Vertical(id="detail"):
             with VerticalScroll(id="task-head-box"):
                 yield Static(id="task-head")
+            with VerticalScroll(id="task-steps-box"):
+                yield Static(id="task-steps")
             yield RichLog(id="task-log", wrap=True)
             with Horizontal(id="detail-buttons"):
                 yield Button("Fechar", id="close", variant="primary")
@@ -88,6 +90,7 @@ class TaskScreen(ModalScreen[None]):
         if now - self.diff_at >= 5:  # em curso, o diff é um git ao vivo: no máximo a cada 5 s
             self.diff, self.diff_at = model.task_diff(st, evs, self.tid), now
         self.query_one("#task-head", Static).update(model.task_head(row, self.diff))
+        self.query_one("#task-steps", Static).update(model.steps_text(model.task_steps(self.store, evs, self.tid, now)))
         hist = model.task_history(self.store, evs, self.tid)
         log = self.query_one("#task-log", RichLog)
         for when, text in hist[self.shown:]:  # grade: o texto quebra na própria coluna, sem cair sob o horário
@@ -98,6 +101,10 @@ class TaskScreen(ModalScreen[None]):
             row.add_row(when, "│", text)
             log.write(row, expand=True)
         self.shown = len(hist)
+
+    def action_toggle_steps(self) -> None:
+        box = self.query_one("#task-steps-box")
+        box.display = self.query_one("#task-steps", Static).display = not box.display
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         self.dismiss(None)
@@ -143,7 +150,8 @@ class OrqApp(App):
     Screen.narrow.show-right #left { display: none; }
     Screen.narrow.show-right #right { display: block; border-left: none; }
     DetailScreen, ConfirmScreen, TaskScreen { align: center middle; }
-    #task-head-box { height: auto; max-height: 40%; }
+    #task-head-box { height: auto; max-height: 30%; }
+    #task-steps-box { height: auto; max-height: 40%; border-top: solid $foreground 30%; }
     #task-log { height: 1fr; }
     #detail { width: 90%; height: 80%; border: thick $foreground 50%; background: $surface; padding: 1; }
     #detail-buttons { height: 3; }
