@@ -16,6 +16,7 @@ a data abaixo passa disso.
 | writing-for-agents | github.com/mattpocock/skills (MIT, `LICENSE.mattpocock`) | 49dd158 | 2026-10-09 |
 | wizard | idem | 49dd158 | 2026-10-09 |
 | retro | idem | 49dd158 | 2026-10-09 |
+| diagram-design | github.com/cathrynlavery/diagram-design (MIT, `LICENSE.diagram-design`) | 2.6 (cdfdc96) | 2026-10-09 |
 
 copiado-em: 2026-10-09
 
@@ -74,6 +75,9 @@ m=$(mktemp -d) && git clone --depth 1 https://github.com/mattpocock/skills "$m"
 diff -ru "$m/skills/productivity/writing-for-agents" ~/.ai-setup/skills/writing-for-agents
 diff -ru "$m/skills/engineering/wizard" ~/.ai-setup/skills/wizard
 diff -ru "$m/skills/engineering/retro" ~/.ai-setup/skills/retro
+
+g=$(mktemp -d) && git clone --depth 1 https://github.com/cathrynlavery/diagram-design "$g"
+diff -ru "$g/skills/diagram-design" ~/.ai-setup/skills/diagram-design
 ```
 
 1. Leia o diff. O que não estiver na lista de edições locais é novidade do upstream: traga.
