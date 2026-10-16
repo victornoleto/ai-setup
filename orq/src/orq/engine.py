@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import context, council, harness as harness_mod, intervene, notify
-from .config import ORQ_HOME, Config
+from .config import ORQ_HOME, Config, ConfigError
 from .control import Control, StopRun
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
 from .store import RunStore, active_seconds, now_iso, queue_label
@@ -38,12 +38,16 @@ def schema(name: str) -> dict:
     return json.loads((ORQ_HOME / "schemas" / f"{name}.json").read_text())
 
 
-def block_push_env(repo: Path) -> dict:
+def block_push_env(repo: Path | list[Path]) -> dict:
     """`git push` bloqueado nos processos filhos: pushurl inválido para cada remote, por GIT_CONFIG_*."""
-    r = subprocess.run(["git", "-C", str(repo), "remote"], capture_output=True, text=True)
+    repos = [repo] if isinstance(repo, Path) else repo
+    remotes = set()
+    for path in repos:
+        r = subprocess.run(["git", "-C", str(path), "remote"], capture_output=True, text=True, check=True)
+        remotes.update(r.stdout.split())
     i = int(os.environ.get("GIT_CONFIG_COUNT", "0") or 0)
     env = {}
-    for remote in r.stdout.split():
+    for remote in sorted(remotes):
         env[f"GIT_CONFIG_KEY_{i}"] = f"remote.{remote}.pushurl"
         env[f"GIT_CONFIG_VALUE_{i}"] = "blocked://orq-sem-push"
         i += 1
@@ -84,6 +88,7 @@ class Task:
     plan_file: Path
     decisions_file: Path
     base_prompt: str = ""
+    cfg: Config | None = None
 
 
 class Problem(Exception):
@@ -126,10 +131,22 @@ class Engine:
         tid = f.stem
         d = self.s.dir / tid
         (d / "calls").mkdir(parents=True, exist_ok=True)
-        return Task(id=tid, file=f, dir=d, text=f.read_text(), plan_file=d / "plan.md", decisions_file=d / "decisions.md")
+        cfg = self.cfg.task_config(tid)
+        saved_repo = self.s.get(tid, "repo")
+        if saved_repo and saved_repo != str(cfg.repo):
+            raise ConfigError(f"repositório da tarefa {tid} mudou: {saved_repo} → {cfg.repo}")
+        return Task(cfg=cfg, id=tid, file=f, dir=d, text=f.read_text(), plan_file=d / "plan.md", decisions_file=d / "decisions.md")
+
+    def task_config(self, t: Task | None) -> Config:
+        return (t.cfg or self.cfg.task_config(t.id)) if t else self.cfg
+
+    def task_env(self, t: Task | None) -> dict:
+        return {**self.git_env, "ORQ_TASK_ID": t.id if t else "",
+                "ORQ_TASK_REPO": str(self.task_config(t).repo),
+                "ORQ_QUEUE_DIR": str(self.cfg.queue_dir), "ORQ_RUN_DIR": str(self.s.dir)}
 
     def base_prompt(self, t: Task) -> str:
-        return prompt("_base", REPO=self.cfg.repo, TASK_ID=t.id, TASK=t.text.rstrip("\n"), RULES=self.rules.rstrip("\n"),
+        return prompt("_base", REPO=self.task_config(t).repo, TASK_ID=t.id, TASK=t.text.rstrip("\n"), RULES=self.task_config(t).rules_text().rstrip("\n"),
                       PROGRESS=self.progress(t))
 
     def progress(self, t: Task) -> str:
@@ -208,10 +225,10 @@ class Engine:
             acc = f" · conta {account}" if role.harness == "claude" else ""
             self.s.log(f"{name}: {role.harness}{acc} · {role.model} · effort {role.effort} · "
                        f"{'resume' if resume else 'new'} {(sid or '-')[:8]}", tid)
-            req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.cfg.repo,
+            req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.task_config(t).repo,
                               calls_dir=calls_dir, read_only=read_only or role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
-                              env=self.git_env, thinking=self.thinking,
+                              env=self.task_env(t), thinking=self.thinking,
                               on_session=save_session,
                               account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
             self.s.active_start(tid)
@@ -304,7 +321,7 @@ class Engine:
             "tiebreak": r["tiebreak"].label(), "voters": self.cfg.voters, "max_cycles": self.cfg.max_cycles})
 
     async def run(self) -> bool:
-        self.git_env = block_push_env(self.cfg.repo)
+        self.git_env = block_push_env(self.cfg.repos)
         if not self.task_files():
             raise SystemExit(f"orq: fila sem tarefas (NN-nome.md) em {self.cfg.queue_dir}")
         poller = asyncio.create_task(self.control.loop())
@@ -363,9 +380,13 @@ class Engine:
 
     async def summarize(self) -> None:
         """Resumo final escrito pelo planejador (sessão nova, só leitura); falhou, fica o resumo determinístico."""
-        base = next((e["base"] for e in self.s.events() if e["type"] == "task_start"), "HEAD")
+        base = next((e["base"] for e in self.s.events() if e["type"] == "task_start"
+                     and e.get("repo", str(self.cfg.repo)) == str(self.cfg.repo)), "HEAD")
         out, _ = await self.call(None, "planner", f"summary-{hms()}", "summary", prompt(
-            "summary", REPO=self.cfg.repo, RUN_DIR=self.s.dir, BASE=base), read_only=True)
+            "summary", REPO=self.cfg.repo, RUN_DIR=self.s.dir, BASE=base) +
+            "\nRepositórios e bases por tarefa (use cada SHA apenas no respectivo repositório):\n" +
+            "\n".join(f"{e['task']}: {e.get('repo', str(self.cfg.repo))} base {e['base']}"
+                      for e in self.s.events() if e["type"] == "task_start"), read_only=True)
         if out is None:
             self.s.notice("error", "O resumo final (LLM) falhou; o journal segue com o resumo determinístico.")
             return
@@ -382,13 +403,13 @@ class Engine:
     def end(self, t: Task, result: str, reason: str):
         started = self.s.get(t.id, "started", int(time.time()))
         base = self.s.get(t.id, "base")
-        delivery = {"commits": git(self.cfg.repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
-                    "stat": git(self.cfg.repo, "diff", "--stat", f"{base}..HEAD"),
-                    "numstat": git(self.cfg.repo, "diff", "--numstat", f"{base}..HEAD")} if base and base != "none" else {}
-        if result in ("ok", "ok_takeover", "ok_victor") and git(self.cfg.repo, "rev-parse", "HEAD") == base:
+        delivery = {"commits": git(self.task_config(t).repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
+                    "stat": git(self.task_config(t).repo, "diff", "--stat", f"{base}..HEAD"),
+                    "numstat": git(self.task_config(t).repo, "diff", "--numstat", f"{base}..HEAD")} if base and base != "none" else {}
+        if result in ("ok", "ok_takeover", "ok_victor") and git(self.task_config(t).repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.update_task(t.id, {"phase": "done", "result": result})
-        self.s.event("task_end", {"task": t.id, "result": result, "reason": reason,
+        self.s.event("task_end", {"task": t.id, "repo": str(self.task_config(t).repo), "result": result, "reason": reason,
                                   "duration_s": int(time.time()) - int(started), "cycles": self.s.get(t.id, "cycle", 1),
                                   "active_s": int(self.s.get(t.id, "active_s", 0) or 0),
                                   "cost": self.s.cost_by().get(t.id, {}), "delivery": delivery,
@@ -397,7 +418,8 @@ class Engine:
 
     async def _run_task(self, t: Task) -> None:
         s = self.s
-        repo = self.cfg.repo
+        repo = self.task_config(t).repo
+        s.set(t.id, "repo", str(repo))
         phase = s.get(t.id, "phase", "start")
         if phase == "done":
             return
@@ -426,7 +448,7 @@ class Engine:
                     s.set(t.id, "base", base)
                     s.set(t.id, "started", int(time.time()))
                     s.set(t.id, "cycle", 1)
-                    s.event("task_start", {"task": t.id, "base": base, "task_file": str(t.file)})
+                    s.event("task_start", {"task": t.id, "repo": str(repo), "base": base, "task_file": str(t.file)})
                     phase = "plan"
 
                 elif phase == "plan":
@@ -588,7 +610,7 @@ class Engine:
 
     async def clean(self, t: Task, cycle: int, role: str, sid: str | None) -> None:
         """Árvore suja depois da execução: quem executou tem uma chance de arrumar (sem gastar ciclo); senão, bloqueia."""
-        dirty = git(self.cfg.repo, "status", "--porcelain")
+        dirty = git(self.task_config(t).repo, "status", "--porcelain")
         if not dirty:
             return
         again = "clean" if role == "executor" else "final_clean"
@@ -598,14 +620,14 @@ class Engine:
             raise Problem("failed", "A arrumação da árvore depois da execução falhou.", again)
         who = "executor" if role == "executor" else "planejador"
         self.exec_event(t, out, cycle, f"{who}, {self.cfg.roles[role].label()}, arrumando a árvore")
-        dirty = git(self.cfg.repo, "status", "--porcelain")
+        dirty = git(self.task_config(t).repo, "status", "--porcelain")
         if dirty:
             raise Problem("blocked", "A árvore continuou suja depois da arrumação: " + " ".join(dirty.splitlines()[:5]),
                           again)
 
     async def verify(self, t: Task, cycle: int) -> tuple[bool, str]:
         """Roda o `[verify] command` na raiz do repo. → (passou?, texto para o prompt). Sem comando: passa calado."""
-        cmd = self.cfg.verify_command
+        cmd = self.task_config(t).verify_command
         if not cmd:
             return True, ""
         await self.checkpoint(t)
@@ -613,8 +635,8 @@ class Engine:
         started, started_iso = time.time(), now_iso()
         self.s.active_start(t.id)
         try:
-            rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.cfg.repo, self.git_env,
-                                                 self.cfg.verify_timeout, log, lambda _: None)
+            rc, timed_out, _ = await run_process(["sh", "-c", "exec 2>&1\n" + cmd], None, self.task_config(t).repo, self.task_env(t),
+                                                 self.task_config(t).verify_timeout, log, lambda _: None)
         finally:
             self.s.active_stop(t.id)
         log.with_suffix(".err").unlink(missing_ok=True)  # stderr já vai junto no log

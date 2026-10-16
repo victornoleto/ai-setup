@@ -76,6 +76,19 @@ class Config:
     def repo(self) -> Path:
         return Path(self.get("run", "repo") or ".").resolve()
 
+    def task_config(self, task_id: str) -> Config:
+        override = self.get("tasks", task_id, default={})
+        run = {k: override[k] for k in ("repo", "rules_file") if k in override}
+        if "repo" in run:
+            path = Path(run["repo"]).expanduser()
+            run["repo"] = str((self.queue_dir / path).resolve())
+        raw = deep_merge(self.raw, {"run": run, "verify": override.get("verify", {})})
+        return Config(raw, self.queue_dir, self.roles)
+
+    @property
+    def repos(self) -> list[Path]:
+        return sorted({self.repo, *(self.task_config(t).repo for t in self.get("tasks", default={}))})
+
     @property
     def max_cycles(self) -> int:
         return int(self.get("loop", "max_cycles", default=3))
@@ -259,4 +272,21 @@ def from_raw(raw: dict, queue_dir: Path) -> Config:
         raise ConfigError("votantes, ciclos e rodadas devem ser positivos")
     if cfg.max_task_seconds < 0 or cfg.max_run_cost < 0:
         raise ConfigError("loop.max_task_time e loop.max_run_cost não podem ser negativos (0 desliga)")
+    tasks = cfg.get("tasks", default={})
+    if not isinstance(tasks, dict):
+        raise ConfigError("tasks deve ser uma tabela")
+    for tid, override in tasks.items():
+        if not re.fullmatch(r"[0-9][A-Za-z0-9_-]*", tid) or not isinstance(override, dict):
+            raise ConfigError(f"tasks.{tid}: tarefa inválida")
+        if set(override) - {"repo", "rules_file", "verify"}:
+            raise ConfigError(f"tasks.{tid}: campos desconhecidos")
+        for key in ("repo", "rules_file"):
+            if key in override and (not isinstance(override[key], str) or not override[key].strip()):
+                raise ConfigError(f"tasks.{tid}.{key}: caminho vazio ou inválido")
+        verify = override.get("verify", {})
+        if not isinstance(verify, dict) or set(verify) - {"command", "timeout"}:
+            raise ConfigError(f"tasks.{tid}.verify: campos inválidos")
+        if "command" in verify and not isinstance(verify["command"], str):
+            raise ConfigError(f"tasks.{tid}.verify.command: deve ser texto")
+        cfg.task_config(tid).verify_timeout
     return cfg

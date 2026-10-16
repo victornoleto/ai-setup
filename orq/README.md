@@ -248,3 +248,25 @@ bash tests/run-isolated.sh -q
 Esse lançador requer Linux com Bubblewrap e `prlimit`, além da `.venv` já instalada. O checkout fica somente
 leitura; arquivos temporários ficam em tmpfs limitado a 256 MiB. A execução tem limites de 110 s de parede,
 90 s de CPU, 2 GiB de memória virtual, 128 processos, 32 MiB por arquivo e 256 descritores. Não instala dependências.
+
+## Uma fila, vários repositórios
+
+`[run] repo`, `rules_file` e `[verify]` continuam sendo os padrões da fila.
+Uma tarefa pode sobrescrever somente esses campos pelo ID do arquivo, sem `.md`:
+
+```toml
+[tasks."02-monit"]
+repo = "../../monit-worktree"
+rules_file = "regras-monit.md"
+
+[tasks."02-monit".verify]
+command = "make test"
+timeout = "20m"
+```
+
+Caminhos relativos são resolvidos a partir da pasta da fila. Planner, executor, revisores,
+conselho, intervenção, checks e coleta de commits usam o repositório da tarefa. O snapshot
+salvo mantém os overrides no `orq resume`; editar o TOML depois não muda a execução existente.
+O motor bloqueia todas as worktrees configuradas e mantém o bloqueio de push nos seus remotes.
+Scripts recebem `ORQ_TASK_ID`, `ORQ_TASK_REPO`, `ORQ_QUEUE_DIR` e `ORQ_RUN_DIR`.
+`orq check` valida arquivos, regras e repositórios das tarefas. Inicie com `orq run <atividade>`.

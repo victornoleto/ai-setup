@@ -309,12 +309,13 @@ class RunStore:
 
     # --- processo ---------------------------------------------------------------------------------
     @contextmanager
-    def engine_lock(self, repo: Path):
-        git_dir = subprocess.run(["git", "-C", str(repo), "rev-parse", "--absolute-git-dir"],
-                                 capture_output=True, text=True, check=True).stdout.strip()
+    def engine_lock(self, repo: Path | list[Path]):
+        repos = [repo] if isinstance(repo, Path) else repo
+        git_dirs = sorted({subprocess.run(["git", "-C", str(path), "rev-parse", "--absolute-git-dir"],
+                                         capture_output=True, text=True, check=True).stdout.strip() for path in repos})
         handles = []
         try:
-            for path in (self.dir / "engine.lock", Path(git_dir) / "orq.lock"):
+            for path in [self.dir / "engine.lock", *(Path(d) / "orq.lock" for d in git_dirs)]:
                 fh = open(path, "a")
                 handles.append(fh)
                 # engine_alive() testa o lock por um instante (painel a cada 500 ms): tolera essa colisão
