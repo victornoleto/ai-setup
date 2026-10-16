@@ -77,7 +77,7 @@ def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -
             return 130
 
     try:
-        with store.engine_lock(cfg.repo):
+        with store.engine_lock(cfg.repos):
             known = {p.stem for p in cfg.queue_dir.glob("[0-9]*.md") if p.is_file()}
             if any(tid not in known for tid in retries):
                 die("--retry exige o nome exato de uma tarefa existente")
@@ -208,6 +208,8 @@ def cmd_run(args) -> int:
     cfg = load_cfg(queue_dir, args)
     try:
         cfg.rules_text()  # falha aqui, antes de criar o run dir
+        for task in cfg.get("tasks", default={}):
+            cfg.task_config(task).rules_text()
     except config.ConfigError as e:
         die(str(e))
     run_dir = Path(args.run_dir) if args.run_dir else queue_dir / "runs" / datetime.now().strftime("%Y-%m-%d-%H%M")

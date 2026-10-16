@@ -275,16 +275,21 @@ class Control:
         from .tui.model import task_rows, timeline_line
 
         events = self.s.events()
-        tasks = "\n".join(f"- {r.glyph} `{r.id}` {r.status}{' · ' + r.extra if r.extra else ''} — {r.title}"
+        tasks = "\n".join(f"- {r.glyph} `{r.id}` {r.status}{' · ' + r.extra if r.extra else ''} — {r.title} · repo {self.eng.cfg.task_config(r.id).repo}"
                            for r in task_rows(self.s, events))
         decisions = "\n".join(
             f"- qid `{e['qid']}` ({e['task']}): {e['question']} → `{e['choice']}` {e['label']}; opções: "
             + ", ".join(f"`{o['id']}` {o['label']}" for o in e.get("options", []))
             for e in events if e["type"] == "decision") or "(nenhuma)"
         timeline = "\n".join(line for e in events[-40:] if (line := timeline_line(e)))
+        task_rules = dict.fromkeys((str(self.eng.cfg.task_config(tid).repo),
+                                    self.eng.cfg.task_config(tid).rules_text())
+                                   for tid in self.eng.cfg.get("tasks", default={}))
+        rules = self.eng.rules.rstrip("\n") + "\nRegras específicas por repositório:\n" + "\n".join(
+            f"{repo}:\n{text}" for repo, text in task_rules)
         out, _ = await self.eng.call(None, "operator", f"operator-{cmd_id}", "operator", prompt(
             "operator", REPO=self.eng.cfg.repo, RUN_DIR=self.s.dir, TASKS=tasks, DECISIONS=decisions,
-            TIMELINE=timeline, RULES=self.eng.rules.rstrip("\n"), MESSAGE=message), gate=False)
+            TIMELINE=timeline, RULES=rules, MESSAGE=message), gate=False)
         if out is None:
             out = {"reply": "O operador não respondeu (ver orq.log).", "commands": []}
         cmds = [c.strip() for c in out.get("commands") or [] if c.strip().startswith("/") and not c.startswith("/ask")]

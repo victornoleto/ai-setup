@@ -97,7 +97,7 @@ def inspect(path: Path) -> Report:
         r.errors.append(str(e))
     if cfg.verify_command:
         r.info.append(f"verificação automática: `{cfg.verify_command}` (timeout {cfg.get('verify', 'timeout', default='30m')})")
-    else:
+    elif any(not cfg.task_config(t.stem).verify_command for t in tasks):
         r.warnings.append("sem [verify] command: o revisor roda a suíte por conta própria a cada ciclo (caro). No orq.toml "
                           'da fila: [verify] command = "make test" (ou o comando curto que vale para toda tarefa)')
     for name, role in cfg.roles.items():
@@ -121,6 +121,26 @@ def inspect(path: Path) -> Report:
         if rules_branch and rules_branch != branch:
             r.warnings.append(f"regras.md pede a branch `{rules_branch}` e o repositório está em `{branch or '(destacada)'}`: "
                               "troque antes de rodar, ou a primeira sessão vai trocar")
+    task_ids = {t.stem for t in tasks}
+    for tid in cfg.get("tasks", default={}):
+        if tid not in task_ids:
+            r.errors.append(f"tasks.{tid}: arquivo da tarefa não existe")
+            continue
+        task_cfg = cfg.task_config(tid)
+        try:
+            task_cfg.rules_text()
+        except config.ConfigError as e:
+            r.errors.append(str(e))
+        if not config.git_toplevel(task_cfg.repo):
+            r.errors.append(f"{tid}: {task_cfg.repo} não é um repositório git")
+        elif task_cfg.repo != cfg.repo:
+            r.info.append(f"{tid}: repositório {task_cfg.repo}")
+            dirty = subprocess.run(["git", "-C", str(task_cfg.repo), "status", "--porcelain"],
+                                   capture_output=True, text=True).stdout.strip()
+            if dirty:
+                r.warnings.append(f"{tid}: árvore suja em {task_cfg.repo}")
+        if task_cfg.verify_command != cfg.verify_command:
+            r.info.append(f"{tid}: verificação `{task_cfg.verify_command}`")
     for name in ("planner", "executor", "reviewer", "voter", "tiebreak"):
         role = cfg.roles[name]
         extra = f" ×{role.count}" if name == "voter" else ""

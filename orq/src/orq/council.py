@@ -46,8 +46,8 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     d = t.dir / "council" / f"{datetime.now():%H%M%S}-{qid}"
     d.mkdir(parents=True, exist_ok=True)
     n = eng.cfg.voters
-    common = dict(VOTERS=n, REPO=eng.cfg.repo, TASK_ID=t.id, PLAN_FILE=t.plan_file, SOURCE=source,
-                  TASK=t.text.rstrip("\n"), RULES=eng.rules.rstrip("\n"), QUESTION=q["question"],
+    common = dict(VOTERS=n, REPO=eng.task_config(t).repo, TASK_ID=t.id, PLAN_FILE=t.plan_file, SOURCE=source,
+                  TASK=t.text.rstrip("\n"), RULES=eng.task_config(t).rules_text().rstrip("\n"), QUESTION=q["question"],
                   QCONTEXT=q["context"], OPTIONS=options_md, PROGRESS=eng.progress(t))
     vote_prompt = prompt("vote", **common)
     (d / "vote.md").write_text(vote_prompt)

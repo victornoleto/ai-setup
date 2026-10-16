@@ -257,6 +257,8 @@ def render_task(ev: list[dict], t: str) -> str:
         lines += [f"Início {start['ts'][11:16]} · base `{start['base'][0:9]}` · tarefa: `{start['task_file']}`"
                   + (f" · duração {dur_both(end)}" if end else ""), ""]
     # as seções usam caminhos relativos ao run dir; o report mora dentro da pasta da tarefa
+    if start and start.get("repo"):
+        lines += [f"Repositório: `{start['repo']}`", ""]
     lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
               if (sec := _section(e)) is not None]
     lines += steps_md(steps(ev, t))

@@ -129,7 +129,7 @@ async def build_failure_ask(eng: "Engine", t: "Task", p) -> dict:
     """O operador (só leitura) lê o report e o log e monta a pergunta; sem resposta útil, as opções padrão."""
     from .engine import hms, prompt
     out, _ = await eng.call(t, "operator", f"intervene-{hms()}", "ask", prompt(
-        "intervene", REPO=eng.cfg.repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=p.result, PHASE=p.phase,
+        "intervene", REPO=eng.task_config(t).repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=p.result, PHASE=p.phase,
         REASON=p.reason), gate=False)
     opts = [o for o in (out or {}).get("options") or [] if o.get("action") in ACTIONS][:4]
     if len(opts) < 2:
@@ -170,7 +170,7 @@ async def resolve(eng: "Engine", t: "Task", ask: dict, text: str) -> dict | None
     opts = "\n".join(f"{i}) `{o['id']}` {o['label']}" + (f" — ação {o['action']}" if o.get("action") else "")
                      for i, o in enumerate(ask["options"], 1))
     out, _ = await eng.call(t, "operator", f"resolve-{hms()}", "resolve", prompt(
-        "resolve", REPO=eng.cfg.repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=ask["kind"], QUESTION=ask["question"],
+        "resolve", REPO=eng.task_config(t).repo, RUN_DIR=eng.s.dir, TASK_ID=t.id, KIND=ask["kind"], QUESTION=ask["question"],
         DIAGNOSIS=ask["diagnosis"], OPTIONS=opts, ANSWER=text), gate=False)
     return out
 
