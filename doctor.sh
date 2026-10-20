@@ -66,7 +66,8 @@ grep -Eq '^\s*memories\s*=\s*false' "$HOME/.codex/config.toml" 2>/dev/null \
 # Cada harness precisa das três pontas do ai-memory: hooks (captura), MCP (consulta) e a
 # instrução de uso (bloco markered ou, no agy, as instruções do próprio servidor MCP).
 # Quem grava essas pontas é o `ai-memory install-*`; aqui só se confere que estão lá.
-conta() { grep -c "ai-memory/hooks/$1/" "$2" 2>/dev/null || echo 0; }
+# 2.x grava `hooks/<agente>/*.sh`; 3.x grava o runner nativo com `--agent <agente>`.
+conta() { grep -cE "ai-memory/hooks/$1/|hook --event [a-z-]+ --agent $1 " "$2" 2>/dev/null; }
 [ "$(conta claude-code "$HOME/.claude/settings.json")" -ge 9 ] && ok "claude: hooks do ai-memory" || bad "claude: hooks do ai-memory incompletos — install-hooks --agent claude-code"
 [ "$(conta codex "$HOME/.codex/hooks.json")" -ge 7 ] && ok "codex: hooks do ai-memory" || bad "codex: hooks do ai-memory incompletos — install-hooks --agent codex"
 grep -q '"ai-memory"' "$HOME/.gemini/config/hooks.json" 2>/dev/null && ok "agy: hooks do ai-memory" || bad "agy: hooks do ai-memory ausentes — install-hooks --agent antigravity-cli"
