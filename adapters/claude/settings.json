@@ -152,6 +152,7 @@
   },
   "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
+  "language": "Brazilian Portuguese (pt-BR)",
   "effortLevel": "medium",
   "modelSettings": {
     "claude-sonnet-5": {
