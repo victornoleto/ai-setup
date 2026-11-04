@@ -48,8 +48,8 @@ def new(activity: Path, repo_flag: str | None = None) -> int:
     role = cfg.roles["wizard"]
     h = harness_mod.make(role.harness, q)
     env = dict(os.environ)
-    if role.harness == "claude":
-        env["CLAUDE_CONFIG_DIR"] = cfg.account_dir(role.account)
+    if role.harness == "claude" and (config_dir := cfg.claude_config_env(role.account)):
+        env["CLAUDE_CONFIG_DIR"] = config_dir
     print(f"orq new: {q}\nwizard: {role.label()} (interativo). Ao sair, rode: orq check {activity}\n")
     rc = subprocess.call(h.interactive_argv(role, wizard_prompt(activity, q, cfg)), cwd=cfg.repo, env=env)
     if rc == 0 and any(q.glob("[0-9]*.md")):

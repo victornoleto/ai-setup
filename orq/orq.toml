@@ -44,7 +44,7 @@ effort = "high"
 # Conta do claude por papel: `account = 1` no papel; vazio = default. Os aliases xclaude/xclaude2 não valem
 # em script: o orq faz o que eles fazem (CLAUDE_CONFIG_DIR + permissões).
 [accounts.claude]
-default = "2"
+default = "1"
 fallback = ""        # vazio: no limite de uso, espera o reset; "1" ou "2": troca para essa conta
 dirs = { "1" = "~/.claude", "2" = "~/.claude2" }
 

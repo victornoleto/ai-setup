@@ -139,6 +139,12 @@ class Config:
             raise ConfigError(f"conta inválida: '{account}' (contas: {', '.join(dirs)})")
         return os.path.expanduser(dirs[str(account)])
 
+    def claude_config_env(self, account: str) -> str | None:
+        """CLAUDE_CONFIG_DIR da conta, ou None quando ela é o diretório padrão (~/.claude): apontar para ele troca
+        ~/.claude.json por ~/.claude/.claude.json, outra configuração (MCPs, pastas confiáveis, onboarding)."""
+        path = self.account_dir(account)
+        return None if os.path.realpath(path) == os.path.realpath(os.path.expanduser("~/.claude")) else path
+
     @property
     def fallback_account(self) -> str:
         return str(self.get("accounts", "claude", "fallback", default="") or "")

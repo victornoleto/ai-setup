@@ -230,7 +230,7 @@ class Engine:
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
                               env=self.task_env(t), thinking=self.thinking,
                               on_session=save_session,
-                              account_dir=self.cfg.account_dir(account) if role.harness == "claude" else None)
+                              account_dir=self.cfg.claude_config_env(account) if role.harness == "claude" else None)
             self.s.active_start(tid)
             try:
                 res = await h.call(req, self.on_line_for(role_name, name, tid))
