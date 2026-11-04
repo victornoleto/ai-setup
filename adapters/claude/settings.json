@@ -146,11 +146,11 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "commit-commands@claude-plugins-official": true
+    "commit-commands@claude-plugins-official": true,
+    "plugin-interno@empresa": true
   },
   "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
-  "effortLevel": "high",
   "modelSettings": {
     "claude-sonnet-5": {
       "effortLevel": "high"
@@ -168,9 +168,10 @@
       "effortLevel": "high"
     },
     "claude-sonnet-5-5": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     }
   },
+  "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi"
