@@ -133,6 +133,8 @@ for f in "$HOME/.claude.json" "$HOME/.claude2/.claude.json" "$HOME/.codex/config
 	if grep -qE 'github_pat_|gh[pousr]_[A-Za-z0-9]{20,}|sk-ant-|sk-or-v1-' "$f"; then bad "token em texto puro em ${f#"$HOME"/}"
 	else ok "sem token em texto puro: ${f#"$HOME"/}"; fi
 done
+grep -qs 'adapters/shell/aliases.sh' "$HOME/.bashrc" "$HOME/.zshrc" && ok "rc do shell carrega adapters/shell/aliases.sh" \
+	|| note "rc do shell não carrega adapters/shell/aliases.sh (claude2, xclaude...): veja docs/claude-code.md"
 gh auth status >/dev/null 2>&1 && ok "gh autenticado" || note "gh sem login: gh auth login"
 
 # --- núcleo: skills, plugins, confiança ---

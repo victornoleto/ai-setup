@@ -1,4 +1,4 @@
-"""orq — fila de tarefas para agentes de código. Documentação: ~/.ai-setup/orq/README.md"""
+"""orq — fila de tarefas para agentes de código. Documentação: ~/.ai-setup/docs/orq.md"""
 from __future__ import annotations
 
 import argparse

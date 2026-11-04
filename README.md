@@ -1,39 +1,34 @@
-# ~/.ai-setup
+# ai-setup
 
-As instruções que valem em toda sessão de agente, e a fiação que as leva a cada ferramenta.
-Quatro ferramentas usam isto: **Claude Code**, **Codex**, **OpenCode** e **Antigravity CLI** (`agy`).
+As instruções que valem em toda sessão de agente, e a fiação que as leva a cada ferramenta. Quatro ferramentas
+usam isto: **Claude Code**, **Codex**, **OpenCode** e **Antigravity CLI** (`agy`).
 
-**A memória de longo prazo não mora mais aqui.** Desde 2026-09-16 ela é do
-[ai-memory](https://github.com/akitaonrails/ai-memory), servidor em Docker nesta máquina. O
-acervo antigo (136 memórias) foi importado nele; o estado anterior está na tag `pre-ai-memory`
-e em `~/backups-ai-setup/`.
+A ideia: **cada coisa tem um dono só**, e um script diz quando algo saiu do lugar. Regra vai para instrução,
+história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memory)).
 
-Para montar isto do zero em outra máquina — ou para passar a colegas — leia o
-[TUTORIAL.md](TUTORIAL.md).
+## O que tem aqui
 
-## Instrução contra memória
+| Funcionalidade | Doc |
+|---|---|
+| **orq**: fila de tarefas sem supervisão. Opus planeja e revisa, Sonnet executa, as dúvidas vão a um conselho, e você só é chamado quando precisa | [docs/orq.md](docs/orq.md) |
+| **Instruções**: um `GLOBAL.md` e um `machine.md` que chegam às quatro ferramentas pelo mecanismo nativo de cada uma | [docs/instrucoes.md](docs/instrucoes.md) |
+| **ai-memory**: memória de longo prazo compartilhada entre as ferramentas, e as escolhas para ele conviver com este repositório | [docs/ai-memory.md](docs/ai-memory.md) |
+| **Claude Code**: duas contas logadas ao mesmo tempo, aliases (`claude2`, `xclaude`…) e teto de RAM | [docs/claude-code.md](docs/claude-code.md) |
+| **Skills**: comportamento numa fonte só, em vez de plugin | [docs/skills.md](docs/skills.md) |
+| **Segurança**: GitHub pelo `gh`, permissões, credenciais negadas, sandbox do Codex | [docs/seguranca.md](docs/seguranca.md) |
+| **memory-ui**: o que o ai-memory guardou, no navegador, só leitura | [docs/memory-ui.md](docs/memory-ui.md) |
 
-A regra que separa o que fica aqui do que foi para o ai-memory:
+## Instalar
 
-- **Instrução** vale todo turno, sem ninguém consultar. Mora num arquivo carregado pela própria
-  ferramenta: `GLOBAL.md` e `machine.md`.
-- **Memória** é recuperada sob demanda, por busca, e o agente a trata como evidência histórica
-  não-confiável — nunca como ordem. Mora no ai-memory.
+```sh
+git clone <url-deste-repositório> ~/.ai-setup
+git clone <seu-repositório-privado> ~/.ai-setup/sync      # GLOBAL.md, máquinas, skills pessoais
+sh ~/.ai-setup/install.sh
+echo '. "$HOME/.ai-setup/adapters/shell/aliases.sh"' >> ~/.bashrc
+sh ~/.ai-setup/doctor.sh                                   # até sair sem FALHA
+```
 
-Regra posta no acervo de memória é ignorada por desenho. Fato posto no arquivo de instrução
-ocupa contexto em toda sessão de todo projeto. Por isso `GLOBAL.md` fica curto.
-
-## As três gavetas
-
-| Gaveta | O que é | Como viaja |
-|---|---|---|
-| `sync/` | o que é seu: `GLOBAL.md`, um `machine/<host>.md` por máquina, skills e entradas pessoais (`sync/MANIFEST`), docs de trabalho | fora deste repositório; um repositório git privado seu, clonado em `sync/` |
-| `adapters/`, `*.sh` | a fiação: como cada ferramenta acha as instruções | git |
-| `local/` | estado desta máquina | não viaja |
-
-O teste para saber a gaveta: se copiar para outra máquina e virar **mentira lá**, é `local/`.
-É o que impede a máquina do trabalho de afirmar que tem a GPU da máquina de casa: `machine/casa.md`
-fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um symlink.
+Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md](docs/instalacao.md).
 
 ## Mapa
 
@@ -44,290 +39,36 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 ├── adapters/
 │   ├── MANIFEST           o que é symlink, o que é cópia, e para onde
 │   ├── claude/            CLAUDE.md, settings.json
-│   ├── codex/             AGENTS.md, hooks/load-portable-memory.sh
-│   ├── opencode/          opencode.jsonc, AGENTS.md, package.json
-│   └── antigravity/       skills.json (aponta o agy para ~/.agents/skills)
-├── skills/                skills nossas, um link por harness (UPSTREAM.md: as copiadas)
-├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff), orq
-├── orq/                   fila de tarefas Opus planeja/revisa, Sonnet executa, conselho decide (README)
+│   ├── codex/             AGENTS.md, hook SessionStart, perfil AppArmor
+│   ├── opencode/          opencode.jsonc, AGENTS.md
+│   ├── antigravity/       skills.json
+│   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy
+├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
+├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia
+├── orq/                   o motor do orq e seus testes
+├── memory-ui/             o servidor do memory-ui
+├── docs/                  um doc por funcionalidade
 ├── tests/                 test_install.sh (install.sh com HOME falso)
-├── sync/                  repositório privado seu, fora deste
-│   ├── memory/GLOBAL.md   quem é o usuário, em qualquer máquina
+├── sync/                  seu repositório privado, ignorado por este
+│   ├── memory/GLOBAL.md   quem você é, em qualquer máquina
 │   ├── memory/machine/    um <host>.md por máquina
 │   ├── MANIFEST           entradas pessoais (lido antes do adapters/MANIFEST)
-│   ├── skills/            skills pessoais
-│   └── docs/              specs e planos de trabalho
-└── local/
-    └── machine.md         symlink para machine/<esta máquina>.md
+│   └── skills/            skills pessoais
+└── local/                 estado desta máquina (machine.md, handoffs)
 ```
 
-## Como cada ferramenta recebe as instruções
+## Princípios
 
-Nenhuma depende de o modelo lembrar de ler nada: cada uma usa o mecanismo nativo que tem.
+- **Uma fonte por coisa.** Instrução no `GLOBAL.md`, comportamento em `skills/`, memória no ai-memory. Nada
+  repetido em plugin ou em memória nativa de ferramenta.
+- **Mecanismo nativo de cada ferramenta.** Nenhuma depende de o modelo lembrar de ler um arquivo.
+- **Neutro.** Este repositório não guarda nada pessoal nem de empresa: isso vai no seu `sync/`.
+- **Verificável.** O `doctor.sh` aponta o que saiu do lugar, inclusive o que um instalador reescreveu por baixo,
+  e imprime o comando que resolve.
 
-| | Mecanismo | Por quê este |
-|---|---|---|
-| Claude Code | `@import` no `CLAUDE.md` | nativo |
-| Codex | hook `SessionStart` (em `~/.codex/hooks.json`) que imprime os dois arquivos | não tem `@import` nem lista de instruções: o hook é a única via |
-| OpenCode | lista `instructions` no `opencode.jsonc` | nativo |
-| Antigravity | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais, medido; `context.fileName` com lista maior não surte efeito |
+## Resultado
 
-A ligação com o ai-memory (hooks de captura, MCP, bloco `<!-- ai-memory:start -->` nos
-`AGENTS.md`/`CLAUDE.md`) é instalada pelo próprio `ai-memory install-*`, não por este
-repositório. Ao atualizar o ai-memory, `ai-memory install-instructions` refaz o bloco.
-
-## Comportamento: uma fonte só
-
-Desde 2026-09-17, comportamento mora no `GLOBAL.md` e em `skills/`, não em plugin. Plugin só
-existe no Claude e no Codex, e injeta texto em toda sessão; o `GLOBAL.md` e as skills chegam às
-quatro ferramentas.
-
-- **Regras de saída para TDAH** ([i-have-adhd](https://github.com/ayghri/i-have-adhd)) e a
-  **escada do mínimo** ([ponytail](https://github.com/DietrichGebert/ponytail)): versões compactas
-  no `GLOBAL.md`. Os plugins saíram.
-- **brainstorming, systematic-debugging, writing-plans, test-driven-development,
-  verification-before-completion, receiving-code-review**: copiadas do
-  [superpowers](https://github.com/obra/superpowers) para `skills/`. A seção "Skills" do
-  `GLOBAL.md` diz quando carregar cada uma. **Revisar a cada 90 dias** conforme
-  `skills/UPSTREAM.md`; o `doctor.sh` avisa.
-- **security-audit**: copiada do
-  [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
-  Mesmo regime de revisão. Por padrão é *guidance mode* — responde pergunta de segurança sem
-  escrever arquivo; a auditoria completa só roda quando você pede auditoria ou pen test, e as
-  três edições locais estão em `skills/UPSTREAM.md`.
-- **impeccable**: copiada do [pbakaus/impeccable](https://github.com/pbakaus/impeccable)
-  (Apache-2.0) só como skill, sem o plugin. O upstream gera uma variante por harness:
-  `skills/impeccable` vai para `~/.agents/skills`, `skills/impeccable-claude` para o Claude. Baixa
-  o motor em `~/.impeccable/bin/` no primeiro uso; o hook detector só liga por projeto.
-- **writing-for-agents, wizard, retro**: copiadas do
-  [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Mesmo regime de revisão.
-  `retro` é só por comando (`/retro`) e leva cinco edições locais, listadas em `skills/UPSTREAM.md`.
-- **Plugins que ficam no Claude:** só `commit-commands`. O `security-guidance` foi desligado em
-  2026-09-20 e desinstalado em 2026-10-07: só existia no Claude, e a `security-audit` cobre o
-  mesmo nas quatro ferramentas. Também desinstalados em 2026-10-07, por repetirem o que já existe:
-  `superpowers` (skills copiadas), `frontend-design` (`impeccable`), `code-review` e
-  `code-simplifier` (`/code-review` e `/simplify` nativos), `claude-md-management` (regra mora no
-  `GLOBAL.md`, fato no ai-memory). O `doctor.sh` acusa se algum voltar a ligar.
-- **Skills próprias:** `entrega` (relatório do que uma branch entregou), `handoff` (`/handoff`:
-  gera o handoff detalhado da sessão, imprime, copia para o clipboard e salva em
-  `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50%) e
-  `spec-review` (`/spec-review <ponto>`: confere o diff contra a issue, o plano ou o card que o
-  pediu; é o eixo Spec do `code-review` do mattpocock/skills, ao lado do `/code-review` nativo).
-
-Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenCode em
-`~/.agents/skills`, agy pelo `~/.gemini/config/skills.json`. Skill de terceiro instalada por
-fora (archify) tem a cópia real em `~/.agents/skills` e um link em `~/.claude/skills`.
-
-## Quem é dono de quê
-
-Os dois sistemas mexem nos mesmos arquivos de config, então a fronteira é por **trecho**, não por
-arquivo. Regra: quem grava é o dono, e o outro só confere.
-
-| Trecho | Dono | Como muda |
-|---|---|---|
-| Entradas de hook do ai-memory (`native-runner/ai-memory hook --event …`; na 2.x eram scripts em `ai-memory/hooks/`) | ai-memory | `ai-memory install-hooks --apply` |
-| Servidor MCP `ai-memory` nos quatro configs e no `~/.claude2/.claude.json` | ai-memory | `ai-memory install-mcp --apply` |
-| Bloco `<!-- ai-memory:start/end -->` nos adaptadores | ai-memory | `ai-memory install-instructions` (arquivo real) |
-| Skills `ai-memory-*` e plugin `opencode/plugins/ai-memory.ts` | ai-memory | `install-instructions`/`install-hooks` |
-| Todo o resto: `GLOBAL.md`, `machine.md`, `skills/`, permissões, plugins, modelo | ai-setup | editar em `~/.ai-setup` e `install.sh` |
-
-Na prática:
-
-1. **Depois de qualquer `ai-memory install-*`**: `sh doctor.sh`. O `settings.json` do Claude vai
-   acusar diferença, porque o instalador grava no vivo. Aceite com o comando que o doctor
-   imprime (um `sed` que devolve `@HOME@` no lugar do seu `$HOME`), revise o diff e faça o commit. No Codex, aprove os hooks em
-   `/hooks`.
-2. **Regra de comportamento nunca vai para o ai-memory.** Memória chega ao agente como evidência
-   não-confiável: regra posta lá é ignorada por desenho. Regra global vai no `GLOBAL.md`, regra
-   de projeto no `AGENTS.md`/`CLAUDE.md` do projeto.
-3. **Fato de projeto nunca vai para o `GLOBAL.md`.** Ele carrega em todo turno de todo projeto.
-   Decisão, pegadinha e histórico vão para o ai-memory (a skill `ai-memory-durable-pages`, quando
-   o usuário pedir para lembrar).
-4. **O `doctor.sh` confere as três pontas do ai-memory em cada ferramenta**: hooks (captura), MCP
-   (consulta) e instrução de uso. O agy não recebe o bloco: as instruções do servidor MCP fazem
-   esse papel.
-
-## Os scripts
-
-**`install.sh`** lê o `adapters/MANIFEST` e põe cada arquivo onde a ferramenta procura. Modo
-`link` cria symlink. Modo `copy` copia, porque a ferramenta reescreve o arquivo sozinha e um
-symlink sumiria na primeira reescrita; na cópia, `@HOME@` vira o seu `$HOME` (o repositório não
-guarda caminho de usuário). Arquivo real no caminho vira `<nome>.pre-ai-setup`.
-
-**`sync/MANIFEST`**, se existir, é lido antes e no mesmo formato, com origem relativa a `sync/`.
-É onde entram skills e arquivos pessoais: uma entrada com o mesmo destino de uma pública vale no
-lugar dela. Assim o repositório continua neutro e o que é seu fica no `sync/`.
-
-**`doctor.sh`** só verifica: symlinks, cópias iguais à referência, `machine.md` resolvendo,
-container do ai-memory healthy, memória nativa do Claude Code e do Codex **desligada**, skills sem
-cópia duplicada, plugins substituídos desligados, Codex sem confiança em `/home`, nenhum hook do
-Orca, tamanho do `GLOBAL.md` e idade das skills copiadas.
-
-**`bin/orq`** roda uma fila de tarefas sem supervisão: o Opus planeja e revisa, o Sonnet executa, e as dúvidas
-vão a um conselho de 3 votantes. Escreve um journal por execução. Uso e formato da fila em
-[`orq/README.md`](orq/README.md); no PATH por `~/.local/bin/orq`.
-
-**`bin/memory-ui`** abre no navegador, só para leitura, o que o ai-memory guardou: projetos, todas
-as páginas da wiki, busca e handoffs abertos. Uso e de onde vem cada dado em
-[`memory-ui/README.md`](memory-ui/README.md).
-
-## Máquina nova
-
-1. Clonar este repositório em `~/.ai-setup` e, dentro dele, o seu repositório privado em `sync/`
-   (`git clone git@github.com:<seu-usuario>/<seu-repo-pessoal>.git ~/.ai-setup/sync`). Primeira vez:
-   `mkdir -p ~/.ai-setup/sync/memory` e escreva o `sync/memory/GLOBAL.md` (quem você é, como trabalha).
-2. `sh install.sh` — cria os symlinks e o `machine/<hostname>.md` em branco.
-3. Preencher o `machine/<hostname>.md`.
-4. Subir o ai-memory e ligar cada ferramenta (ver abaixo).
-5. Segunda conta do Claude, se houver: ver [Duas contas do Claude](#duas-contas-do-claude).
-6. `sh doctor.sh` até sair sem FALHA.
-
-### Ligar o ai-memory
-
-Wrapper do CLI: seguir o *Quick start → Docker* do README do ai-memory (baixa
-`~/.local/bin/ai-memory` conferindo o sha256). Depois:
-
-```sh
-# Servidor. As chaves ficam em ~/.config/ai-memory/server.env (chmod 600, fora de qualquer repo):
-#   AI_MEMORY_LLM_PROVIDER=openai-compat
-#   AI_MEMORY_LLM_BASE_URL=https://openrouter.ai/api/v1
-#   AI_MEMORY_LLM_MODEL=z-ai/glm-5.3-flash
-#   AI_MEMORY_LLM_REASONING_EFFORT=low
-#   AI_MEMORY_EMBEDDING_PROVIDER=local
-#   AI_MEMORY_RERANKER=llm
-#   LLM_API_KEY=<chave da OpenRouter>
-docker run -d --name ai-memory --restart unless-stopped \
-  -p 127.0.0.1:49374:49374 -v ai-memory-data:/data \
-  --env-file ~/.config/ai-memory/server.env docker.io/akitaonrails/ai-memory:latest
-
-# Hooks e MCP, por ferramenta. Rodar a partir de ~, nunca de dentro de um repositório.
-for a in claude-code codex open-code antigravity-cli; do
-  ai-memory install-hooks --agent $a --project-strategy repo-root --apply
-done
-ai-memory install-mcp --client claude-code --apply
-ai-memory install-mcp --client codex --apply
-ai-memory install-mcp --client open-code --apply --config-file ~/.config/opencode/opencode.jsonc
-ai-memory install-mcp --client antigravity-cli --apply
-# Só com a segunda conta do Claude: o MCP mora no .claude.json, que é um por conta.
-ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
-
-# Bloco de instruções, sempre no arquivo real (nunca no symlink):
-ai-memory install-instructions --compact --skills-scope global --skills-agent claude-code \
-  --target ~/.ai-setup/adapters/claude/CLAUDE.md
-for t in codex opencode; do
-  ai-memory install-instructions --compact --skills-scope global --skills-agent agents \
-    --target ~/.ai-setup/adapters/$t/AGENTS.md
-done
-```
-
-Projeto cujo nome não é o basename da raiz, ou raiz que não é repositório git, precisa de
-`.ai-memory.toml` com `workspace = "default"` e `project = "<nome>"`. Em repositório de time,
-excluir localmente: `echo .ai-memory.toml >> .git/info/exclude`.
-
-`REASONING_EFFORT` tem que ser `low`, nunca `none`: o `glm-5.3-flash` exige raciocínio e a
-OpenRouter recusa a chamada com 400. O `llm-test` não pega isso, porque não manda o parâmetro — a
-falha só aparece no log do servidor, e o servidor degrada em silêncio (reranker mantém a ordem,
-consolidação cai para o resumo por regra).
-
-O reranker custa uma chamada ao LLM por `memory_query` (mediana 2,4 s). Medido em 30 perguntas
-parafraseadas sobre o acervo: a memória certa em 1º lugar passou de 15 para 26, sem piorar
-nenhuma. Sem ele, o multiplicador de autoridade por `kind` (fixo no código: `rule` +0,15,
-`fact` 0) derruba notas `fact` que casam melhor.
-
-Nunca exporte `AI_MEMORY_SERVER_URL` no shell: o wrapper roda em container com `--network host`,
-e a variável faz o CLI responder `local spool` em vez de erro.
-
-Validar: `ai-memory audit-contamination` limpo e, depois de qualquer `memory_query`,
-`docker logs ai-memory 2>&1 | grep -iE 'provider error|reranker failed'` vazio. O `llm-test` sozinho
-não serve de prova — ele passou com a configuração quebrada.
-
-### Atualizar o ai-memory
-
-Desde a 3.x os hooks não são mais scripts: chamam o cliente nativo
-`~/.local/share/ai-memory/native-runner/ai-memory hook --event …`, baixado e conferido pelo
-wrapper. O wrapper usa a imagem `:latest`, então o CLI pode ficar à frente do servidor (`ai-memory
---version` contra `docker inspect ai-memory --format '{{.Config.Image}}'`).
-
-```sh
-ai-memory upgrade          # atualiza o wrapper, puxa a imagem, troca o cliente nativo
-# O upgrade só refaz os hooks de quem já tinha; rode o laço de install-hooks acima de novo (idempotente).
-# Ele também não recria o container (o que ele escreve em ~/.cache leva as chaves inline).
-# Recrie à mão com o mesmo `docker run` de cima:
-docker rm -f ai-memory && docker run -d --name ai-memory ...
-# Bloco de instruções e skills: os dois comandos install-instructions de cima.
-sh ~/.ai-setup/doctor.sh   # aceite o settings.json regravado (cp + commit)
-```
-
-## Duas contas do Claude
-
-Duas assinaturas logadas ao mesmo tempo: quando uma bate no limite, a outra continua.
-
-| Conta | Comando | Diretório |
-|---|---|---|
-| 1 | `claude` (e `xclaude`) | `~/.claude` (padrão, sem variável) |
-| 2 | `claude2` (e `xclaude2`) | `~/.claude2`, via `CLAUDE_CONFIG_DIR` |
-
-A conta 2 é um esqueleto de symlinks para `~/.claude`: `CLAUDE.md`, `settings.json`, `plugins`,
-`skills`, `projects`, `commands` e `agents` são os mesmos nas duas. Só a identidade é separada:
-`.credentials.json` e `.claude.json` (conta, MCPs, pastas confiáveis), além do estado de
-execução (`sessions/`, `session-env/`).
-
-```sh
-mkdir -p ~/.claude2 && sh ~/.ai-setup/install.sh     # cria os links (só age se ~/.claude2 existir)
-echo "alias claude2='CLAUDE_CONFIG_DIR=\$HOME/.claude2 claude'" >> ~/.bashrc   # ou ~/.zshrc
-ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
-claude2                                              # /login com a segunda conta, uma vez
-sh ~/.ai-setup/doctor.sh                             # "claude2: ..." tudo ok
-```
-
-**Nunca aponte `CLAUDE_CONFIG_DIR` para `~/.claude`** (o antigo alias `claude1`): o Claude passa a
-ler `~/.claude/.claude.json` em vez de `~/.claude.json` e some com MCPs, pastas confiáveis e
-onboarding. A conta 1 é o `claude` puro; o `orq` segue a mesma regra.
-
-## Pegadinhas
-
-- **Plugin interno da empresa não entra no `settings.json` versionado.** Este repositório é
-  público. Ligue o plugin por projeto (`claude plugin install <plugin> --scope project`, no repo
-  da empresa) ou aceite que o `doctor.sh` acuse a diferença na máquina do trabalho.
-
-- **Nunca rode `ai-memory install-instructions` apontando para um symlink.** Ele grava com
-  arquivo temporário + rename, e o rename troca o link por arquivo comum. O alvo é sempre o
-  arquivo real em `adapters/`.
-- **Rode `install-instructions` com `--skills-scope global`.** Sem isso, as Agent Skills caem
-  em `$PWD/.claude/skills` — dentro do repositório onde você estiver.
-- **`install-mcp --client open-code` recusa JSONC com comentário.** Mantenha o
-  `opencode.jsonc` sem `//`.
-- **OpenCode** carrega plugins quando a sessão é criada, não quando o servidor sobe.
-- **Codex** pede confiança de novo sempre que um hook muda de hash **ou de posição**: tirar
-  uma entrada do `hooks.json` renumera as seguintes e todas perdem a confiança. Aprovar em
-  `codex` → `/hooks`. Hook desaprovado não roda em `codex exec` e aparece como `Failed`.
-- **agy** não aceita `~` no `skills.json`, apesar da documentação: o caminho tem que ser absoluto
-  (o erro só aparece em `~/.gemini/antigravity-cli/log/`).
-- **O sandbox do Codex fica inerte no Ubuntu 24.04** sem o perfil AppArmor: o `bwrap` não cria
-  user namespace e o aviso aparece em toda abertura. O perfil está em
-  `adapters/codex/apparmor/codex-bwrap` (instalação no `doctor.sh`, precisa de `sudo`).
-- **`agy -p` (modo print) não manda `cwd` no hook**: a sessão cai no projeto `scratch` do
-  ai-memory. Para testar o agy, use o modo interativo, ou apague depois com `ai-memory purge-session`.
-- **O pacote `orca` do Ubuntu é o leitor de tela do GNOME.** O Orca IDE é o `orca-ide`.
-
-## GitHub
-
-Agentes acessam o GitHub pelo `gh`, não por MCP. O token fica no keyring do sistema
-(`gh auth login`), um login serve a todas as ferramentas, e nenhum segredo fica em arquivo de
-config — o MCP do GitHub exigia um PAT no header, e cada instalador que tocava o config gravava
-uma cópia dele num `.bak`. Removido em 2026-09-16 do Claude Code e do Codex (incluindo o plugin
-`github@openai-curated`, que embute o mesmo MCP); o PAT foi revogado.
-
-O controle do que o agente pode fazer é a permissão de shell de cada ferramenta: leitura
-(`gh pr view`, `gh issue list`, `gh run view`) liberada; `gh pr merge` e `gh repo delete` pedem
-aprovação.
-
-| | Onde | `gh api` |
-|---|---|---|
-| Claude | `permissions` no `adapters/claude/settings.json` | pede aprovação com `-X`, `--method`, `-f`, `-F` |
-| Codex | `~/.codex/rules/default.rules` | pede sempre (regra por prefixo não enxerga flag no meio) |
-| OpenCode | `permission.bash` no `opencode.jsonc` | pede sempre |
-
-Arquivos de credencial (`~/.claude/.credentials.json`, `~/.codex/auth.json`,
-`~/.gemini/oauth_creds.json`, `~/.config/ai-memory/server.env`) têm leitura negada no Claude e no
-OpenCode. A regra vale para a ferramenta de leitura, não para `cat` no shell.
+- Uma memória só, que as quatro ferramentas escrevem e leem, com busca reordenada por LLM.
+- Uma fonte só de comportamento, que chega às quatro do mesmo jeito.
+- Contexto fixo por sessão do Claude caiu de ~18 KB para ~9 KB ao trocar plugin por skill.
+- Filas inteiras de tarefas rodando sem supervisão, com revisão e conselho, e o `git push` com você.

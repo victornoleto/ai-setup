@@ -96,11 +96,13 @@ if [ -d "$HOME/.claude2" ]; then
 		ln -sfn "$HOME/.claude/$e" "$to"
 		say "link  .claude2/$e -> .claude/$e"
 	done
-	grep -qs "alias claude2=" "$HOME/.bashrc" "$HOME/.zshrc" || {
-		say ""; say "Falta o alias da conta 2. Acrescente ao rc do shell:"
-		say "  alias claude2='CLAUDE_CONFIG_DIR=\$HOME/.claude2 claude'"
-	}
 fi
+
+# --- aliases (claude2, xclaude, xcodex...): o rc do shell carrega o arquivo do repositório ---
+grep -qs 'adapters/shell/aliases.sh' "$HOME/.bashrc" "$HOME/.zshrc" || {
+	say ""; say "Faltam os aliases. Acrescente ao rc do shell:"
+	say "  . \"\$HOME/.ai-setup/adapters/shell/aliases.sh\""
+}
 
 case ":${PATH}:" in
 	*":$SETUP/bin:"*) ;;

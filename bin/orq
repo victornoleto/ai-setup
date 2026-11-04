@@ -1,4 +1,4 @@
 #!/bin/sh
-# orq — fila de tarefas para agentes de código, com painel no terminal. Documentação: ~/.ai-setup/orq/README.md
+# orq — fila de tarefas para agentes de código, com painel no terminal. Documentação: ~/.ai-setup/docs/orq.md
 project=$(dirname "$(readlink -f "$0")")/../orq
 exec uv run --frozen --quiet --project "$project" orq "$@"
