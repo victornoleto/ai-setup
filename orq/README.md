@@ -121,12 +121,12 @@ Com `[intervene] enabled = true` (padrão), a fila **pausa e pergunta** em vez d
 
 | Gatilho | Opções | Sem resposta |
 |---|---|---|
-| Decisão do conselho com 2 ou 2,5 pts | as do conselho; recomendada = a escolhida | depois de `decision_timeout` (1 h), segue com a escolha: **[DECISÃO SEM usuario]** |
+| Decisão do conselho com 2 ou 2,5 pts | as do conselho; recomendada = a escolhida | depois de `decision_timeout` (1 h), segue com a escolha: **[DECISÃO SEM USUÁRIO]** |
 | Tarefa bloqueada (árvore suja, executor travado) ou que falhou (chamada, revisão final, verificação depois do takeover, laço de dúvidas) | 3 ou 4, montadas pelo operador (só leitura), uma recomendada | espera; lembrete no ntfy a cada `reminder` (2 h) |
 | Orçamento estourado: `[loop] max_task_time` (tempo ativo da tarefa, 3 h) ou `max_run_cost` (US$ da execução, desligado) | as mesmas; `retry` segue sem perguntar de novo nesta tarefa | espera, como acima |
 
 Cada opção de bloqueio/falha é uma ação: `retry` (refaz a fase com uma nota), `replan` (volta ao plano), `accept`
-(fecha como **ok, aceita pelo o usuário**), `skip` (pula) ou `stop` (para; `orq resume` volta à mesma pergunta).
+(fecha como **ok, aceita pelo usuário**), `skip` (pula) ou `stop` (para; `orq resume` volta à mesma pergunta).
 
 A pergunta aparece num bloco destacado acima do chat (`[PRECISA DE VOCÊ]`, a recomendada com `★ RECOMENDADA`); o
 celular (ntfy) recebe só a fila e a tarefa. Consulte os detalhes no painel antes de responder com o **número** da
@@ -204,14 +204,14 @@ pelo planejador no fim, só leitura) e uma linha por tarefa com link para o repo
 | `NN-tarefa/calls/*` | prompt, stream cru e resposta de cada chamada |
 
 A duração de cada tarefa é a de parede; quando difere, a **ativa** (só chamadas e verificações: sem a espera pelo
-o usuário nem o tempo com o motor parado) aparece entre parênteses. A lista do painel e a previsão de término usam a
+usuário nem o tempo com o motor parado) aparece entre parênteses. A lista do painel e a previsão de término usam a
 ativa. O journal e o painel mostram a tentativa atual; `events.jsonl` mantém o histórico completo. Depois de `--retry`,
 o journal aponta também para o relatório arquivado. Custos incluem tentativas com erro quando o harness informa
 o consumo. Sem informação de custo (por exemplo, no adaptador Codex), o total aparece como **parcial**; zero
 informado e custo desconhecido são situações distintas. O detalhamento está em `/cost` e nos relatórios finais.
 
-Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**, **[DECISÃO SEM usuario]**, **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
-**[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO usuario]**, **[PENDÊNCIAS]**
+Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**, **[DECISÃO SEM USUÁRIO]**, **[VERIFICAÇÃO cN]** (só timeline), **[FALHOU]**, **[BLOQUEIO]**, **[ASSUMIDA PELO PLANEJADOR]**,
+**[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO USUÁRIO]**, **[PENDÊNCIAS]**
 (só a contagem: o texto de cada pendência e destaque fica na seção da tarefa), **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
 **[AJUSTE]**, **[OPERADOR]**, **[ÁRVORE SUJA]**, **[SEM COMMIT]** (terminou ok sem commit: confira).
 

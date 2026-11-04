@@ -1,4 +1,4 @@
-Você escreve o resumo final de uma execução do orq (fila automática de tarefas de código) para o o usuário, dono do
+Você escreve o resumo final de uma execução do orq (fila automática de tarefas de código) para o usuário, dono do
 projeto. **Só leitura**: não altere nada.
 
 Repositório: {{REPO}} · run dir: {{RUN_DIR}}

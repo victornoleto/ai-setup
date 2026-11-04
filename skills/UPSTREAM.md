@@ -45,7 +45,7 @@ skill antes de qualquer resposta. A cópia chega aos quatro harnesses, e quem ro
    - O `plan-document-reviewer-prompt.md` saiu no upstream 6.4.2; não recriar.
 4. `security-audit/SKILL.md` (as três levam a marca `(ai-setup)`, para o diff achar):
    - O diretório de saída padrão sai de `~/security-audit-skill/` para
-     `~/projetos/security-audits/`, com a proibição de cair direto em `$HOME`.
+     `<diretório de projetos>/security-audits/` (o das instruções globais), com a proibição de cair direto em `$HOME`.
    - Em **Universal execution safety**, o parágrafo *Local sandbox reality*: sem root por tool
      call, análise só de fonte é o caminho normal, e o resto vira `needs_validation`.
    - Em **Cost budget**, o parágrafo *Local cap*: 2 subagents em paralelo, salvo pedido

@@ -32,7 +32,7 @@ ocupa contexto em toda sessão de todo projeto. Por isso `GLOBAL.md` fica curto.
 | `local/` | estado desta máquina | não viaja |
 
 O teste para saber a gaveta: se copiar para outra máquina e virar **mentira lá**, é `local/`.
-É o que impede a máquina do trabalho de afirmar que tem uma GPU notebook: `machine/pc.md`
+É o que impede a máquina do trabalho de afirmar que tem a GPU da máquina de casa: `machine/casa.md`
 fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um symlink.
 
 ## Mapa
@@ -51,7 +51,7 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 ├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff), orq
 ├── orq/                   fila de tarefas Opus planeja/revisa, Sonnet executa, conselho decide (README)
 ├── sync/memory/
-│   ├── GLOBAL.md          quem é o o usuário, em qualquer máquina
+│   ├── GLOBAL.md          quem é o usuário, em qualquer máquina
 │   └── machine/pc.md      o que só vale nesta máquina
 └── local/
     └── machine.md         symlink para machine/<esta máquina>.md
@@ -138,7 +138,7 @@ Na prática:
    de projeto no `AGENTS.md`/`CLAUDE.md` do projeto.
 3. **Fato de projeto nunca vai para o `GLOBAL.md`.** Ele carrega em todo turno de todo projeto.
    Decisão, pegadinha e histórico vão para o ai-memory (a skill `ai-memory-durable-pages`, quando
-   o o usuário pedir para lembrar).
+   o usuário pedir para lembrar).
 4. **O `doctor.sh` confere as três pontas do ai-memory em cada ferramenta**: hooks (captura), MCP
    (consulta) e instrução de uso. O agy não recebe o bloco: as instruções do servidor MCP fazem
    esse papel.

@@ -1,6 +1,6 @@
 ---
 name: orq-setup
-description: Monta a fila do orq para uma atividade — lê a pasta de contexto (card do Notion, spec, plano), tira as dúvidas com o o usuário e escreve <pasta>/orq/ com tarefas pequenas, regras e config. Use quando o `orq new` abrir a sessão, ou quando pedirem para criar, revisar ou dividir uma fila do orq.
+description: Monta a fila do orq para uma atividade — lê a pasta de contexto (card do Notion, spec, plano), tira as dúvidas com o usuário e escreve <pasta>/orq/ com tarefas pequenas, regras e config. Use quando o `orq new` abrir a sessão, ou quando pedirem para criar, revisar ou dividir uma fila do orq.
 ---
 
 # orq-setup — montar a fila do orq
@@ -34,7 +34,7 @@ numeradas e a sua recomendação primeiro. Nesta ordem, e só o que faltar:
    que vale para toda tarefa como `[verify] command` no `orq.toml`: o motor o roda antes de cada revisão e, se
    falhar, devolve ao executor sem gastar a revisão (que é a parte cara).
 5. **Registro**: onde cada tarefa anota o que fez (TODO, journal, doc).
-6. **Harness e modelos**: pergunte só se o o usuário quer mudar o padrão (mostre o padrão do `orq.toml` global).
+6. **Harness e modelos**: pergunte só se o usuário quer mudar o padrão (mostre o padrão do `orq.toml` global).
 
 ## 3. Dividir para conquistar
 
@@ -48,7 +48,7 @@ Regra da fila: **muitas tarefas pequenas, não uma grande**. Cada uma:
 - tem **verificação própria**: os comandos que provam que ficou pronta.
 
 Ordene por dependência. A primeira tarefa costuma ser a fundação (modelo, migração, contrato). A última, se fizer
-sentido, é o fecho (documentação, revisão geral, squash, se o o usuário liberou).
+sentido, é o fecho (documentação, revisão geral, squash, se o usuário liberou).
 
 Quando a spec já tem seções com "Pronto quando", a tarefa pode ser uma linha: "Execute a seção 4 de
 `docs/x.md`, e só ela, até o 'Pronto quando' dela." Mais que ~6.000 caracteres numa tarefa é sinal de que ela
@@ -63,7 +63,7 @@ Em `<fila>`:
   tarefa: branch, proibições, verificação, registro;
 - `orq.toml`: só o que difere do global (harness e modelo por papel, conta, `on_fail`) e o `[verify] command`.
 
-Mostre ao o usuário a lista final (número, título, "pronto quando" em uma linha) e ajuste até ele aprovar.
+Mostre ao usuário a lista final (número, título, "pronto quando" em uma linha) e ajuste até ele aprovar.
 
 ## 5. Conferir
 

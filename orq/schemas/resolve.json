@@ -4,7 +4,7 @@
   "required": ["sufficient", "reply", "option_id", "action", "note", "follow_up"],
   "properties": {
     "sufficient": {"type": "boolean"},
-    "reply": {"type": "string", "description": "uma frase ao o usuário: o que vai acontecer, ou o que falta saber"},
+    "reply": {"type": "string", "description": "uma frase ao usuário: o que vai acontecer, ou o que falta saber"},
     "option_id": {"type": "string", "description": "decisão do conselho: id da opção escolhida, ou vazio"},
     "action": {"type": "string", "enum": ["", "retry", "replan", "accept", "skip", "stop"]},
     "note": {"type": "string", "description": "instrução para o próximo prompt (retry/replan) ou a decisão livre"},

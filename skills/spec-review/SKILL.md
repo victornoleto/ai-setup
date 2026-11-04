@@ -42,7 +42,7 @@ Pare na primeira fonte que existir:
 3. Spec ou plano versionado: arquivo sob algum `docs/` (`specs/`, `plans/`, `superpowers/`) cujo
    nome bate com a branch ou com o escopo dos commits (`feat(memory-ui)` → `*memory-ui*`).
 4. Pasta de atividade do orq: `plan.md`, `notion.md` e as tarefas em `orq/`.
-5. Nada disso: pergunte ao o usuário onde está. Sem spec, este eixo não tem o que revisar: diga isso e
+5. Nada disso: pergunte ao usuário onde está. Sem spec, este eixo não tem o que revisar: diga isso e
    pare.
 
 Duas fontes candidatas no mesmo degrau: pergunte qual vale.
@@ -77,4 +77,4 @@ Cobertura: <N> requisitos: <a> atendidos, <f> faltando, <e> errados; <s> sobrand
 ```
 
 Seção vazia sai. Termine com o achado mais grave e a próxima ação. A skill acaba no relatório;
-corrigir é outro pedido do o usuário.
+corrigir é outro pedido do usuário.

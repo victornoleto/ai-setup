@@ -4,7 +4,7 @@
   "required": ["diagnosis", "question", "options", "recommended"],
   "properties": {
     "diagnosis": {"type": "string", "description": "o que aconteceu, em até 3 frases, sem código nem caminhos"},
-    "question": {"type": "string", "description": "a pergunta ao o usuário, até 200 caracteres, sem código nem caminhos"},
+    "question": {"type": "string", "description": "a pergunta ao usuário, até 200 caracteres, sem código nem caminhos"},
     "options": {"type": "array", "minItems": 3, "maxItems": 4, "items": {
       "type": "object", "additionalProperties": false, "required": ["id", "label", "detail", "action", "note"],
       "properties": {
