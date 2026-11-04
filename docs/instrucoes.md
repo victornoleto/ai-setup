@@ -86,6 +86,9 @@ link	skills/slides	.claude/skills/slides
 link	systemd/claude.slice	.config/systemd/user/claude.slice
 ```
 
+Como criar o repositório privado, levar para outra máquina e trocar um arquivo público pelo seu:
+[sync.md](sync.md).
+
 ## Os scripts
 
 **`install.sh`** lê os dois MANIFESTs e põe cada arquivo no lugar. Idempotente. Arquivo real no caminho de um

@@ -25,11 +25,8 @@ git clone git@github.com:<seu-usuario>/<seu-repo-pessoal>.git ~/.ai-setup/sync
 ```
 
 O `sync/` é **seu e privado**: `GLOBAL.md`, um arquivo por máquina, skills e entradas pessoais. Este
-repositório o ignora. Primeira vez, sem repositório pessoal ainda:
-
-```sh
-mkdir -p ~/.ai-setup/sync/memory && cd ~/.ai-setup/sync && git init
-```
+repositório o ignora. Primeira vez, sem repositório pessoal ainda: crie um seguindo
+[sync.md](sync.md#1-criar-o-repositório-privado) e volte para o passo 4.
 
 ## 3. Escrever o GLOBAL.md
 

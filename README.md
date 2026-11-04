@@ -13,6 +13,7 @@ história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memo
 | **orq**: fila de tarefas sem supervisão. Opus planeja e revisa, Sonnet executa, as dúvidas vão a um conselho, e você só é chamado quando precisa | [docs/orq.md](docs/orq.md) |
 | **Instruções**: um `GLOBAL.md` e um `machine.md` que chegam às quatro ferramentas pelo mecanismo nativo de cada uma | [docs/instrucoes.md](docs/instrucoes.md) |
 | **ai-memory**: memória de longo prazo compartilhada entre as ferramentas, e as escolhas para ele conviver com este repositório | [docs/ai-memory.md](docs/ai-memory.md) |
+| **sync/**: seus arquivos pessoais e de empresa num repositório privado, sobrepostos a este na instalação | [docs/sync.md](docs/sync.md) |
 | **Claude Code**: duas contas logadas ao mesmo tempo, aliases (`claude2`, `xclaude`…) e teto de RAM | [docs/claude-code.md](docs/claude-code.md) |
 | **Skills**: comportamento numa fonte só, em vez de plugin | [docs/skills.md](docs/skills.md) |
 | **Segurança**: GitHub pelo `gh`, permissões, credenciais negadas, sandbox do Codex | [docs/seguranca.md](docs/seguranca.md) |
