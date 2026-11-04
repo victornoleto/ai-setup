@@ -151,6 +151,7 @@
   },
   "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
+  "effortLevel": "medium",
   "modelSettings": {
     "claude-sonnet-5": {
       "effortLevel": "high"
