@@ -1,10 +1,9 @@
 #!/bin/sh
 # Põe cada arquivo de configuração no lugar onde a ferramenta procura, conforme
-# adapters/MANIFEST. Idempotente: rodar de novo não estraga nada.
+# adapters/MANIFEST (e sync/MANIFEST, se existir). Idempotente: rodar de novo não estraga nada.
 set -eu
 
 SETUP=$(cd "$(dirname "$0")" && pwd -P)
-MANIFEST="$SETUP/adapters/MANIFEST"
 host=$(hostname)
 rc=0
 
@@ -33,12 +32,24 @@ TPL
 	say "local/machine.md -> machine/$host.md"
 fi
 
+# Entradas do MANIFEST, uma por linha: modo<TAB>origem absoluta<TAB>destino. Primeiro o
+# sync/MANIFEST (pessoal, origem relativa a sync/), depois o adapters/MANIFEST (relativa a
+# adapters/); destino repetido fica com a primeira, então o pessoal sobrepõe o público.
+manifest_lines() {
+	for base in "$SETUP/sync" "$SETUP/adapters"; do
+		[ -f "$base/MANIFEST" ] || continue
+		while IFS='	' read -r mode src dst; do
+			case "${mode:-}" in ''|\#*) continue ;; esac
+			printf '%s\t%s\t%s\n' "$mode" "$base/$src" "$dst"
+		done < "$base/MANIFEST"
+	done | awk -F'\t' '!seen[$3]++'
+}
+
 # --- adaptadores ---
 while IFS='	' read -r mode src dst; do
-	case "${mode:-}" in ''|\#*) continue ;; esac
-	from=$(realpath -m "$SETUP/adapters/$src")
+	from=$(realpath -m "$src")
 	to="$HOME/$dst"
-	[ -e "$from" ] || { say "FALTA no repositório: adapters/$src"; rc=1; continue; }
+	[ -e "$from" ] || { say "FALTA no repositório: ${src#"$SETUP"/}"; rc=1; continue; }
 	mkdir -p "$(dirname "$to")"
 	case "$mode" in
 	link)
@@ -62,7 +73,9 @@ while IFS='	' read -r mode src dst; do
 		;;
 	*) say "modo desconhecido no MANIFEST: $mode"; rc=1 ;;
 	esac
-done < "$MANIFEST"
+done <<EOF
+$(manifest_lines)
+EOF
 
 # --- segunda conta do Claude Code (opcional: só se ~/.claude2 existir) ---
 # CLAUDE_CONFIG_DIR=~/.claude2 isola credencial e .claude.json; o resto é symlink para ~/.claude,

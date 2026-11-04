@@ -9,20 +9,32 @@ bad()  { printf 'FALHA %s\n' "$*"; rc=1; }
 note() { printf 'nota  %s\n' "$*"; }
 
 
+# Entradas do MANIFEST, uma por linha: modo<TAB>origem absoluta<TAB>destino. Primeiro o
+# sync/MANIFEST (pessoal, origem relativa a sync/), depois o adapters/MANIFEST (relativa a
+# adapters/); destino repetido fica com a primeira, então o pessoal sobrepõe o público.
+manifest_lines() {
+	for base in "$SETUP/sync" "$SETUP/adapters"; do
+		[ -f "$base/MANIFEST" ] || continue
+		while IFS='	' read -r mode src dst; do
+			case "${mode:-}" in ''|\#*) continue ;; esac
+			printf '%s\t%s\t%s\n' "$mode" "$base/$src" "$dst"
+		done < "$base/MANIFEST"
+	done | awk -F'\t' '!seen[$3]++'
+}
+
 # --- adaptadores ---
 while IFS='	' read -r mode src dst; do
-	case "${mode:-}" in ''|\#*) continue ;; esac
-	from="$SETUP/adapters/$src"; to="$HOME/$dst"
+	from="$src"; to="$HOME/$dst"; rel=${src#"$SETUP"/}
 	case "$mode" in
 	link)
 		if [ -L "$to" ] && [ "$(readlink -f "$to")" = "$(readlink -f "$from")" ]; then ok "link  $dst"
 		elif [ ! -e "$to" ]; then bad "link  $dst ausente — rode install.sh"
-		else bad "link  $dst não aponta para adapters/$src — rode install.sh"; fi ;;
+		else bad "link  $dst não aponta para $rel — rode install.sh"; fi ;;
 	copy)
 		if [ ! -e "$to" ]; then bad "copy  $dst ausente — rode install.sh"
 		elif cmp -s "$from" "$to"; then ok "copy  $dst igual à referência"
 		else
-			bad "copy  $dst difere de adapters/$src"
+			bad "copy  $dst difere de $rel"
 			if [ "$to" -nt "$from" ]; then
 				note "      o vivo é mais novo (a ferramenta reescreveu). Para aceitar:"
 				note "      cp \"$to\" \"$from\""
@@ -31,7 +43,9 @@ while IFS='	' read -r mode src dst; do
 			fi
 		fi ;;
 	esac
-done < "$SETUP/adapters/MANIFEST"
+done <<EOF
+$(manifest_lines)
+EOF
 
 # --- máquina ---
 if [ -L "$SETUP/local/machine.md" ] && [ -f "$SETUP/local/machine.md" ]; then
