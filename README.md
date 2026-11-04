@@ -27,7 +27,7 @@ ocupa contexto em toda sessão de todo projeto. Por isso `GLOBAL.md` fica curto.
 
 | Gaveta | O que é | Como viaja |
 |---|---|---|
-| `sync/` | `GLOBAL.md` e um `machine/<host>.md` por máquina | fora do git; sincronização entre máquinas a definir |
+| `sync/` | o que é seu: `GLOBAL.md`, um `machine/<host>.md` por máquina, skills e entradas pessoais (`sync/MANIFEST`), docs de trabalho | fora deste repositório; um repositório git privado seu, clonado em `sync/` |
 | `adapters/`, `*.sh` | a fiação: como cada ferramenta acha as instruções | git |
 | `local/` | estado desta máquina | não viaja |
 
@@ -50,9 +50,13 @@ fica em `sync/`, mas **qual deles vale** é decidido por `local/machine.md`, um 
 ├── skills/                skills nossas, um link por harness (UPSTREAM.md: as copiadas)
 ├── bin/                   entrega-verifica (skill entrega), handoff-copia (skill handoff), orq
 ├── orq/                   fila de tarefas Opus planeja/revisa, Sonnet executa, conselho decide (README)
-├── sync/memory/
-│   ├── GLOBAL.md          quem é o usuário, em qualquer máquina
-│   └── machine/pc.md      o que só vale nesta máquina
+├── tests/                 test_install.sh (install.sh com HOME falso)
+├── sync/                  repositório privado seu, fora deste
+│   ├── memory/GLOBAL.md   quem é o usuário, em qualquer máquina
+│   ├── memory/machine/    um <host>.md por máquina
+│   ├── MANIFEST           entradas pessoais (lido antes do adapters/MANIFEST)
+│   ├── skills/            skills pessoais
+│   └── docs/              specs e planos de trabalho
 └── local/
     └── machine.md         symlink para machine/<esta máquina>.md
 ```
@@ -169,7 +173,9 @@ as páginas da wiki, busca e handoffs abertos. Uso e de onde vem cada dado em
 
 ## Máquina nova
 
-1. Clonar este repositório em `~/.ai-setup` e trazer o `sync/`.
+1. Clonar este repositório em `~/.ai-setup` e, dentro dele, o seu repositório privado em `sync/`
+   (`git clone git@github.com:<seu-usuario>/<seu-repo-pessoal>.git ~/.ai-setup/sync`). Primeira vez:
+   `mkdir -p ~/.ai-setup/sync/memory` e escreva o `sync/memory/GLOBAL.md` (quem você é, como trabalha).
 2. `sh install.sh` — cria os symlinks e o `machine/<hostname>.md` em branco.
 3. Preencher o `machine/<hostname>.md`.
 4. Subir o ai-memory e ligar cada ferramenta (ver abaixo).

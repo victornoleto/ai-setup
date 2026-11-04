@@ -13,6 +13,7 @@ say() { printf '%s\n' "$*"; }
 if [ ! -e "$SETUP/local/machine.md" ]; then
 	target="$SETUP/sync/memory/machine/$host.md"
 	if [ ! -f "$target" ]; then
+		mkdir -p "$(dirname "$target")"
 		cat > "$target" <<TPL
 # Machine: $host
 

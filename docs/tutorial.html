@@ -422,7 +422,9 @@ copy    claude/settings.json    .claude/settings.json</code></pre>
 
   <h3><span class="num">2.3</span> Instalar numa máquina nova</h3>
 <pre><code>git clone &lt;seu-fork&gt; ~/.ai-setup
-# traga o sync/ (fora do git: GLOBAL.md e um arquivo por máquina)
+# o sync/ é seu e privado (GLOBAL.md, um arquivo por máquina, skills pessoais): clone o seu repo
+# git clone git@github.com:&lt;seu-usuario&gt;/&lt;seu-repo-pessoal&gt;.git ~/.ai-setup/sync
+# primeira vez: mkdir -p ~/.ai-setup/sync/memory &amp;&amp; $EDITOR ~/.ai-setup/sync/memory/GLOBAL.md
 sh ~/.ai-setup/install.sh    # cria os links e um machine/&lt;hostname&gt;.md em branco
 $EDITOR ~/.ai-setup/sync/memory/machine/$(hostname).md
 sh ~/.ai-setup/doctor.sh     # até sair sem FALHA</code></pre>

@@ -236,7 +236,9 @@ a entrada pessoal.
 
 ```sh
 git clone <seu-fork> ~/.ai-setup
-# traga o sync/ (ele fica fora do git: contém o GLOBAL.md e um arquivo por máquina)
+# o sync/ é seu e privado (GLOBAL.md, um arquivo por máquina, skills pessoais): clone o seu repo
+# git clone git@github.com:<seu-usuario>/<seu-repo-pessoal>.git ~/.ai-setup/sync
+# primeira vez: mkdir -p ~/.ai-setup/sync/memory && $EDITOR ~/.ai-setup/sync/memory/GLOBAL.md
 sh ~/.ai-setup/install.sh      # cria os links e um machine/<hostname>.md em branco
 $EDITOR ~/.ai-setup/sync/memory/machine/$(hostname).md
 sh ~/.ai-setup/doctor.sh       # até sair sem FALHA
