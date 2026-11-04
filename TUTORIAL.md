@@ -197,7 +197,9 @@ que **cada coisa tenha um dono só** e que um script diga quando algo saiu do lu
 ├── adapters/MANIFEST   o que é symlink, o que é cópia, e para onde
 ├── adapters/           claude/, codex/, opencode/, antigravity/
 ├── skills/             skills nossas, uma fonte, um link por harness
-├── sync/memory/        GLOBAL.md + machine/<host>.md   (fora do git)
+├── sync/               seu repositório git privado, fora deste:
+│                       memory/GLOBAL.md, memory/machine/<host>.md,
+│                       MANIFEST e skills/ pessoais
 └── local/machine.md    symlink para o machine/<esta máquina>.md
 ```
 

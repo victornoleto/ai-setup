@@ -398,7 +398,9 @@ docker logs ai-memory 2>&amp;1 | grep -iE 'provider error|reranker failed'</code
 ├── adapters/MANIFEST   o que é symlink, o que é cópia, e para onde
 ├── adapters/           claude/, codex/, opencode/, antigravity/
 ├── skills/             skills nossas: uma fonte, um link por harness
-├── sync/memory/        GLOBAL.md + machine/&lt;host&gt;.md   (fora do git)
+├── sync/               seu repositório git privado, fora deste:
+│                       memory/GLOBAL.md, memory/machine/&lt;host&gt;.md,
+│                       MANIFEST e skills/ pessoais
 └── local/machine.md    symlink para o machine/&lt;esta máquina&gt;.md</code></pre>
   <p>O teste da gaveta: se copiar para outra máquina e virar <strong>mentira lá</strong>, é <code>local/</code>. É o que impede a máquina do trabalho de afirmar que tem a GPU da máquina de casa.</p>
 
