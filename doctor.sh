@@ -74,6 +74,16 @@ grep -q '"ai-memory"' "$HOME/.gemini/config/hooks.json" 2>/dev/null && ok "agy: 
 [ -f "$HOME/.config/opencode/plugins/ai-memory.ts" ] && ok "opencode: plugin do ai-memory" || bad "opencode: plugin ausente — install-hooks --agent open-code"
 
 jq -e '.mcpServers["ai-memory"]' "$HOME/.claude.json" >/dev/null 2>&1 && ok "claude: MCP ai-memory" || bad "claude: MCP ai-memory ausente"
+# Conta 2 (~/.claude2, opcional): compartilha tudo por symlink, menos .claude.json, onde mora o MCP.
+if [ -d "$HOME/.claude2" ]; then
+	quebra=""
+	for e in CLAUDE.md settings.json plugins skills projects commands agents; do
+		[ "$(readlink "$HOME/.claude2/$e")" = "$HOME/.claude/$e" ] && [ -e "$HOME/.claude2/$e" ] || quebra="$quebra $e"
+	done
+	[ -z "$quebra" ] && ok "claude2: compartilha config com ~/.claude" || bad "claude2: link ausente ou quebrado:$quebra — rode install.sh"
+	jq -e '.mcpServers["ai-memory"]' "$HOME/.claude2/.claude.json" >/dev/null 2>&1 && ok "claude2: MCP ai-memory" \
+		|| bad "claude2: MCP ai-memory ausente — install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json"
+fi
 grep -q '^\[mcp_servers\.ai-memory\]' "$HOME/.codex/config.toml" && ok "codex: MCP ai-memory" || bad "codex: MCP ai-memory ausente"
 jq -e '.mcp["ai-memory"]' "$SETUP/adapters/opencode/opencode.jsonc" >/dev/null 2>&1 && ok "opencode: MCP ai-memory" || bad "opencode: MCP ai-memory ausente"
 jq -e '.mcpServers["ai-memory"]' "$HOME/.gemini/config/mcp_config.json" >/dev/null 2>&1 && ok "agy: MCP ai-memory" || bad "agy: MCP ai-memory ausente"
@@ -103,7 +113,7 @@ fi
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
 # lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.
-for f in "$HOME/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.gemini/config/mcp_config.json"; do
+for f in "$HOME/.claude.json" "$HOME/.claude2/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.gemini/config/mcp_config.json"; do
 	[ -f "$f" ] || continue
 	if grep -qE 'github_pat_|gh[pousr]_[A-Za-z0-9]{20,}|sk-ant-|sk-or-v1-' "$f"; then bad "token em texto puro em ${f#"$HOME"/}"
 	else ok "sem token em texto puro: ${f#"$HOME"/}"; fi

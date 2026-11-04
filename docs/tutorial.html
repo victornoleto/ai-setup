@@ -331,6 +331,9 @@ ai-memory install-mcp --client codex --apply
 ai-memory install-mcp --client open-code --apply \
   --config-file ~/.config/opencode/opencode.jsonc
 ai-memory install-mcp --client antigravity-cli --apply
+# segunda conta do Claude (2.3): o MCP mora no .claude.json, um por conta
+ai-memory install-mcp --client claude-code --apply \
+  --config-file ~/.claude2/.claude.json
 
 ai-memory install-instructions --compact --skills-scope global \
   --skills-agent claude-code --target ~/.claude/CLAUDE.md
@@ -374,6 +377,16 @@ docker logs ai-memory 2>&amp;1 | grep -iE 'provider error|reranker failed'</code
     <li>Sessão de teste suja o acervo: <code>ai-memory purge-session --session-id &lt;uuid&gt; --confirm</code>.</li>
   </ul>
 
+  <h3><span class="num">1.9</span> Atualizar</h3>
+  <p>Desde a 3.x os hooks chamam um cliente nativo (<code>~/.local/share/ai-memory/native-runner/ai-memory hook --event …</code>) que o wrapper baixa e confere pelo sha256. O wrapper usa a imagem <code>:latest</code>; compare <code>ai-memory --version</code> com a tag do container (<code>docker inspect ai-memory --format '{{.Config.Image}}'</code>) para saber se o servidor ficou para trás.</p>
+<pre><code>ai-memory upgrade     # wrapper, imagem e cliente nativo</code></pre>
+  <p>Duas coisas que o <code>upgrade</code> não faz direito neste arranjo:</p>
+  <ol>
+    <li><strong>Refaz os hooks sem <code>--project-strategy repo-root</code>.</strong> Rode o laço de <code>install-hooks</code> da 1.4 de novo.</li>
+    <li><strong>Não recria o container.</strong> O script que ele grava em <code>~/.cache</code> leva as chaves inline; com <code>--env-file</code> é mais limpo recriar à mão: <code>docker rm -f ai-memory</code> e o mesmo <code>docker run</code> da 1.3.</li>
+  </ol>
+  <p>Depois, os <code>install-instructions</code> da 1.4 e o <code>doctor.sh</code> (parte 2).</p>
+
   <p class="part-label" id="parte2">Parte 2</p>
   <h2>ai-setup: a configuração</h2>
   <p>O que sobra depois que a memória sai: instrução, skills, permissões, plugins, modelo. A ideia é que <strong>cada coisa tenha um dono só</strong> e que um script diga quando algo saiu do lugar.</p>
@@ -413,6 +426,13 @@ copy    claude/settings.json    .claude/settings.json</code></pre>
 sh ~/.ai-setup/install.sh    # cria os links e um machine/&lt;hostname&gt;.md em branco
 $EDITOR ~/.ai-setup/sync/memory/machine/$(hostname).md
 sh ~/.ai-setup/doctor.sh     # até sair sem FALHA</code></pre>
+  <p><strong>Segunda conta do Claude (opcional).</strong> Duas assinaturas logadas ao mesmo tempo: <code>claude</code> usa <code>~/.claude</code>; <code>claude2</code> usa <code>~/.claude2</code>, um esqueleto de symlinks para <code>~/.claude</code> (instrução, settings, plugins, skills, histórico). Só a credencial e o <code>.claude.json</code> (conta, MCPs, pastas confiáveis) ficam separados.</p>
+<pre><code>mkdir -p ~/.claude2 &amp;&amp; sh ~/.ai-setup/install.sh   # só monta os links se ~/.claude2 existir
+echo "alias claude2='CLAUDE_CONFIG_DIR=\$HOME/.claude2 claude'" &gt;&gt; ~/.bashrc
+ai-memory install-mcp --client claude-code --apply \
+  --config-file ~/.claude2/.claude.json
+claude2                                            # /login com a segunda conta, uma vez</code></pre>
+  <p>Nunca aponte <code>CLAUDE_CONFIG_DIR</code> para <code>~/.claude</code>: o Claude passa a ler <code>~/.claude/.claude.json</code> em vez de <code>~/.claude.json</code> e perde MCPs, pastas confiáveis e onboarding. A conta 1 é o <code>claude</code> puro, sem variável.</p>
 
   <h3><span class="num">2.4</span> O que escrever no GLOBAL.md</h3>
   <p>Ele carrega em <strong>todo turno de toda sessão de toda ferramenta</strong>, então cada linha paga aluguel. Aqui ele tem 3,9 KB e cinco seções:</p>
@@ -475,7 +495,7 @@ sh ~/.ai-setup/doctor.sh     # até sair sem FALHA</code></pre>
     <table>
       <thead><tr><th>Trecho</th><th>Dono</th></tr></thead>
       <tbody>
-        <tr><td>Entradas de hook com <code>ai-memory/hooks/</code>, servidor MCP <code>ai-memory</code>, bloco <code>&lt;!-- ai-memory:start --&gt;</code>, skills <code>ai-memory-*</code></td><td>ai-memory</td></tr>
+        <tr><td>Entradas de hook do ai-memory (<code>native-runner/ai-memory hook</code>), servidor MCP <code>ai-memory</code>, bloco <code>&lt;!-- ai-memory:start --&gt;</code>, skills <code>ai-memory-*</code></td><td>ai-memory</td></tr>
         <tr><td>Todo o resto: instrução, skills próprias, permissões, plugins, modelo</td><td>ai-setup</td></tr>
       </tbody>
     </table>

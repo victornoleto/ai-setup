@@ -121,8 +121,8 @@ arquivo. Regra: quem grava é o dono, e o outro só confere.
 
 | Trecho | Dono | Como muda |
 |---|---|---|
-| Entradas de hook com `ai-memory/hooks/` | ai-memory | `ai-memory install-hooks --apply` |
-| Servidor MCP `ai-memory` nos quatro configs | ai-memory | `ai-memory install-mcp --apply` |
+| Entradas de hook do ai-memory (`native-runner/ai-memory hook --event …`; na 2.x eram scripts em `ai-memory/hooks/`) | ai-memory | `ai-memory install-hooks --apply` |
+| Servidor MCP `ai-memory` nos quatro configs e no `~/.claude2/.claude.json` | ai-memory | `ai-memory install-mcp --apply` |
 | Bloco `<!-- ai-memory:start/end -->` nos adaptadores | ai-memory | `ai-memory install-instructions` (arquivo real) |
 | Skills `ai-memory-*` e plugin `opencode/plugins/ai-memory.ts` | ai-memory | `install-instructions`/`install-hooks` |
 | Todo o resto: `GLOBAL.md`, `machine.md`, `skills/`, permissões, plugins, modelo | ai-setup | editar em `~/.ai-setup` e `install.sh` |
@@ -168,7 +168,8 @@ as páginas da wiki, busca e handoffs abertos. Uso e de onde vem cada dado em
 2. `sh install.sh` — cria os symlinks e o `machine/<hostname>.md` em branco.
 3. Preencher o `machine/<hostname>.md`.
 4. Subir o ai-memory e ligar cada ferramenta (ver abaixo).
-5. `sh doctor.sh` até sair sem FALHA.
+5. Segunda conta do Claude, se houver: ver [Duas contas do Claude](#duas-contas-do-claude).
+6. `sh doctor.sh` até sair sem FALHA.
 
 ### Ligar o ai-memory
 
@@ -196,6 +197,8 @@ ai-memory install-mcp --client claude-code --apply
 ai-memory install-mcp --client codex --apply
 ai-memory install-mcp --client open-code --apply --config-file ~/.ai-setup/adapters/opencode/opencode.jsonc
 ai-memory install-mcp --client antigravity-cli --apply
+# Só com a segunda conta do Claude: o MCP mora no .claude.json, que é um por conta.
+ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
 
 # Bloco de instruções, sempre no arquivo real (nunca no symlink):
 ai-memory install-instructions --compact --skills-scope global --skills-agent claude-code \
@@ -227,7 +230,54 @@ Validar: `ai-memory audit-contamination` limpo e, depois de qualquer `memory_que
 `docker logs ai-memory 2>&1 | grep -iE 'provider error|reranker failed'` vazio. O `llm-test` sozinho
 não serve de prova — ele passou com a configuração quebrada.
 
+### Atualizar o ai-memory
+
+Desde a 3.x os hooks não são mais scripts: chamam o cliente nativo
+`~/.local/share/ai-memory/native-runner/ai-memory hook --event …`, baixado e conferido pelo
+wrapper. O wrapper usa a imagem `:latest`, então o CLI pode ficar à frente do servidor (`ai-memory
+--version` contra `docker inspect ai-memory --format '{{.Config.Image}}'`).
+
+```sh
+ai-memory upgrade          # atualiza o wrapper, puxa a imagem, troca o cliente nativo
+# O upgrade refaz os hooks sem --project-strategy: rode o laço de install-hooks acima de novo.
+# Ele também não recria o container (o que ele escreve em ~/.cache leva as chaves inline).
+# Recrie à mão com o mesmo `docker run` de cima:
+docker rm -f ai-memory && docker run -d --name ai-memory ...
+# Bloco de instruções e skills: os dois comandos install-instructions de cima.
+sh ~/.ai-setup/doctor.sh   # aceite o settings.json regravado (cp + commit)
+```
+
+## Duas contas do Claude
+
+Duas assinaturas logadas ao mesmo tempo: quando uma bate no limite, a outra continua.
+
+| Conta | Comando | Diretório |
+|---|---|---|
+| 1 | `claude` (e `xclaude`) | `~/.claude` (padrão, sem variável) |
+| 2 | `claude2` (e `xclaude2`) | `~/.claude2`, via `CLAUDE_CONFIG_DIR` |
+
+A conta 2 é um esqueleto de symlinks para `~/.claude`: `CLAUDE.md`, `settings.json`, `plugins`,
+`skills`, `projects`, `commands` e `agents` são os mesmos nas duas. Só a identidade é separada:
+`.credentials.json` e `.claude.json` (conta, MCPs, pastas confiáveis), além do estado de
+execução (`sessions/`, `session-env/`).
+
+```sh
+mkdir -p ~/.claude2 && sh ~/.ai-setup/install.sh     # cria os links (só age se ~/.claude2 existir)
+echo "alias claude2='CLAUDE_CONFIG_DIR=\$HOME/.claude2 claude'" >> ~/.bashrc   # ou ~/.zshrc
+ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
+claude2                                              # /login com a segunda conta, uma vez
+sh ~/.ai-setup/doctor.sh                             # "claude2: ..." tudo ok
+```
+
+**Nunca aponte `CLAUDE_CONFIG_DIR` para `~/.claude`** (o antigo alias `claude1`): o Claude passa a
+ler `~/.claude/.claude.json` em vez de `~/.claude.json` e some com MCPs, pastas confiáveis e
+onboarding. A conta 1 é o `claude` puro; o `orq` segue a mesma regra.
+
 ## Pegadinhas
+
+- **Plugin interno da empresa não entra no `settings.json` versionado.** Este repositório é
+  público. Ligue o plugin por projeto (`claude plugin install <plugin> --scope project`, no repo
+  da empresa) ou aceite que o `doctor.sh` acuse a diferença na máquina do trabalho.
 
 - **Nunca rode `ai-memory install-instructions` apontando para um symlink.** Ele grava com
   arquivo temporário + rename, e o rename troca o link por arquivo comum. O alvo é sempre o

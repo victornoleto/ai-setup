@@ -91,6 +91,8 @@ ai-memory install-mcp --client claude-code --apply
 ai-memory install-mcp --client codex --apply
 ai-memory install-mcp --client open-code --apply --config-file ~/.config/opencode/opencode.jsonc
 ai-memory install-mcp --client antigravity-cli --apply
+# segunda conta do Claude (2.3): o MCP mora no .claude.json, que é um por conta
+ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
 
 ai-memory install-instructions --compact --skills-scope global --skills-agent claude-code \
   --target ~/.claude/CLAUDE.md
@@ -158,6 +160,26 @@ sessão escrever o seu.
 - **OpenCode carrega plugin quando a sessão é criada**, não quando o servidor sobe.
 - Sessão de teste suja o acervo: `ai-memory purge-session --session-id <uuid> --confirm`.
 
+## 1.9 Atualizar
+
+Desde a 3.x os hooks chamam um cliente nativo
+(`~/.local/share/ai-memory/native-runner/ai-memory hook --event …`) que o wrapper baixa e confere
+pelo sha256. O wrapper usa a imagem `:latest`; compare `ai-memory --version` com a tag do container
+(`docker inspect ai-memory --format '{{.Config.Image}}'`) para saber se o servidor ficou para trás.
+
+```sh
+ai-memory upgrade     # wrapper, imagem e cliente nativo
+```
+
+Duas coisas que o `upgrade` não faz direito neste arranjo:
+
+1. **Refaz os hooks sem `--project-strategy repo-root`.** Rode o laço de `install-hooks` da 1.4
+   de novo.
+2. **Não recria o container.** O script que ele grava em `~/.cache` leva as chaves inline; com
+   `--env-file` é mais limpo recriar à mão: `docker rm -f ai-memory` e o mesmo `docker run` da 1.3.
+
+Depois, os `install-instructions` da 1.4 e o `doctor.sh` (parte 2).
+
 ---
 
 # Parte 2 — ai-setup
@@ -213,6 +235,22 @@ sh ~/.ai-setup/install.sh      # cria os links e um machine/<hostname>.md em bra
 $EDITOR ~/.ai-setup/sync/memory/machine/$(hostname).md
 sh ~/.ai-setup/doctor.sh       # até sair sem FALHA
 ```
+
+**Segunda conta do Claude (opcional).** Duas assinaturas logadas ao mesmo tempo: `claude` usa
+`~/.claude`; `claude2` usa `~/.claude2`, um esqueleto de symlinks para `~/.claude` (instrução,
+settings, plugins, skills, histórico). Só credencial e `.claude.json` (conta, MCPs, pastas
+confiáveis) são separados.
+
+```sh
+mkdir -p ~/.claude2 && sh ~/.ai-setup/install.sh     # o install só monta os links se ~/.claude2 existir
+echo "alias claude2='CLAUDE_CONFIG_DIR=\$HOME/.claude2 claude'" >> ~/.bashrc
+ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
+claude2                                              # /login com a segunda conta, uma vez
+```
+
+Nunca aponte `CLAUDE_CONFIG_DIR` para `~/.claude`: o Claude passa a ler `~/.claude/.claude.json`
+em vez de `~/.claude.json` e perde MCPs, pastas confiáveis e onboarding. A conta 1 é o `claude`
+puro, sem variável.
 
 ## 2.4 O que escrever no GLOBAL.md
 
@@ -302,7 +340,7 @@ Os dois sistemas mexem nos mesmos arquivos, então a divisão é por **trecho**,
 
 | Trecho | Dono |
 |---|---|
-| Entradas de hook com `ai-memory/hooks/`, servidor MCP `ai-memory`, bloco `<!-- ai-memory:start -->`, skills `ai-memory-*` | ai-memory |
+| Entradas de hook do ai-memory (`native-runner/ai-memory hook`), servidor MCP `ai-memory`, bloco `<!-- ai-memory:start -->`, skills `ai-memory-*` | ai-memory |
 | Todo o resto: instrução, skills próprias, permissões, plugins, modelo | ai-setup |
 
 Na dúvida sobre onde escrever algo:
