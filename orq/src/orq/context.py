@@ -1,12 +1,12 @@
 """Uma sessão nova por tarefa, mas sabendo onde está na fila: o bloco PROGRESS do prompt (o que já foi feito, a
-tarefa atual, o que falta) e as mensagens do operador que ainda não chegaram a uma sessão retomada."""
+tarefa atual, o que falta) e as mensagens do usuário que ainda não chegaram a uma sessão retomada."""
 from __future__ import annotations
 
 import re
 from functools import lru_cache
 from pathlib import Path
 
-from .journal import RESULT_LABEL, _clip, current_events, from_operator
+from .journal import RESULT_LABEL, _clip, current_events, from_user
 
 
 def title(f: Path) -> str:
@@ -27,14 +27,14 @@ def applies(ev: dict, task: str) -> bool:
     return not ev.get("for_task") or ev.get("for_task") == task
 
 
-def operator_messages(events: list[dict], task: str) -> list[str]:
-    """Notas e decisões do operador que valem para a tarefa."""
+def user_messages(events: list[dict], task: str) -> list[str]:
+    """Notas e decisões do usuário que valem para a tarefa."""
     out = []
     for e in events:
         if e["type"] == "note" and applies(e, task):
             out.append(f"- ({e['ts'][11:16]}) {e['text']}")
-        elif e["type"] == "decision" and from_operator(e) and e.get("task") == task:
-            out.append(f"- ({e['ts'][11:16]}) Decisão trocada pelo operador: **{e['question']}** → `{e['choice']}` — "
+        elif e["type"] == "decision" and from_user(e) and e.get("task") == task:
+            out.append(f"- ({e['ts'][11:16]}) Decisão trocada pelo usuário: **{e['question']}** → `{e['choice']}` — "
                        f"{e['label']}. {e.get('why', '')}".rstrip())
     return out
 
@@ -65,12 +65,12 @@ def progress(events: list[dict], task_files: list[Path], current: str) -> str:
     rest = [f for f in task_files if f.stem not in ends and f.stem != current]
     if rest:
         lines += ["", "Falta depois desta (não adiante):"] + [f"- `{f.stem}` — {title(f)}" for f in rest]
-    msgs = operator_messages(events, current)
+    msgs = user_messages(events, current)
     if msgs:
-        lines += ["", "Mensagens do operador durante a execução (valem como instrução do dono do projeto):"] + msgs
+        lines += ["", "Mensagens do usuário durante a execução (valem como instrução do dono do projeto):"] + msgs
     return "\n".join(lines)
 
 
 def inbox_block(msgs: list[str]) -> str:
-    return ("\n\n## Mensagem nova do operador (enviada durante a execução)\n\n" + "\n".join(msgs) +
+    return ("\n\n## Mensagem nova do usuário (enviada durante a execução)\n\n" + "\n".join(msgs) +
             "\n\nIsto vale como instrução do dono do projeto e tem prioridade sobre o plano onde houver conflito.\n")

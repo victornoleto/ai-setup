@@ -38,7 +38,7 @@ async def test_nota_chega_na_sessao_retomada(tmp_path):
     assert await e.run()
     calls = e.harness("fake").calls
     review = next(c for c in calls if c.name.startswith("review") and "01-a" in str(c.calls_dir))
-    assert "## Mensagem nova do operador" in review.prompt and "confira o README" in review.prompt
+    assert "## Mensagem nova do usuário" in review.prompt and "confira o README" in review.prompt
     plan_b = next(c for c in calls if c.name == "plan" and "02-b" in str(c.calls_dir))
     assert "Mensagem nova" not in plan_b.prompt          # sessão nova: vem pelo PROGRESS
     assert "confira o README" in plan_b.prompt

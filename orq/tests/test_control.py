@@ -81,10 +81,10 @@ async def test_decisao_trocada(tmp_path):
 
     e.run_task = run_task
     assert await e.run()
-    vd = [x for x in e.s.events() if x["type"] == "decision" and x.get("source") == "operador"][0]
+    vd = [x for x in e.s.events() if x["type"] == "decision" and x.get("source") == "usuario"][0]
     assert (vd["choice"], vd["label"], vd["points"]) == ("b", "B", None)
     assert e.s.get("01a-ajuste-decisao-nome", "result") == "ok"  # tarefa de ajuste criada e rodada
-    assert "[DECISÃO DO OPERADOR]" in e.s.journal_path.read_text()
+    assert "[DECISÃO DO USUÁRIO]" in e.s.journal_path.read_text()
     assert c.apply("/decision nada x")[0] is False
 
 

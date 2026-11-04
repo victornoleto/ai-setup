@@ -318,7 +318,7 @@ def test_notificacao_nao_publica_texto_do_projeto():
            "recommended": "a", "options": [{"id": "a", "label": "senha-123"}]}
     payload = notify.ask_payload({"server": "https://invalid", "topic": "dummy"}, "cliente-secreto", ask)
     encoded = json.dumps(payload)
-    assert payload["title"] == "orq cliente-secreto · cliente-secreto precisa de você"  # fila e tarefa: decisão do operador
+    assert payload["title"] == "orq cliente-secreto · cliente-secreto precisa de você"  # fila e tarefa: decisão do usuário
     assert all(s not in encoded for s in ("/private/repo", "senha-123"))
     assert payload["actions"][0]["body"] == "a123 1"
 

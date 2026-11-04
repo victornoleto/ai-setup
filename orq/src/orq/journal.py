@@ -6,23 +6,23 @@ import re
 from datetime import datetime
 
 # Quem dirige a fila: decisões e aceites dele levam estes valores no journal.
-OPERATOR = "operador"
-OK_OPERATOR = "ok_operador"
+USER = "usuario"
+OK_USER = "ok_usuario"
 
 
-def from_operator(e: dict) -> bool:
-    return e.get("source") == OPERATOR
+def from_user(e: dict) -> bool:
+    return e.get("source") == USER
 
 
 RESULT_LABEL = {"ok": "ok", "ok_takeover": "**ok (assumida pelo planejador)**", "failed": "**FALHOU**",
-                "blocked": "**BLOQUEADA**", "skipped": "pulada", OK_OPERATOR: "**ok (aceita pelo operador)**"}
+                "blocked": "**BLOQUEADA**", "skipped": "pulada", OK_USER: "**ok (aceita pelo usuário)**"}
 VERDICT_LABEL = {"approved": "aprovada", "changes": "**reprovada**"}
 STATUS_LABEL = {"done": "concluída", "needs_decision": "parou com dúvida", "blocked": "**bloqueada**"}
 NOTICE_LABEL = {"limit_wait": "LIMITE DE USO", "limit_giveup": "LIMITE DE USO", "account_switch": "TROCA DE CONTA",
                 "timeout": "TIMEOUT", "error": "ERRO", "interrupted": "INTERROMPIDO", "resumed": "RETOMADA",
                 "retry": "REFEITA", "paused": "PAUSA", "stopped": "PARADA", "control": "AJUSTE",
                 "note": "NOTA", "operator": "OPERADOR",
-                "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT", "decision_no_operator": "DECISÃO SEM OPERADOR",
+                "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT", "decision_no_user": "DECISÃO SEM USUÁRIO",
                 "background_killed": "BACKGROUND MORTO"}
 
 
@@ -67,7 +67,7 @@ def dur(s) -> str:
 
 
 def dur_both(e: dict) -> str:
-    """Duração de parede e, quando difere (espera pelo operador, motor parado), a ativa entre parênteses."""
+    """Duração de parede e, quando difere (espera pelo usuário, motor parado), a ativa entre parênteses."""
     d, a = e.get("duration_s"), e.get("active_s")
     out = dur(d)
     if d is not None and a is not None and a < d - 60:
@@ -101,8 +101,8 @@ def _section(e: dict) -> str | None:
     if t == "plan":
         return f"### Plano\n\n{e['summary']}\n\nArquivo: [{e['plan_rel']}]({e['plan_rel']})\n"
     if t == "decision":
-        who = "operador (pelo painel)" if from_operator(e) else e["source"]
-        head = "do operador" if e.get("points") is None else f"**{pts(e['points'])} pontos**"
+        who = "usuário (pelo painel)" if from_user(e) else e["source"]
+        head = "do usuário" if e.get("points") is None else f"**{pts(e['points'])} pontos**"
         out = f"### Decisão — {esc(e['question'])} ({head})\n\nPerguntado por: {who}. {esc(e.get('context', ''))}\n\n"
         out += "| Opção | Votos |\n|---|---|\n"
         rows = []
@@ -115,7 +115,7 @@ def _section(e: dict) -> str | None:
         if e.get("tiebreak"):
             out += f"\n- **Desempate** (`{e['choice']}`): {esc(e['tiebreak'])}"
         if e.get("override"):
-            out += f"\n- **Trocada pelo operador** para `{e['choice']}`: {esc(e.get('why', ''))}"
+            out += f"\n- **Trocada pelo usuário** para `{e['choice']}`: {esc(e.get('why', ''))}"
         return out + "\n"
     if t == "exec":
         out = f"### Ciclo {e['cycle']} — execução ({e['actor']}): {STATUS_LABEL.get(e['status'], e['status'])}\n\n{e['summary']}\n"
@@ -137,11 +137,11 @@ def _section(e: dict) -> str | None:
     if t == "ask":
         opts = "\n".join(f"{i}. `{o['id']}` {esc(o['label'])}" + (" **← recomendada**" if o["id"] == e["recommended"] else "")
                          for i, o in enumerate(e.get("options") or [], 1))
-        return f"### Pergunta ao operador ({e['kind']})\n\n{esc(e['question'])}\n\n{esc(e.get('diagnosis', ''))}\n\n{opts}\n"
+        return f"### Pergunta ao usuário ({e['kind']})\n\n{esc(e['question'])}\n\n{esc(e.get('diagnosis', ''))}\n\n{opts}\n"
     if t == "ask_reply":
         return f"*Operador:* {esc(e.get('text', ''))}\n"
     if t == "ask_answer" and e.get("kind") != "council":
-        return (f"**Resposta do operador:** {esc(e.get('answer', ''))} → `{e.get('action')}`"
+        return (f"**Resposta do usuário:** {esc(e.get('answer', ''))} → `{e.get('action')}`"
                 + (f": {esc(e['note'])}" if e.get("note") else "") + "\n")
     if t == "verify":
         return (f"### Ciclo {e['cycle']} — verificação automática: {verify_label(e)}\n\n"
@@ -178,8 +178,8 @@ def render(ev: list[dict]) -> str:
            for e in te if e["result"] == "ok_takeover"]
         + [f"- **[DECISÃO {pts(e['points'])} pts]** {link(e['task'])} — {esc(e['question'])} → `{e['choice']}` {esc(e['label'])}"
            for e in ev if e["type"] == "decision" and e.get("points") is not None and e["points"] < 3]
-        + [f"- **[DECISÃO DO OPERADOR]** {link(e['task'])} — {esc(e['question'])} → `{e['choice']}` {esc(e['label'])}"
-           for e in ev if e["type"] == "decision" and from_operator(e)]
+        + [f"- **[DECISÃO DO USUÁRIO]** {link(e['task'])} — {esc(e['question'])} → `{e['choice']}` {esc(e['label'])}"
+           for e in ev if e["type"] == "decision" and from_user(e)]
         + [f"- **[INTERVENÇÃO]** {link(e['task'])} — {esc(e['question'])} → {e.get('action')}"
            + (f": {esc(e['note'])}" if e.get("note") else "")
            for e in ev if e["type"] == "ask_answer" and e.get("kind") != "council"]
@@ -308,7 +308,7 @@ def _epoch(ts: str) -> float:
 
 
 def steps(ev: list[dict], t: str) -> list[dict]:
-    """As etapas de uma tarefa, em ordem: chamadas (evento step), verificações e esperas pelo operador (ask →
+    """As etapas de uma tarefa, em ordem: chamadas (evento step), verificações e esperas pelo usuário (ask →
     ask_answer). → [{label, kind, cycle, start, dur, ok, call}]; ok None = não se aplica."""
     ev = [e for e in current_events(ev) if e.get("task") == t]
     verdicts = {e["cycle"]: e.get("verdict") == "approved" for e in ev if e["type"] == "review"}
@@ -379,7 +379,7 @@ def event_line(e: dict) -> str | None:
     if t == "task_start":
         return f"▶ {task} começou"
     if t == "task_end":
-        glyph = {"ok": "✓", "ok_takeover": "✓", OK_OPERATOR: "✓", "skipped": "⊘"}.get(e["result"], "✗")
+        glyph = {"ok": "✓", "ok_takeover": "✓", OK_USER: "✓", "skipped": "⊘"}.get(e["result"], "✗")
         return f"{glyph} {task} terminou: {RESULT_LABEL.get(e['result'], e['result']).replace('**', '')} " \
                f"({dur_both(e)}, {e.get('cycles', 1)} ciclo(s)) — {_clip(e.get('reason', ''), 160)}"
     if t == "plan":
@@ -395,7 +395,7 @@ def event_line(e: dict) -> str | None:
         return (f"[REVISÃO c{e['cycle']}] {task}: {VERDICT_LABEL.get(e['verdict'], e['verdict']).replace('**', '')}"
                 f" · problemas alta {n['alta']} / média {n['media']} / baixa {n['baixa']}")
     if t == "decision":
-        tag = "DECISÃO DO OPERADOR" if from_operator(e) else f"DECISÃO {pts(e['points'])} pts"
+        tag = "DECISÃO DO USUÁRIO" if from_user(e) else f"DECISÃO {pts(e['points'])} pts"
         votes = ", ".join(v["option_id"] for v in e.get("votes") or [])
         return f"[{tag}] {task}: {_clip(e['question'], 120)} → `{e['choice']}` {e['label']}" + (f" (votos {votes})" if votes else "")
     if t == "notice":

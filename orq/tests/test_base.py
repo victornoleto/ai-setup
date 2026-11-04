@@ -112,7 +112,7 @@ def test_intervencao_padrao(tmp_path):
     (tmp_path / "orq.toml").write_text('[intervene]\nenabled = false\ndecision_timeout = "5s"\n')
     c = config.load(tmp_path)
     assert c.intervene is False and c.intervene_seconds("decision_timeout") == 5
-    assert journal.RESULT_LABEL["ok_operador"] == "**ok (aceita pelo operador)**"
+    assert journal.RESULT_LABEL["ok_usuario"] == "**ok (aceita pelo usuário)**"
 
 
 def test_linhas_da_intervencao():
@@ -128,7 +128,7 @@ def test_linhas_da_intervencao():
     md = journal.render([{"type": "run_start", "ts": ask["ts"]}, ask, ans])
     assert "- **[INTERVENÇÃO]** [04-x](04-x/report.md) — E agora? → retry: use Y" in md
     task = journal.render_task([ask, rep, ans], "04-x")
-    assert "### Pergunta ao operador" in task and "**← recomendada**" in task and "**Resposta do operador:** 1" in task
+    assert "### Pergunta ao usuário" in task and "**← recomendada**" in task and "**Resposta do usuário:** 1" in task
 
 
 def test_stream_com_horario_e_historico_da_tarefa(tmp_path):

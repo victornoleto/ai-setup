@@ -19,7 +19,7 @@ PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "c
                "exec": "executando", "exec_answers": "executando", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
                "takeover": "planejador assumiu", "takeover_answers": "planejador assumiu",
                "final_clean": "arrumando a árvore", "final_verify": "verificação final", "final_review": "revisão final"}
-RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "ok_operador": ("✓", "ok, aceita pelo operador"), "failed": ("✗", "FALHOU"),
+RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "ok_usuario": ("✓", "ok, aceita pelo usuário"), "failed": ("✗", "FALHOU"),
           "blocked": ("✗", "BLOQUEADA"), "skipped": ("⊘", "pulada")}
 
 
@@ -110,7 +110,7 @@ def timeline_line(e: dict) -> str | None:
 
 def eta(events: list[dict], rows: list[TaskRow], now: float, tasks: dict | None = None) -> float | None:
     """Horário previsto de término: média do tempo ativo das tarefas terminadas × o que falta (a em curso conta o
-    que sobra). Tempo ativo, não de parede: a espera pelo operador não entra na média nem no que já correu."""
+    que sobra). Tempo ativo, não de parede: a espera pelo usuário não entra na média nem no que já correu."""
     durs = [e.get("active_s", e["duration_s"]) for e in events if e["type"] == "task_end" and e["result"] != "skipped"]
     pending = sum(1 for r in rows if r.glyph == "·")
     running = [r.id for r in rows if r.glyph in "▶⏸"]
