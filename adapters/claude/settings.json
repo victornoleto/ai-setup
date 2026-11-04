@@ -147,8 +147,7 @@
     "padding": 0
   },
   "enabledPlugins": {
-    "commit-commands@claude-plugins-official": true,
-    "plugin-interno@empresa": true
+    "commit-commands@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {},
   "outputStyle": "Concise",
