@@ -173,8 +173,9 @@ ai-memory upgrade     # wrapper, imagem e cliente nativo
 
 Duas coisas que o `upgrade` não faz direito neste arranjo:
 
-1. **Refaz os hooks sem `--project-strategy repo-root`.** Rode o laço de `install-hooks` da 1.4
-   de novo.
+1. **Só refaz os hooks dos agentes que já tinham hooks.** Ele mantém o `--project-strategy` de
+   quem já estava ligado, mas cria com o padrão os que faltavam. Rode o laço de `install-hooks`
+   da 1.4 de novo: é idempotente.
 2. **Não recria o container.** O script que ele grava em `~/.cache` leva as chaves inline; com
    `--env-file` é mais limpo recriar à mão: `docker rm -f ai-memory` e o mesmo `docker run` da 1.3.
 

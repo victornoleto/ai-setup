@@ -239,7 +239,7 @@ wrapper. O wrapper usa a imagem `:latest`, então o CLI pode ficar à frente do 
 
 ```sh
 ai-memory upgrade          # atualiza o wrapper, puxa a imagem, troca o cliente nativo
-# O upgrade refaz os hooks sem --project-strategy: rode o laço de install-hooks acima de novo.
+# O upgrade só refaz os hooks de quem já tinha; rode o laço de install-hooks acima de novo (idempotente).
 # Ele também não recria o container (o que ele escreve em ~/.cache leva as chaves inline).
 # Recrie à mão com o mesmo `docker run` de cima:
 docker rm -f ai-memory && docker run -d --name ai-memory ...

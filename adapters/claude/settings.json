@@ -139,6 +139,17 @@
           }
         ]
       }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.local/share/ai-memory/native-runner/ai-memory --data-dir $HOME/.local/share/ai-memory hook --event post-tool-use --agent claude-code --server-url http://127.0.0.1:49374 --project-strategy repo-root"
+          }
+        ]
+      }
     ]
   },
   "statusLine": {
