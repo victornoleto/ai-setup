@@ -103,12 +103,12 @@ class Config:
 
     @property
     def max_task_seconds(self) -> int:
-        """Tempo ativo por tarefa antes de perguntar ao o usuário; 0 = sem limite."""
+        """Tempo ativo por tarefa antes de perguntar ao operador; 0 = sem limite."""
         return parse_duration(self.get("loop", "max_task_time", default="0"))
 
     @property
     def max_run_cost(self) -> float:
-        """US$ estimados da execução antes de perguntar ao o usuário; 0 = sem limite."""
+        """US$ estimados da execução antes de perguntar ao operador; 0 = sem limite."""
         return float(self.get("loop", "max_run_cost", default=0) or 0)
 
     @property

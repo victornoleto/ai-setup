@@ -9,6 +9,7 @@ from collections import Counter
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from .journal import OPERATOR
 from .store import now_iso
 
 if TYPE_CHECKING:
@@ -95,20 +96,20 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     return record(eng, t, source, q, votes, choice, points, tb_rationale)
 
 
-def record_usuario(store, task: str, orig: dict, choice: str, label: str, why: str, command_id: str = "") -> str:
-    """Decisão do o usuário sobre uma pergunta do conselho: evento + decisions.md. → a linha para o prompt."""
+def record_operator(store, task: str, orig: dict, choice: str, label: str, why: str, command_id: str = "") -> str:
+    """Decisão do operador sobre uma pergunta do conselho: evento + decisions.md. → a linha para o prompt."""
     # reentrega do mesmo comando: o evento e a linha do decisions.md já existem
     if not command_id or not any(e["type"] == "decision" and e.get("command_id") == command_id for e in store.events()):
         store.event("decision", {
-            "task": task, "source": "usuario", "qid": orig["qid"], "question": orig["question"],
+            "task": task, "source": OPERATOR, "qid": orig["qid"], "question": orig["question"],
             "context": orig.get("context", ""), "options": orig["options"], "votes": [], "choice": choice,
             "label": label, "points": None, "tiebreak": "", "why": why, "override": choice != orig["choice"],
             "command_id": command_id})
         d = store.dir / task / "decisions.md"
         d.parent.mkdir(parents=True, exist_ok=True)
         with open(d, "a") as fh:
-            fh.write(f"## {orig['question']} (decisão do o usuário)\n\nEscolha: `{choice}` — {label}. {why}\n\n")
-    return f"- **{orig['question']}** → `{choice}` — {label} (decisão do o usuário). {why}"
+            fh.write(f"## {orig['question']} (decisão do operador)\n\nEscolha: `{choice}` — {label}. {why}\n\n")
+    return f"- **{orig['question']}** → `{choice}` — {label} (decisão do operador). {why}"
 
 
 def record(eng: "Engine", t: "Task", source: str, q: dict, votes: list[dict], choice: str, points, tb: str) -> str:

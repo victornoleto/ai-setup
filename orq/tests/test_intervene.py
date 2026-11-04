@@ -62,7 +62,7 @@ COUNCIL = {"plan": [{"summary": "s", "questions": [Q]}, PLAN], "execute": [EXEC_
            "voter:vote": [vote("a"), vote("a"), vote("b")]}
 
 
-async def test_conselho_2_pts_pergunta_e_usuario_escolhe(tmp_path):
+async def test_conselho_2_pts_pergunta_e_operador_escolhe(tmp_path):
     e = engine(tmp_path, make_queue(tmp_path, COUNCIL, intervene="enabled = true"))
     job = asyncio.create_task(e.run())
     await until(lambda: e.s.top("open_ask"))
@@ -71,16 +71,16 @@ async def test_conselho_2_pts_pergunta_e_usuario_escolhe(tmp_path):
     e.s.send(f"/answer {ask['id']} 2")
     assert await job
     decs = [x for x in e.s.events() if x["type"] == "decision"]
-    assert (decs[-1]["source"], decs[-1]["choice"]) == ("usuario", "b")
+    assert (decs[-1]["source"], decs[-1]["choice"]) == ("operador", "b")
     upd = next((e.s.dir / "01-a" / "calls").glob("plan-update-*.prompt.md")).read_text()
-    assert "decisão do o usuário" in upd
+    assert "decisão do operador" in upd
 
 
 async def test_conselho_sem_resposta_segue_com_a_escolha(tmp_path):
     e = engine(tmp_path, make_queue(tmp_path, COUNCIL, intervene='enabled = true\ndecision_timeout = "1s"'))
     assert await e.run()
-    assert [x.get("kind") for x in e.s.events() if x["type"] == "notice"].count("decision_no_usuario") == 1
-    assert "[DECISÃO SEM usuario]" in e.s.journal_path.read_text()
+    assert [x.get("kind") for x in e.s.events() if x["type"] == "notice"].count("decision_no_operator") == 1
+    assert "[DECISÃO SEM OPERADOR]" in e.s.journal_path.read_text()
     assert e.s.top("open_ask") is None
     upd = next((e.s.dir / "01-a" / "calls").glob("plan-update-*.prompt.md")).read_text()
     assert "`a`" in upd and "não respondeu" in upd
@@ -133,7 +133,7 @@ async def test_operador_falhou_usa_opcoes_padrao(tmp_path):
     assert await job and e.s.get("01-a", "result") == "skipped"
 
 
-async def test_accept_fecha_como_ok_usuario(tmp_path):
+async def test_accept_fecha_como_ok_operador(tmp_path):
     out = {**ASK_OUT, "options": [*ASK_OUT["options"][:2], {"id": "3", "label": "Aceitar", "detail": "",
                                                               "action": "accept", "note": ""}]}
     cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED], "review": [APPROVED], "ask": [out]},
@@ -141,7 +141,7 @@ async def test_accept_fecha_como_ok_usuario(tmp_path):
     e = engine(tmp_path, cfg)
     job = asyncio.create_task(e.run())
     await answer_when_open(e, "3")
-    assert await job and e.s.get("01-a", "result") == "ok_usuario"
+    assert await job and e.s.get("01-a", "result") == "ok_operador"
 
 
 async def test_resume_com_pergunta_aberta_nao_chama_o_operador(tmp_path):
@@ -205,13 +205,13 @@ async def test_texto_livre_suficiente_no_conselho(tmp_path):
     assert [x for x in e.s.events() if x["type"] == "decision"][-1]["choice"] == "c"
 
 
-async def test_espera_pelo_usuario_nao_conta_como_tempo_ativo(tmp_path):
+async def test_espera_pelo_operador_nao_conta_como_tempo_ativo(tmp_path):
     cfg = make_queue(tmp_path, {"plan": [PLAN], "execute": [BLOCKED, EXEC_OK], "review": [APPROVED],
                                 "ask": [ASK_OUT]}, intervene="enabled = true")
     e = engine(tmp_path, cfg)
     job = asyncio.create_task(e.run())
     await until(lambda: e.s.top("open_ask"))
-    await asyncio.sleep(1.3)  # o o usuário demora
+    await asyncio.sleep(1.3)  # o operador demora
     e.s.send(f"/answer {e.s.top('open_ask')['id']} 1")
     assert await job
     end = next(x for x in e.s.events() if x["type"] == "task_end")

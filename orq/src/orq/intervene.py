@@ -1,4 +1,4 @@
-"""Intervenção do o usuário: a fila pausa, avisa (painel e ntfy) e espera a resposta a uma pergunta com opções. A
+"""Intervenção do operador: a fila pausa, avisa (painel e ntfy) e espera a resposta a uma pergunta com opções. A
 pergunta aberta mora em state.json (open_ask): sobrevive a um `orq resume`."""
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from . import council as council_mod, notify
 from .council import points_label
 from .control import StopRun
+from .journal import OPERATOR
 
 if TYPE_CHECKING:
     from .engine import Engine, Task
@@ -86,7 +87,7 @@ def close(eng: "Engine", ask: dict, **answer) -> None:
 
 
 async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) -> str:
-    """Decisão com 2 ou 2,5 pts: pergunta ao o usuário; sem resposta no prazo, fica a do conselho. → linha do prompt."""
+    """Decisão com 2 ou 2,5 pts: pergunta ao operador; sem resposta no prazo, fica a do conselho. → linha do prompt."""
     votes = ", ".join(v["option_id"] for v in dec.get("votes") or [])
     ask = ask or new_ask(t.id, "council", eng.s.get(t.id, "phase"), dec["question"],
                          f"Conselho sem unanimidade ({points_label(dec['points'])} pts; votos {votes}). "
@@ -98,10 +99,10 @@ async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) 
         text = await wait(eng, ask)
         if text is None:
             close(eng, ask, timeout=True, choice=dec["choice"])
-            eng.s.notice("decision_no_usuario", f"Sem resposta: segue com `{dec['choice']}` — {dec['label']}.", t.id)
+            eng.s.notice("decision_no_operator", f"Sem resposta: segue com `{dec['choice']}` — {dec['label']}.", t.id)
             eng.notify(f"orq {eng.queue_name()} · {t.id}: a decisão seguiu sem você", notify.clip(dec["question"], 200))
             return (f"- **{dec['question']}** → `{dec['choice']}` — {dec['label']} (conselho, "
-                    f"{points_label(dec['points'])} pontos; o o usuário não respondeu no prazo).")
+                    f"{points_label(dec['points'])} pontos; o operador não respondeu no prazo).")
         opt = match_option(ask, text)
         if opt:
             choice, label = opt["id"], opt["label"]
@@ -111,9 +112,9 @@ async def council(eng: "Engine", t: "Task", dec: dict, ask: dict | None = None) 
                 ask = out
                 continue
             opt = next((o for o in ask["options"] if o["id"] == out[1]["option_id"]), None)
-            choice, label = (opt["id"], opt["label"]) if opt else ("usuario", out[1]["note"] or text)
+            choice, label = (opt["id"], opt["label"]) if opt else (OPERATOR, out[1]["note"] or text)
         close(eng, ask, choice=choice, answer=text)
-        return council_mod.record_usuario(eng.s, t.id, dec, choice, label, "Escolhida pelo o usuário.")
+        return council_mod.record_operator(eng.s, t.id, dec, choice, label, "Escolhida pelo operador.")
 
 
 def fallback_ask(task: str, p) -> dict:
@@ -142,7 +143,7 @@ async def build_failure_ask(eng: "Engine", t: "Task", p) -> dict:
 
 
 async def failure(eng: "Engine", t: "Task", p, ask: dict | None = None) -> tuple[str, str]:
-    """Bloqueio ou falha: pergunta ao o usuário e espera o tempo que for. → (ação, nota)."""
+    """Bloqueio ou falha: pergunta ao operador e espera o tempo que for. → (ação, nota)."""
     ask = ask or await build_failure_ask(eng, t, p)
     while True:
         text = await wait(eng, ask)

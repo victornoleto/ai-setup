@@ -32,7 +32,7 @@ def scaffold(activity: Path, repo: Path) -> Path:
 def wizard_prompt(activity: Path, q: Path, cfg: config.Config) -> str:
     roles = "; ".join(f"{n}: {r.label()}" for n, r in cfg.roles.items() if n not in ("wizard", "operator"))
     exists = sorted(p.name for p in q.glob("[0-9]*.md"))
-    state = (f"A fila já tem {len(exists)} tarefa(s) ({', '.join(exists)}): revise com o o usuário em vez de começar do zero."
+    state = (f"A fila já tem {len(exists)} tarefa(s) ({', '.join(exists)}): revise com o operador em vez de começar do zero."
              if exists else "A fila ainda não tem tarefas.")
     return (f"Use a skill orq-setup para montar a fila do orq.\n\nAtividade (contexto): {activity}\nFila (destino): {q}\n"
             f"Repositório: {cfg.repo}\n{state}\nPadrão dos papéis (orq.toml global): {roles}.\n\n"

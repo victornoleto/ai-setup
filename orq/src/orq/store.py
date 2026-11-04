@@ -242,7 +242,7 @@ class RunStore:
         self._save(st)
 
     # --- tempo ativo ---------------------------------------------------------------------------------
-    # Parede ≠ trabalho: a espera pelo o usuário e o motor parado não contam. Ativo = chamadas e verificações.
+    # Parede ≠ trabalho: a espera pelo operador e o motor parado não contam. Ativo = chamadas e verificações.
     def active_start(self, task: str) -> None:
         if task:
             self.update_task(task, {"active_since": time.time()})

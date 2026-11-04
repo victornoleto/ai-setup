@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from . import council
+from .journal import OPERATOR, from_operator
 from .store import write_atomic
 
 if TYPE_CHECKING:
@@ -248,20 +249,20 @@ class Control:
             return False, "uso: /decision <qid> <id da opção ou texto livre>"
         qid, answer = m.group(1), m.group(2).strip()
         orig = next((e for e in reversed(self.s.events())
-                     if e["type"] == "decision" and e.get("qid") == qid and e.get("source") != "usuario"), None)
+                     if e["type"] == "decision" and e.get("qid") == qid and not from_operator(e)), None)
         if not orig:
             return False, f"decisão '{qid}' não encontrada"
         opt = next((o for o in orig["options"] if o["id"] == answer), None)
-        choice, label = (opt["id"], opt["label"]) if opt else ("usuario", answer)
+        choice, label = (opt["id"], opt["label"]) if opt else (OPERATOR, answer)
         task = orig["task"]
-        council.record_usuario(self.s, task, orig, choice, label,
-                              f"Trocada pelo o usuário (o conselho tinha escolhido `{orig['choice']}` — {orig['label']}).",
+        council.record_operator(self.s, task, orig, choice, label,
+                              f"Trocada pelo operador (o conselho tinha escolhido `{orig['choice']}` — {orig['label']}).",
                               command_id=cmd_id)
         if self.s.get(task, "phase") != "done":
             return True, f"{task} recebe a decisão no próximo prompt"
         files = self.eng.task_files()
         after = find_task(files, task)
-        text = (f"Ajuste pedido pelo o usuário na tarefa `{task}`: a decisão **{orig['question']}** foi trocada de "
+        text = (f"Ajuste pedido pelo operador na tarefa `{task}`: a decisão **{orig['question']}** foi trocada de "
                 f"`{orig['choice']}` ({orig['label']}) para `{choice}` ({label}).\n\n"
                 f"Leia o que a `{task}` fez (`git log`, o plano e o journal da execução em {self.s.dir}) e ajuste o "
                 "código, os testes e a documentação para a decisão nova. Commits no padrão do repositório.\n")
@@ -270,7 +271,7 @@ class Control:
 
     async def ask(self, cmd_id: str, message: str) -> None:
         """Texto livre → papel operator (só leitura, sessão nova) → resposta + comandos propostos. O painel só
-        aplica os comandos com a confirmação do o usuário."""
+        aplica os comandos com a confirmação do operador."""
         from .engine import prompt
         from .tui.model import task_rows, timeline_line
 

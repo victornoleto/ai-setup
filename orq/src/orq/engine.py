@@ -17,10 +17,11 @@ from pathlib import Path
 from . import context, council, harness as harness_mod, intervene, notify
 from .config import ORQ_HOME, Config, ConfigError
 from .control import Control, StopRun
+from .journal import OK_OPERATOR
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
 from .store import RunStore, active_seconds, now_iso, queue_label
 
-OK_RESULTS = ("ok", "ok_takeover", "ok_usuario", "skipped")
+OK_RESULTS = ("ok", "ok_takeover", OK_OPERATOR, "skipped")
 
 
 def render(template: str, **kv) -> str:
@@ -92,7 +93,7 @@ class Task:
 
 
 class Problem(Exception):
-    """A tarefa não consegue seguir sozinha. Com [intervene], vira pergunta ao o usuário; sem, encerra a tarefa."""
+    """A tarefa não consegue seguir sozinha. Com [intervene], vira pergunta ao operador; sem, encerra a tarefa."""
 
     def __init__(self, result: str, reason: str, phase: str):
         super().__init__(reason)
@@ -153,12 +154,12 @@ class Engine:
         return context.progress(self.s.events(), self.task_files(), t.id)
 
     def with_inbox(self, t: Task | None, sid: str | None, resume: bool, text: str) -> str:
-        """Sessão retomada: acrescenta o que o o usuário mandou desde o último prompt dela. Sessão nova já recebe
+        """Sessão retomada: acrescenta o que o operador mandou desde o último prompt dela. Sessão nova já recebe
         tudo pelo PROGRESS."""
         if not (t and resume and sid):
             return text
         seen = int(self.s.top("sessions", {}).get(sid, 0))  # nº de eventos quando a sessão recebeu o último prompt
-        msgs = context.usuario_messages(self.s.events()[seen:], t.id)
+        msgs = context.operator_messages(self.s.events()[seen:], t.id)
         return text + context.inbox_block(msgs) if msgs else text
 
     def mark_session(self, sid: str | None, seen: int) -> None:
@@ -406,7 +407,7 @@ class Engine:
         delivery = {"commits": git(self.task_config(t).repo, "log", "--oneline", f"{base}..HEAD").splitlines(),
                     "stat": git(self.task_config(t).repo, "diff", "--stat", f"{base}..HEAD"),
                     "numstat": git(self.task_config(t).repo, "diff", "--numstat", f"{base}..HEAD")} if base and base != "none" else {}
-        if result in ("ok", "ok_takeover", "ok_usuario") and git(self.task_config(t).repo, "rev-parse", "HEAD") == base:
+        if result in OK_RESULTS and result != "skipped" and git(self.task_config(t).repo, "rev-parse", "HEAD") == base:
             self.s.notice("no_commits", "A tarefa terminou ok sem nenhum commit: confira se era isso mesmo.", t.id)
         self.s.update_task(t.id, {"phase": "done", "result": result})
         self.s.event("task_end", {"task": t.id, "repo": str(self.task_config(t).repo), "result": result, "reason": reason,
@@ -557,7 +558,7 @@ class Engine:
                 phase = await self.problem(t, p)
 
     async def problem(self, t: Task, p: Problem, ask: dict | None = None) -> str:
-        """Sem intervenção: encerra a tarefa como antes. Com: pergunta ao o usuário e aplica a ação escolhida.
+        """Sem intervenção: encerra a tarefa como antes. Com: pergunta ao operador e aplica a ação escolhida.
         → a fase seguinte."""
         if not self.cfg.intervene:
             self.end(t, p.result, p.reason)
@@ -574,9 +575,9 @@ class Engine:
             self.s.set(t.id, "decision_rounds", 0)
             return "plan"
         if action == "accept":
-            self.end(t, "ok_usuario", f"Aceita pelo o usuário. {p.reason}")
+            self.end(t, OK_OPERATOR, f"Aceita pelo operador. {p.reason}")
         if action == "skip":
-            self.end(t, "skipped", f"Pulada pelo o usuário. {p.reason}")
+            self.end(t, "skipped", f"Pulada pelo operador. {p.reason}")
         raise StopRun
 
     def over_budget(self, t: Task) -> str | None:
@@ -605,7 +606,7 @@ class Engine:
 
     def retake(self, t: Task, why_md: str) -> None:
         """O prompt do (próximo) takeover leva sempre a última reprovação: a do executor ou, depois de o planejador
-        assumir, a da verificação ou do revisor independente (um `retry` do o usuário refaz com esse parecer)."""
+        assumir, a da verificação ou do revisor independente (um `retry` do operador refaz com esse parecer)."""
         (t.dir / "takeover.prompt.md").write_text(prompt("takeover", MAX_CYCLES=self.cfg.max_cycles, REVIEW=why_md))
 
     async def clean(self, t: Task, cycle: int, role: str, sid: str | None) -> None:
