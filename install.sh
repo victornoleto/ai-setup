@@ -98,16 +98,10 @@ if [ -d "$HOME/.claude2" ]; then
 	done
 fi
 
-# --- aliases (claude2, xclaude, xcodex...): o rc do shell carrega o arquivo do repositório ---
+# --- shell: o rc carrega aliases.sh, que traz os aliases (claude2, xclaude...) e o bin/ no PATH ---
 grep -qs 'adapters/shell/aliases.sh' "$HOME/.bashrc" "$HOME/.zshrc" || {
-	say ""; say "Faltam os aliases. Acrescente ao rc do shell:"
+	say ""; say "Faltam os aliases e o bin/ no PATH. Acrescente ao rc do shell:"
 	say "  . \"\$HOME/.ai-setup/adapters/shell/aliases.sh\""
 }
-
-case ":${PATH}:" in
-	*":$SETUP/bin:"*) ;;
-	*) say ""; say "Falta o bin no PATH. Acrescente ao rc do shell:"
-	   say "  export PATH=\"\$HOME/.ai-setup/bin:\$PATH\"" ;;
-esac
 
 exit $rc

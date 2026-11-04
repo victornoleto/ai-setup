@@ -53,8 +53,8 @@ documentação dela).
 echo '. "$HOME/.ai-setup/adapters/shell/aliases.sh"' >> ~/.bashrc   # ou ~/.zshrc
 ```
 
-Abra um terminal novo. Os comandos (`claude2`, `xclaude`, `xcodex`…) e o teto de RAM opcional estão em
-[claude-code.md](claude-code.md).
+Abra um terminal novo. A linha traz os aliases (`claude2`, `xclaude`, `xcodex`…) e põe o `bin/` no PATH
+(`orq`, `memory-ui`). Detalhes e o teto de RAM opcional em [claude-code.md](claude-code.md).
 
 ## 6. Subir o ai-memory
 

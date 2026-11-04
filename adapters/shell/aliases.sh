@@ -1,6 +1,12 @@
-# Aliases dos agentes. Carregue no rc do shell (bash ou zsh):
+# Aliases dos agentes e o bin/ do repositório no PATH. Carregue no rc do shell (bash ou zsh):
 #   . "$HOME/.ai-setup/adapters/shell/aliases.sh"
 # O que cada um faz e por quê: docs/claude-code.md.
+
+# bin/: orq, memory-ui, entrega-verifica, handoff-copia. Sem duplicar ao recarregar o rc.
+case ":$PATH:" in
+	*":$HOME/.ai-setup/bin:"*) ;;
+	*) PATH="$HOME/.ai-setup/bin:$PATH"; export PATH ;;
+esac
 
 # Conta 2 do Claude Code: ~/.claude2 compartilha tudo com ~/.claude, menos a identidade.
 # A conta 1 é o `claude` puro: CLAUDE_CONFIG_DIR=~/.claude trocaria ~/.claude.json por
