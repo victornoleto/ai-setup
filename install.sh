@@ -64,10 +64,13 @@ while IFS='	' read -r mode src dst; do
 		say "link  $dst"
 		;;
 	copy)
+		# A referência guarda @HOME@ no lugar do caminho do usuário; aqui vira o $HOME real.
+		# Destino que ainda é symlink (modo link antigo) vira arquivo, sem escrever na origem.
+		[ -L "$to" ] && rm "$to"
 		if [ ! -e "$to" ]; then
-			cp "$from" "$to"
+			sed "s|@HOME@|$HOME|g" "$from" > "$to"
 			say "copy  $dst (criado)"
-		elif ! cmp -s "$from" "$to"; then
+		elif ! sed "s|@HOME@|$HOME|g" "$from" | cmp -s - "$to"; then
 			say "difere $dst — a ferramenta reescreveu; resolva com doctor.sh"
 		fi
 		;;

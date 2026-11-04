@@ -33,4 +33,24 @@ instala "$t" && ok "com sync/MANIFEST: sai 0" || bad "com sync/MANIFEST: saiu co
 	&& ok "com sync/MANIFEST: o pessoal vence" || bad "com sync/MANIFEST: o público venceu"
 rm -rf "$t"
 
+# 3. copy com @HOME@: destino que era symlink vira arquivo renderizado; a origem não muda.
+t=$(novo)
+mkdir -p "$t/repo/sync/cfg" "$t/home/.cfg"
+echo '@HOME@/x' > "$t/repo/sync/cfg/f.txt"
+printf 'copy\tcfg/f.txt\t.cfg/f.txt\n' > "$t/repo/sync/MANIFEST"
+ln -s "$t/repo/sync/cfg/f.txt" "$t/home/.cfg/f.txt"
+instala "$t"
+[ ! -L "$t/home/.cfg/f.txt" ] && [ "$(cat "$t/home/.cfg/f.txt")" = "$t/home/x" ] \
+	&& ok "copy: renderiza @HOME@ e troca o link por arquivo" || bad "copy: destino não renderizado"
+[ "$(cat "$t/repo/sync/cfg/f.txt")" = '@HOME@/x' ] && ok "copy: origem intacta" || bad "copy: escreveu na origem"
+
+# 4. O "aceitar" do doctor devolve @HOME@ à origem.
+echo "$t/home/y" > "$t/home/.cfg/f.txt"
+touch -d '+1 min' "$t/home/.cfg/f.txt"
+aceitar=$(HOME="$t/home" sh "$t/repo/doctor.sh" 2>/dev/null | grep -A1 'Para aceitar' | tail -1 | sed 's/^nota *//')
+[ -n "$aceitar" ] && HOME="$t/home" sh -c "$aceitar"
+[ "$(cat "$t/repo/sync/cfg/f.txt")" = '@HOME@/y' ] \
+	&& ok "doctor: aceitar grava @HOME@" || bad "doctor: aceitar deixou caminho real ($(cat "$t/repo/sync/cfg/f.txt"))"
+rm -rf "$t"
+
 exit $falhas

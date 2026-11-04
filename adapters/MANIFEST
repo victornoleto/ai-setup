@@ -6,10 +6,12 @@
 # copy — a ferramenta reescreve o arquivo sozinha (/config, aprovação de hook).
 #        Um symlink sumiria em silêncio na primeira reescrita, então o destino é
 #        arquivo real e a cópia aqui serve de referência: doctor.sh acusa a diferença.
+#        Na cópia, @HOME@ vira o $HOME de quem instala.
+# sync/MANIFEST (pessoal, opcional) é lido antes; mesmo destino lá vence o daqui.
 link	claude/CLAUDE.md	.claude/CLAUDE.md
 link	codex/AGENTS.md	.codex/AGENTS.md
 link	codex/hooks/load-portable-memory.sh	.codex/hooks/load-portable-memory.sh
-link	opencode/opencode.jsonc	.config/opencode/opencode.jsonc
+copy	opencode/opencode.jsonc	.config/opencode/opencode.jsonc
 link	opencode/AGENTS.md	.config/opencode/AGENTS.md
 link	opencode/package.json	.config/opencode/package.json
 copy	claude/settings.json	.claude/settings.json
@@ -58,4 +60,4 @@ link	../skills/spec-review	.claude/skills/spec-review
 link	../skills/spec-review	.agents/skills/spec-review
 link	../skills/diagram-design	.claude/skills/diagram-design
 link	../skills/diagram-design	.agents/skills/diagram-design
-link	antigravity/skills.json	.gemini/config/skills.json
+copy	antigravity/skills.json	.gemini/config/skills.json

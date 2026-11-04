@@ -130,8 +130,8 @@ arquivo. Regra: quem grava é o dono, e o outro só confere.
 Na prática:
 
 1. **Depois de qualquer `ai-memory install-*`**: `sh doctor.sh`. O `settings.json` do Claude vai
-   acusar diferença, porque o instalador grava no vivo. Aceite com `cp ~/.claude/settings.json
-   adapters/claude/settings.json`, revise o diff e faça o commit. No Codex, aprove os hooks em
+   acusar diferença, porque o instalador grava no vivo. Aceite com o comando que o doctor
+   imprime (um `sed` que devolve `@HOME@` no lugar do seu `$HOME`), revise o diff e faça o commit. No Codex, aprove os hooks em
    `/hooks`.
 2. **Regra de comportamento nunca vai para o ai-memory.** Memória chega ao agente como evidência
    não-confiável: regra posta lá é ignorada por desenho. Regra global vai no `GLOBAL.md`, regra
@@ -147,7 +147,12 @@ Na prática:
 
 **`install.sh`** lê o `adapters/MANIFEST` e põe cada arquivo onde a ferramenta procura. Modo
 `link` cria symlink. Modo `copy` copia, porque a ferramenta reescreve o arquivo sozinha e um
-symlink sumiria na primeira reescrita. Arquivo real no caminho vira `<nome>.pre-ai-setup`.
+symlink sumiria na primeira reescrita; na cópia, `@HOME@` vira o seu `$HOME` (o repositório não
+guarda caminho de usuário). Arquivo real no caminho vira `<nome>.pre-ai-setup`.
+
+**`sync/MANIFEST`**, se existir, é lido antes e no mesmo formato, com origem relativa a `sync/`.
+É onde entram skills e arquivos pessoais: uma entrada com o mesmo destino de uma pública vale no
+lugar dela. Assim o repositório continua neutro e o que é seu fica no `sync/`.
 
 **`doctor.sh`** só verifica: symlinks, cópias iguais à referência, `machine.md` resolvendo,
 container do ai-memory healthy, memória nativa do Claude Code e do Codex **desligada**, skills sem
@@ -195,7 +200,7 @@ for a in claude-code codex open-code antigravity-cli; do
 done
 ai-memory install-mcp --client claude-code --apply
 ai-memory install-mcp --client codex --apply
-ai-memory install-mcp --client open-code --apply --config-file ~/.ai-setup/adapters/opencode/opencode.jsonc
+ai-memory install-mcp --client open-code --apply --config-file ~/.config/opencode/opencode.jsonc
 ai-memory install-mcp --client antigravity-cli --apply
 # Só com a segunda conta do Claude: o MCP mora no .claude.json, que é um por conta.
 ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json

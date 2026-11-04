@@ -486,7 +486,7 @@ claude2                                            # /login com a segunda conta,
   </ul>
   <div class="note">
     <span class="tag">Rotina</span>
-    <p>Rode depois de <strong>qualquer</strong> <code>ai-memory install-*</code>: o instalador grava no arquivo vivo e o <code>doctor.sh</code> aponta a diferença para você aceitar no repositório com um <code>cp</code> e um commit.</p>
+    <p>Rode depois de <strong>qualquer</strong> <code>ai-memory install-*</code>: o instalador grava no arquivo vivo e o <code>doctor.sh</code> aponta a diferença para você aceitar no repositório com o comando que ele imprime (um <code>sed</code> que devolve <code>@HOME@</code>) e um commit. A referência no repositório nunca guarda caminho de usuário: o <code>install.sh</code> troca <code>@HOME@</code> pelo <code>$HOME</code> real. O que é só seu vai num <code>sync/MANIFEST</code>, lido antes do público.</p>
   </div>
 
   <h3><span class="num">2.8</span> A fronteira entre os dois</h3>

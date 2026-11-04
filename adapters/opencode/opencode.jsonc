@@ -1,8 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
-    "$HOME/.ai-setup/sync/memory/GLOBAL.md",
-    "$HOME/.ai-setup/local/machine.md"
+    "@HOME@/.ai-setup/sync/memory/GLOBAL.md",
+    "@HOME@/.ai-setup/local/machine.md"
   ],
   "mcp": {
     "ai-memory": {
@@ -20,10 +20,10 @@
     },
     "read": {
       "*": "allow",
-      "$HOME/.claude/.credentials.json": "deny",
-      "$HOME/.codex/auth.json": "deny",
-      "$HOME/.gemini/oauth_creds.json": "deny",
-      "$HOME/.config/ai-memory/server.env": "deny"
+      "@HOME@/.claude/.credentials.json": "deny",
+      "@HOME@/.codex/auth.json": "deny",
+      "@HOME@/.gemini/oauth_creds.json": "deny",
+      "@HOME@/.config/ai-memory/server.env": "deny"
     }
   }
 }

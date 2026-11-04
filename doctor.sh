@@ -32,14 +32,14 @@ while IFS='	' read -r mode src dst; do
 		else bad "link  $dst não aponta para $rel — rode install.sh"; fi ;;
 	copy)
 		if [ ! -e "$to" ]; then bad "copy  $dst ausente — rode install.sh"
-		elif cmp -s "$from" "$to"; then ok "copy  $dst igual à referência"
+		elif sed "s|@HOME@|$HOME|g" "$from" | cmp -s - "$to"; then ok "copy  $dst igual à referência"
 		else
 			bad "copy  $dst difere de $rel"
 			if [ "$to" -nt "$from" ]; then
 				note "      o vivo é mais novo (a ferramenta reescreveu). Para aceitar:"
-				note "      cp \"$to\" \"$from\""
+				note "      sed \"s|\$HOME|@HOME@|g\" \"$to\" > \"$from\""
 			else
-				note "      a referência é mais nova. Para aplicar:  cp \"$from\" \"$to\""
+				note "      a referência é mais nova. Para aplicar:  sed \"s|@HOME@|\$HOME|g\" \"$from\" > \"$to\""
 			fi
 		fi ;;
 	esac
@@ -99,7 +99,7 @@ if [ -d "$HOME/.claude2" ]; then
 		|| bad "claude2: MCP ai-memory ausente — install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json"
 fi
 grep -q '^\[mcp_servers\.ai-memory\]' "$HOME/.codex/config.toml" && ok "codex: MCP ai-memory" || bad "codex: MCP ai-memory ausente"
-jq -e '.mcp["ai-memory"]' "$SETUP/adapters/opencode/opencode.jsonc" >/dev/null 2>&1 && ok "opencode: MCP ai-memory" || bad "opencode: MCP ai-memory ausente"
+jq -e '.mcp["ai-memory"]' "$HOME/.config/opencode/opencode.jsonc" >/dev/null 2>&1 && ok "opencode: MCP ai-memory" || bad "opencode: MCP ai-memory ausente"
 jq -e '.mcpServers["ai-memory"]' "$HOME/.gemini/config/mcp_config.json" >/dev/null 2>&1 && ok "agy: MCP ai-memory" || bad "agy: MCP ai-memory ausente"
 
 for t in claude/CLAUDE.md codex/AGENTS.md opencode/AGENTS.md; do
@@ -110,10 +110,11 @@ done
 # O Codex só roda hook aprovado, e a aprovação vale por posição no hooks.json: mexer no
 # arquivo desaprova tudo em silêncio (em `codex exec` aparece como "Failed").
 hooks_codex=$(jq '[.hooks[][].hooks[]] | length' "$HOME/.codex/hooks.json" 2>/dev/null || echo 0)
-aprovados=$(grep -c '^\[hooks\.state\."$HOME/\.codex/hooks\.json:' "$HOME/.codex/config.toml")
+hook_estado="^\\[hooks\\.state\\.\"$(printf %s "$HOME" | sed 's/\./\\./g')/\\.codex/hooks\\.json:"
+aprovados=$(grep -c "$hook_estado" "$HOME/.codex/config.toml")
 [ "$aprovados" -ge "$hooks_codex" ] && ok "codex: $aprovados/$hooks_codex hooks aprovados" \
 	|| bad "codex: só $aprovados/$hooks_codex hooks aprovados — abra codex e aprove em /hooks (sem isso, nem GLOBAL.md nem captura)"
-grep -A2 '^\[hooks\.state\."$HOME/\.codex/hooks\.json:' "$HOME/.codex/config.toml" | grep -q '^enabled = false' \
+grep -A2 "$hook_estado" "$HOME/.codex/config.toml" | grep -q '^enabled = false' \
 	&& bad "codex: hook desligado (enabled = false) em hooks.state" || true
 
 # O sandbox do Codex usa bubblewrap, que precisa de user namespace. O Ubuntu 24.04 bloqueia isso
@@ -157,8 +158,8 @@ if jq -e '.enabledPlugins | to_entries[] | select(.key|test("^(playwright|superp
 then bad "plugin substituído voltou a ligar no Claude (veja a regex acima)"
 else ok "sem MCP do Playwright nem plugins substituídos no Claude"; fi
 
-grep -Eq '^\[projects\."/home(/usuario)?"\]' "$HOME/.codex/config.toml" \
-	&& bad "Codex confia em /home ou $HOME inteiro" || ok "confiança do Codex sem /home"
+grep -Eq "^\\[projects\\.\"(/home|$HOME)\"\\]" "$HOME/.codex/config.toml" \
+	&& bad "Codex confia em /home ou no \$HOME inteiro" || ok "confiança do Codex sem /home"
 
 grep -rqs '\.orca' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" "$HOME/.gemini/config/hooks.json" \
 	&& bad "hook do Orca voltou" || ok "sem hooks do Orca"

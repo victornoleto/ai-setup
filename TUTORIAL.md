@@ -225,7 +225,12 @@ copy    claude/settings.json    .claude/settings.json
 **`link`** quando só você edita o arquivo. **`copy`** quando a ferramenta reescreve sozinha
 (`/config`, aprovação de hook, instalação de plugin): um symlink sumiria na primeira reescrita, e
 aí a cópia no repositório vira referência — o `doctor.sh` acusa a diferença e você decide qual
-lado vale.
+lado vale. A referência guarda `@HOME@` no lugar do caminho do usuário, e o `install.sh` troca pelo
+`$HOME` real.
+
+O que é só seu (skills pessoais, um `settings.json` diferente) vai num `sync/MANIFEST`, no mesmo
+formato e com origem relativa a `sync/`: ele é lido antes do público, e o mesmo destino fica com
+a entrada pessoal.
 
 ## 2.3 Instalar numa máquina nova
 
@@ -333,7 +338,8 @@ herdar confiança.
   perfil AppArmor, que está em `adapters/codex/apparmor/`).
 
 Rode depois de **qualquer** `ai-memory install-*`: o instalador grava no arquivo vivo e o
-`doctor.sh` vai apontar a diferença para você aceitar no repositório com um `cp` e um commit.
+`doctor.sh` vai apontar a diferença e imprimir o comando que a aceita no repositório (um `sed`
+que devolve `@HOME@`); depois, um commit.
 
 ## 2.8 A fronteira entre os dois
 

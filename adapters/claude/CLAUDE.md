@@ -1,5 +1,5 @@
-@$HOME/.ai-setup/sync/memory/GLOBAL.md
-@$HOME/.ai-setup/local/machine.md
+@~/.ai-setup/sync/memory/GLOBAL.md
+@~/.ai-setup/local/machine.md
 
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
