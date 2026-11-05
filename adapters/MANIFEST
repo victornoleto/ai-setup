@@ -25,39 +25,61 @@ copy	claude/settings.json	.claude/settings.json
 link	../sync/memory/GLOBAL.md	.gemini/GEMINI.md
 link	../local/machine.md	.gemini/AGENTS.md
 
+# Kiro CLI: lê todo ~/.kiro/steering/*.md e ~/.kiro/skills/<x>/SKILL.md, symlink inclusive; não lê
+# ~/.agents/skills (medido em 2026-11-05, kiro-cli 3.0.0, engine v3).
+link	../sync/memory/GLOBAL.md	.kiro/steering/global.md
+link	../local/machine.md	.kiro/steering/machine.md
+link	kiro/ai-memory.md	.kiro/steering/ai-memory.md
+
 # Skills nossas: fonte em skills/, um link por harness. ~/.agents/skills serve Codex e
 # OpenCode; o agy chega lá pelo skills.json. As ai-memory-* são do instalador do ai-memory.
 link	../skills/brainstorming	.claude/skills/brainstorming
 link	../skills/brainstorming	.agents/skills/brainstorming
+link	../skills/brainstorming	.kiro/skills/brainstorming
 link	../skills/systematic-debugging	.claude/skills/systematic-debugging
 link	../skills/systematic-debugging	.agents/skills/systematic-debugging
+link	../skills/systematic-debugging	.kiro/skills/systematic-debugging
 link	../skills/writing-plans	.claude/skills/writing-plans
 link	../skills/writing-plans	.agents/skills/writing-plans
+link	../skills/writing-plans	.kiro/skills/writing-plans
 link	../skills/test-driven-development	.claude/skills/test-driven-development
 link	../skills/test-driven-development	.agents/skills/test-driven-development
+link	../skills/test-driven-development	.kiro/skills/test-driven-development
 link	../skills/verification-before-completion	.claude/skills/verification-before-completion
 link	../skills/verification-before-completion	.agents/skills/verification-before-completion
+link	../skills/verification-before-completion	.kiro/skills/verification-before-completion
 link	../skills/receiving-code-review	.claude/skills/receiving-code-review
 link	../skills/receiving-code-review	.agents/skills/receiving-code-review
+link	../skills/receiving-code-review	.kiro/skills/receiving-code-review
 link	../skills/security-audit	.claude/skills/security-audit
 link	../skills/security-audit	.agents/skills/security-audit
+link	../skills/security-audit	.kiro/skills/security-audit
 # impeccable: o upstream gera uma variante por harness (caminhos e `/` vs `$` diferem).
 link	../skills/impeccable-claude	.claude/skills/impeccable
 link	../skills/impeccable	.agents/skills/impeccable
+link	../skills/impeccable	.kiro/skills/impeccable
 link	../skills/entrega	.claude/skills/entrega
 link	../skills/entrega	.agents/skills/entrega
+link	../skills/entrega	.kiro/skills/entrega
 link	../skills/handoff	.claude/skills/handoff
 link	../skills/handoff	.agents/skills/handoff
+link	../skills/handoff	.kiro/skills/handoff
 link	../skills/orq-setup	.claude/skills/orq-setup
 link	../skills/orq-setup	.agents/skills/orq-setup
+link	../skills/orq-setup	.kiro/skills/orq-setup
 link	../skills/writing-for-agents	.claude/skills/writing-for-agents
 link	../skills/writing-for-agents	.agents/skills/writing-for-agents
+link	../skills/writing-for-agents	.kiro/skills/writing-for-agents
 link	../skills/wizard	.claude/skills/wizard
 link	../skills/wizard	.agents/skills/wizard
+link	../skills/wizard	.kiro/skills/wizard
 link	../skills/retro	.claude/skills/retro
 link	../skills/retro	.agents/skills/retro
+link	../skills/retro	.kiro/skills/retro
 link	../skills/spec-review	.claude/skills/spec-review
 link	../skills/spec-review	.agents/skills/spec-review
+link	../skills/spec-review	.kiro/skills/spec-review
 link	../skills/diagram-design	.claude/skills/diagram-design
 link	../skills/diagram-design	.agents/skills/diagram-design
+link	../skills/diagram-design	.kiro/skills/diagram-design
 copy	antigravity/skills.json	.gemini/config/skills.json
