@@ -29,6 +29,7 @@ Fatos verdadeiros só desta máquina. O \`GLOBAL.md\` carrega o que vale em qual
 TPL
 		say "criado $target — preencha antes de confiar nele"
 	fi
+	mkdir -p "$SETUP/local"   # ignorado pelo git: não existe num clone novo
 	ln -sfn "../sync/memory/machine/$host.md" "$SETUP/local/machine.md"
 	say "local/machine.md -> machine/$host.md"
 fi

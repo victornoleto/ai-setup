@@ -11,7 +11,7 @@ novo() {
 	t=$(mktemp -d)
 	mkdir -p "$t/repo" "$t/home"
 	tar -C "$REPO" --exclude=./.git --exclude=./sync --exclude=./local -cf - . | tar -C "$t/repo" -xf -
-	mkdir -p "$t/repo/sync/memory/machine" "$t/repo/local"
+	mkdir -p "$t/repo/sync/memory/machine"
 	echo '# global' > "$t/repo/sync/memory/GLOBAL.md"
 	echo "$t"
 }
