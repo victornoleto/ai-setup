@@ -65,4 +65,14 @@ done
 [ -d "$t/home/.kiro/skills/brainstorming.pre-ai-setup" ] && ok "kiro: diretório real guardado" || bad "kiro: diretório real perdido"
 rm -rf "$t"
 
+# 6. doctor: Kiro presente sem hooks acusa; Kiro ausente não acusa.
+t=$(novo)
+instala "$t"
+mkdir -p "$t/bin" && printf '#!/bin/sh\n' > "$t/bin/kiro-cli" && chmod +x "$t/bin/kiro-cli"
+HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro: hooks' \
+	&& ok "doctor: kiro sem hooks acusa" || bad "doctor: kiro sem hooks passou"
+HOME="$t/home" PATH="/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro' \
+	&& bad "doctor: acusou kiro sem kiro-cli" || ok "doctor: sem kiro-cli, sem FALHA do kiro"
+rm -rf "$t"
+
 exit $falhas

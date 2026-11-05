@@ -101,8 +101,17 @@ fi
 grep -q '^\[mcp_servers\.ai-memory\]' "$HOME/.codex/config.toml" && ok "codex: MCP ai-memory" || bad "codex: MCP ai-memory ausente"
 jq -e '.mcp["ai-memory"]' "$HOME/.config/opencode/opencode.jsonc" >/dev/null 2>&1 && ok "opencode: MCP ai-memory" || bad "opencode: MCP ai-memory ausente"
 jq -e '.mcpServers["ai-memory"]' "$HOME/.gemini/config/mcp_config.json" >/dev/null 2>&1 && ok "agy: MCP ai-memory" || bad "agy: MCP ai-memory ausente"
+# Kiro CLI (opcional): só confere onde ele está instalado.
+if command -v kiro-cli >/dev/null 2>&1; then
+	grep -q '"ai-memory' "$HOME/.kiro/hooks/ai-memory.json" 2>/dev/null && ok "kiro: hooks do ai-memory" \
+		|| bad "kiro: hooks do ai-memory ausentes — install-hooks --agent kiro-cli-v3 --project-strategy repo-root --apply"
+	jq -e '.mcpServers["ai-memory"]' "$HOME/.kiro/settings/mcp.json" >/dev/null 2>&1 && ok "kiro: MCP ai-memory" \
+		|| bad "kiro: MCP ai-memory ausente — install-mcp --client kiro-cli --apply"
+else
+	note "kiro-cli ausente: Kiro não conferido"
+fi
 
-for t in claude/CLAUDE.md codex/AGENTS.md opencode/AGENTS.md; do
+for t in claude/CLAUDE.md codex/AGENTS.md opencode/AGENTS.md kiro/ai-memory.md; do
 	grep -q '<!-- ai-memory:start -->' "$SETUP/adapters/$t" && ok "bloco ai-memory em $t" \
 		|| bad "bloco ai-memory ausente em $t — install-instructions --target (arquivo real)"
 done
@@ -128,7 +137,7 @@ fi
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
 # lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.
-for f in "$HOME/.claude.json" "$HOME/.claude2/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.gemini/config/mcp_config.json"; do
+for f in "$HOME/.claude.json" "$HOME/.claude2/.claude.json" "$HOME/.codex/config.toml" "$HOME/.config/opencode/opencode.jsonc" "$HOME/.gemini/config/mcp_config.json" "$HOME/.kiro/settings/mcp.json"; do
 	[ -f "$f" ] || continue
 	if grep -qE 'github_pat_|gh[pousr]_[A-Za-z0-9]{20,}|sk-ant-|sk-or-v1-' "$f"; then bad "token em texto puro em ${f#"$HOME"/}"
 	else ok "sem token em texto puro: ${f#"$HOME"/}"; fi
