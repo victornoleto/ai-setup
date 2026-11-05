@@ -98,24 +98,21 @@ no mesmo worktree. `--retry` exige o nome exato da tarefa e arquiva seus relató
 
 ## Painel
 
-```
-orq · public-links · 1/3 tarefas · motor rodando · 00:27:41 · termina ~12:05 · US$ 3.10 estimado
-TAREFAS                                  │ STREAM
-✓ 01-seeder  ok · 00:12:08 · US$ 1.20    │   [plan] › $ git branch --show-current
-▶ 02-command  executando c2 · 00:04:11   │   [plan] › Read api/app/Core/Support/UrlHelper.php
-· 03-coordenadas  pendente               │   [exec-2-1131] › Edit api/app/…
-TIMELINE  (enter: detalhe)               │   [exec-2-1131] ✗ Exit code 1 …
-11:18 ▶ 01-seeder começou                │
-11:31 [DECISÃO 2 pts] 01-seeder: …       │
-11:40 ✓ 01-seeder terminou: ok (12 min)  │
-> /note use o formato em cache           │
-```
+![Painel do orq: tarefas com estado, duração, custo e diff à esquerda; timeline embaixo; stream das sessões à direita](img/orq-painel.png)
 
 - O motor roda desanexado: **`q`** (ou `ctrl+q`) fecha o painel e a execução continua; `orq attach` reabre.
 - Estado por glifo e texto, sem depender de cor: `✓` ok, `▶` rodando, `⏸` pausada, `·` pendente, `✗` falhou,
   `⊘` pulada.
-- **enter** num item da timeline abre o detalhe. Numa decisão, mostra os votos e as justificativas, com um botão
-  para trocar a escolha.
+- **enter** (ou clique) numa tarefa abre o histórico dela: arquivos alterados, o fluxo de ciclos (plano → execução
+  → verificação → revisão), onde foi o tempo de cada fase, as pendências e o custo por papel.
+
+  ![Detalhe de uma tarefa: diff por arquivo, fluxo dos ciclos com tempo por fase, pendências e custo](img/orq-detalhe-tarefa.png)
+
+- **enter** num item da timeline abre o detalhe. Numa revisão reprovada, mostra por que voltou: o resumo do
+  planejador e uma tabela com severidade, onde, o quê e a correção pedida. Numa decisão, mostra os votos e as
+  justificativas, com um botão para trocar a escolha.
+
+  ![Detalhe de uma revisão reprovada: resumo do planejador e tabela de problemas com severidade e correção](img/orq-revisao-reprovada.png)
 - Abaixo de 120 colunas, as metades alternam com **`ctrl+t`**. **`esc`** sai do chat, **`i`** volta a ele;
   fora do chat, `p` pausa ou continua e `f` liga ou desliga o seguimento do stream.
 
