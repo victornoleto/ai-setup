@@ -103,6 +103,9 @@ jq -e '.mcp["ai-memory"]' "$HOME/.config/opencode/opencode.jsonc" >/dev/null 2>&
 jq -e '.mcpServers["ai-memory"]' "$HOME/.gemini/config/mcp_config.json" >/dev/null 2>&1 && ok "agy: MCP ai-memory" || bad "agy: MCP ai-memory ausente"
 # Kiro CLI (opcional): só confere onde ele está instalado.
 if command -v kiro-cli >/dev/null 2>&1; then
+	# Os hooks são da engine v3; o padrão do kiro-cli 3.x ainda é a v2, que não os dispara.
+	[ "$(jq -r '."chat.agentEngine" // empty' "$HOME/.kiro/settings/cli.json" 2>/dev/null)" = v3 ] && ok "kiro: engine v3" \
+		|| bad "kiro: engine padrão não é v3 (hooks do ai-memory não disparam) — kiro-cli settings chat.agentEngine v3"
 	grep -q '"ai-memory' "$HOME/.kiro/hooks/ai-memory.json" 2>/dev/null && ok "kiro: hooks do ai-memory" \
 		|| bad "kiro: hooks do ai-memory ausentes — install-hooks --agent kiro-cli-v3 --project-strategy repo-root --apply"
 	jq -e '.mcpServers["ai-memory"]' "$HOME/.kiro/settings/mcp.json" >/dev/null 2>&1 && ok "kiro: MCP ai-memory" \

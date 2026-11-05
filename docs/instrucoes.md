@@ -40,7 +40,7 @@ Nenhuma depende de o modelo lembrar de ler algo: cada uma usa o mecanismo nativo
 | Codex | hook `SessionStart` (em `~/.codex/hooks.json`) que imprime os dois arquivos | não tem `@import` nem lista de instruções |
 | OpenCode | lista `instructions` no `opencode.jsonc` | nativo |
 | agy | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais (medido; `context.fileName` com lista maior não surte efeito) |
-| Kiro CLI | `~/.kiro/steering/{global,machine,ai-memory}.md` por link | lê todo `.md` do steering global, symlink inclusive (medido em 2026-11-05, 3.0.0) |
+| Kiro CLI | `~/.kiro/steering/{global,machine,ai-memory}.md` por link | lê todo `.md` do steering global, symlink inclusive, nas engines v2 e v3 (medido em 2026-11-05, 3.0.0) |
 
 A ligação com o ai-memory (hooks, MCP, bloco `<!-- ai-memory:start -->`) é gravada pelo próprio
 `ai-memory install-*`, não por este repositório: ver [ai-memory.md](ai-memory.md#9-quem-é-dono-de-quê).

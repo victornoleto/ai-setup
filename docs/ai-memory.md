@@ -70,8 +70,9 @@ partir de `~`**, nunca de dentro de um repositório:
 for a in claude-code codex open-code antigravity-cli; do
   ai-memory install-hooks --agent $a --project-strategy repo-root --apply
 done
-# Kiro CLI, engine v3 (a padrão da 3.x; na engine v2 o agente é `kiro-cli`):
+# Kiro CLI: hooks da engine v3. O padrão do kiro-cli 3.x ainda é a v2, que não os dispara:
 ai-memory install-hooks --agent kiro-cli-v3 --project-strategy repo-root --apply
+kiro-cli settings chat.agentEngine v3
 
 ai-memory install-mcp --client claude-code --apply
 ai-memory install-mcp --client codex --apply
@@ -178,6 +179,10 @@ O `doctor.sh` confere as três pontas em cada ferramenta: hooks, MCP e instruç�
 
 ## 10. Pegadinhas que só aparecem com o tempo
 
+- **Kiro 3.x roda a engine v2 por padrão** (`chat.agentEngine` vazio = v2). Steering e skills funcionam nas
+  duas, mas os hooks `kiro-cli-v3` só disparam na v3: sem `kiro-cli settings chat.agentEngine v3`, nada é
+  capturado e o handoff não chega. O `ai-memory doctor` mostra isso como sessões locais sem captura; o
+  `doctor.sh` acusa `kiro: engine padrão não é v3`.
 - **Codex só roda hook aprovado, e a aprovação é por posição.** Mexer no `hooks.json` renumera as entradas e
   derruba a confiança de todas, em silêncio; em `codex exec` elas viram `Failed`. Reaprovar em `codex` →
   `/hooks`. Isso já deixou o Codex sem captura e sem as instruções globais por dias.

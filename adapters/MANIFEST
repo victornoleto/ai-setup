@@ -26,7 +26,7 @@ link	../sync/memory/GLOBAL.md	.gemini/GEMINI.md
 link	../local/machine.md	.gemini/AGENTS.md
 
 # Kiro CLI: lê todo ~/.kiro/steering/*.md e ~/.kiro/skills/<x>/SKILL.md, symlink inclusive; não lê
-# ~/.agents/skills (medido em 2026-11-05, kiro-cli 3.0.0, engine v3).
+# ~/.agents/skills (medido em 2026-11-05, kiro-cli 3.0.0, engines v2 e v3).
 link	../sync/memory/GLOBAL.md	.kiro/steering/global.md
 link	../local/machine.md	.kiro/steering/machine.md
 link	kiro/ai-memory.md	.kiro/steering/ai-memory.md

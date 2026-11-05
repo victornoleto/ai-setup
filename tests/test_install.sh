@@ -71,6 +71,8 @@ instala "$t"
 mkdir -p "$t/bin" && printf '#!/bin/sh\n' > "$t/bin/kiro-cli" && chmod +x "$t/bin/kiro-cli"
 HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro: hooks' \
 	&& ok "doctor: kiro sem hooks acusa" || bad "doctor: kiro sem hooks passou"
+HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro: engine' \
+	&& ok "doctor: kiro sem engine v3 acusa" || bad "doctor: kiro sem engine v3 passou"
 HOME="$t/home" PATH="/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro' \
 	&& bad "doctor: acusou kiro sem kiro-cli" || ok "doctor: sem kiro-cli, sem FALHA do kiro"
 rm -rf "$t"
