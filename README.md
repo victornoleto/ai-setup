@@ -1,7 +1,7 @@
 # ai-setup
 
-As instruções que valem em toda sessão de agente, e a fiação que as leva a cada ferramenta. Quatro ferramentas
-usam isto: **Claude Code**, **Codex**, **OpenCode** e **Antigravity CLI** (`agy`).
+As instruções que valem em toda sessão de agente, e a fiação que as leva a cada ferramenta. Cinco ferramentas
+usam isto: **Claude Code**, **Codex**, **OpenCode**, **Antigravity CLI** (`agy`) e **Kiro CLI**.
 
 A ideia: **cada coisa tem um dono só**, e um script diz quando algo saiu do lugar. Regra vai para instrução,
 história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memory)).
@@ -11,7 +11,7 @@ história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memo
 | Funcionalidade | Doc |
 |---|---|
 | **orq**: fila de tarefas sem supervisão. Opus planeja e revisa, Sonnet executa, as dúvidas vão a um conselho, e você só é chamado quando precisa | [docs/orq.md](docs/orq.md) |
-| **Instruções**: um `GLOBAL.md` e um `machine.md` que chegam às quatro ferramentas pelo mecanismo nativo de cada uma | [docs/instrucoes.md](docs/instrucoes.md) |
+| **Instruções**: um `GLOBAL.md` e um `machine.md` que chegam às cinco ferramentas pelo mecanismo nativo de cada uma | [docs/instrucoes.md](docs/instrucoes.md) |
 | **ai-memory**: memória de longo prazo compartilhada entre as ferramentas, e as escolhas para ele conviver com este repositório | [docs/ai-memory.md](docs/ai-memory.md) |
 | **sync/**: seus arquivos pessoais e de empresa num repositório privado, sobrepostos a este na instalação | [docs/sync.md](docs/sync.md) |
 | **Claude Code**: duas contas logadas ao mesmo tempo, aliases (`claude2`, `xclaude`…) e teto de RAM | [docs/claude-code.md](docs/claude-code.md) |
@@ -43,7 +43,8 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   ├── codex/             AGENTS.md, hook SessionStart, perfil AppArmor
 │   ├── opencode/          opencode.jsonc, AGENTS.md
 │   ├── antigravity/       skills.json
-│   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy
+│   ├── kiro/              ai-memory.md (steering)
+│   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy, xkiro
 ├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
 ├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia
 ├── orq/                   o motor do orq e seus testes
@@ -69,7 +70,7 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 
 ## Resultado
 
-- Uma memória só, que as quatro ferramentas escrevem e leem, com busca reordenada por LLM.
-- Uma fonte só de comportamento, que chega às quatro do mesmo jeito.
+- Uma memória só, que as cinco ferramentas escrevem e leem, com busca reordenada por LLM.
+- Uma fonte só de comportamento, que chega às cinco do mesmo jeito.
 - Contexto fixo por sessão do Claude caiu de ~18 KB para ~9 KB ao trocar plugin por skill.
 - Filas inteiras de tarefas rodando sem supervisão, com revisão e conselho, e o `git push` com você.

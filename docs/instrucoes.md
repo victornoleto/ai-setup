@@ -1,7 +1,7 @@
 # Instruções: como cada agente sabe quem você é
 
 O núcleo deste repositório: um lugar só para as instruções que valem em toda sessão, e a fiação que as leva às
-quatro ferramentas (Claude Code, Codex, OpenCode e Antigravity CLI, `agy`).
+cinco ferramentas (Claude Code, Codex, OpenCode, Antigravity CLI `agy` e Kiro CLI).
 
 ## Instrução contra memória
 
@@ -40,6 +40,7 @@ Nenhuma depende de o modelo lembrar de ler algo: cada uma usa o mecanismo nativo
 | Codex | hook `SessionStart` (em `~/.codex/hooks.json`) que imprime os dois arquivos | não tem `@import` nem lista de instruções |
 | OpenCode | lista `instructions` no `opencode.jsonc` | nativo |
 | agy | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais (medido; `context.fileName` com lista maior não surte efeito) |
+| Kiro CLI | `~/.kiro/steering/{global,machine,ai-memory}.md` por link | lê todo `.md` do steering global, symlink inclusive (medido em 2026-11-05, 3.0.0) |
 
 A ligação com o ai-memory (hooks, MCP, bloco `<!-- ai-memory:start -->`) é gravada pelo próprio
 `ai-memory install-*`, não por este repositório: ver [ai-memory.md](ai-memory.md#9-quem-é-dono-de-quê).
@@ -99,7 +100,7 @@ link vira `<nome>.pre-ai-setup`. Também monta a conta 2 do Claude, se `~/.claud
 
 - **Fiação:** cada link aponta para o repositório; cada `copy` bate com a referência; `machine.md` resolve;
   conta 2 com os links inteiros.
-- **ai-memory:** container healthy; hooks, MCP e instrução presentes nas quatro ferramentas; memória nativa do
+- **ai-memory:** container healthy; hooks, MCP e instrução presentes nas cinco ferramentas (o Kiro, só se `kiro-cli` estiver instalado); memória nativa do
   Claude e do Codex desligada.
 - **Núcleo:** nenhuma skill duplicada; plugins substituídos continuam desligados; hooks do Codex aprovados;
   tamanho do `GLOBAL.md`; idade das skills copiadas.

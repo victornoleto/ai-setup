@@ -20,6 +20,7 @@ O `install.sh` lembra dessa linha enquanto ela faltar, e o `doctor.sh` confere.
 | `xclaude2` | o mesmo, na conta 2 | 2 |
 | `xcodex` | `codex --yolo` | — |
 | `xagy` | `agy --dangerously-skip-permissions` | — |
+| `xkiro` | `kiro-cli chat --trust-all-tools` | — |
 
 Os `x*` não pedem permissão a cada ferramenta. Use em repositório onde você confia no que o agente vai fazer;
 o `git push` continua com você (e, no [orq](orq.md), bloqueado).

@@ -5,7 +5,7 @@ própria: [README](https://github.com/akitaonrails/ai-memory#readme),
 [instalação por agente](https://github.com/akitaonrails/ai-memory/blob/main/docs/install.md) e
 [atualização](https://github.com/akitaonrails/ai-memory/blob/main/docs/install.md#keeping-ai-memory-up-to-date).
 Este doc cobre só a **adequação**: as escolhas feitas para ele conviver com este repositório (servidor em
-Docker com chaves fora de qualquer repo, quatro ferramentas, duas contas do Claude) e as pegadinhas que
+Docker com chaves fora de qualquer repo, cinco ferramentas, duas contas do Claude) e as pegadinhas que
 apareceram no caminho.
 
 Por que ele existe aqui: **regra vai para instrução, história vai para memória** (ver
@@ -17,7 +17,7 @@ Versão em uso: **3.4.2** (servidor e cliente).
 ## 1. Antes de começar
 
 - Docker, `jq` e `git`.
-- Pelo menos um harness instalado (Claude Code, Codex, OpenCode ou `agy`).
+- Pelo menos um harness instalado (Claude Code, Codex, OpenCode, `agy` ou Kiro CLI).
 - Uma chave de LLM. Aqui é OpenRouter com `z-ai/glm-5.3-flash`: o servidor usa o LLM para consolidar
   sessões e para reordenar resultados de busca. Sem chave, a busca por texto continua funcionando.
 
@@ -70,11 +70,14 @@ partir de `~`**, nunca de dentro de um repositório:
 for a in claude-code codex open-code antigravity-cli; do
   ai-memory install-hooks --agent $a --project-strategy repo-root --apply
 done
+# Kiro CLI, engine v3 (a padrão da 3.x; na engine v2 o agente é `kiro-cli`):
+ai-memory install-hooks --agent kiro-cli-v3 --project-strategy repo-root --apply
 
 ai-memory install-mcp --client claude-code --apply
 ai-memory install-mcp --client codex --apply
 ai-memory install-mcp --client open-code --apply --config-file ~/.config/opencode/opencode.jsonc
 ai-memory install-mcp --client antigravity-cli --apply
+ai-memory install-mcp --client kiro-cli --apply
 # Só com a segunda conta do Claude (claude-code.md): o MCP mora no .claude.json, um por conta.
 ai-memory install-mcp --client claude-code --apply --config-file ~/.claude2/.claude.json
 
@@ -85,6 +88,9 @@ for t in codex opencode; do
   ai-memory install-instructions --compact --skills-scope global --skills-agent agents \
     --target ~/.ai-setup/adapters/$t/AGENTS.md
 done
+# Kiro: o bloco vira um arquivo de steering; ele não lê ~/.agents/skills, então as ai-memory-* vão para o dele.
+ai-memory install-instructions --compact --skills-scope global --skills-target-dir ~/.kiro/skills \
+  --target ~/.ai-setup/adapters/kiro/ai-memory.md
 ```
 
 Depois: `sh ~/.ai-setup/doctor.sh`. O instalador grava no `~/.claude/settings.json` vivo; o doctor acusa a
@@ -163,9 +169,9 @@ grava é o dono, e o outro só confere.
 | Trecho | Dono | Como muda |
 |---|---|---|
 | Entradas de hook (`native-runner/ai-memory hook --event …`) | ai-memory | `install-hooks --apply` |
-| Servidor MCP `ai-memory` nos quatro configs e no `~/.claude2/.claude.json` | ai-memory | `install-mcp --apply` |
-| Bloco `<!-- ai-memory:start/end -->` nos adaptadores | ai-memory | `install-instructions` (arquivo real) |
-| Skills `ai-memory-*` e plugin `opencode/plugins/ai-memory.ts` | ai-memory | `install-instructions` / `install-hooks` |
+| Servidor MCP `ai-memory` nos configs das ferramentas e no `~/.claude2/.claude.json` | ai-memory | `install-mcp --apply` |
+| Bloco `<!-- ai-memory:start/end -->` nos adaptadores (no Kiro, `adapters/kiro/ai-memory.md`) | ai-memory | `install-instructions` (arquivo real) |
+| Skills `ai-memory-*` (também em `~/.kiro/skills`), plugin `opencode/plugins/ai-memory.ts` e `~/.kiro/hooks/ai-memory.json` | ai-memory | `install-instructions` / `install-hooks` |
 | Todo o resto | ai-setup | editar em `~/.ai-setup` e rodar `install.sh` |
 
 O `doctor.sh` confere as três pontas em cada ferramenta: hooks, MCP e instrução de uso.

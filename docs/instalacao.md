@@ -14,7 +14,7 @@ ai-memory. Juntos, a conta fecha assim:
 ## 1. Pré-requisitos
 
 - `git`, `jq` e Docker (este para o ai-memory).
-- Pelo menos um harness: Claude Code, Codex, OpenCode ou Antigravity CLI (`agy`).
+- Pelo menos um harness: Claude Code, Codex, OpenCode, Antigravity CLI (`agy`) ou Kiro CLI.
 - `gh` com login (`gh auth login`): é por ele que os agentes falam com o GitHub ([seguranca.md](seguranca.md)).
 
 ## 2. Clonar os dois repositórios
@@ -58,7 +58,7 @@ Abra um terminal novo. A linha traz os aliases (`claude2`, `xclaude`, `xcodex`�
 
 ## 6. Subir o ai-memory
 
-Servidor em Docker, chaves fora de qualquer repositório, hooks e MCP nas quatro ferramentas:
+Servidor em Docker, chaves fora de qualquer repositório, hooks e MCP nas cinco ferramentas:
 [ai-memory.md](ai-memory.md), seções 1 a 7.
 
 ## 7. Segunda conta do Claude (opcional)

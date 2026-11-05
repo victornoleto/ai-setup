@@ -1,11 +1,11 @@
 # Skills: comportamento numa fonte só
 
 Comportamento mora no `GLOBAL.md` e em [`skills/`](../skills/), não em plugin. Plugin só existe em parte das
-ferramentas e injeta texto em toda sessão; skill vale nas quatro e só entra no contexto quando o modelo decide
+ferramentas e injeta texto em toda sessão; skill vale nas cinco e só entra no contexto quando o modelo decide
 carregar (a descrição dela fica no contexto; o corpo, só quando usada).
 
 Onde cada ferramenta acha as skills: Claude em `~/.claude/skills`, Codex e OpenCode em `~/.agents/skills`,
-agy pelo `~/.gemini/config/skills.json`. Uma fonte em `skills/`, um link por diretório, criados pelo
+agy pelo `~/.gemini/config/skills.json`, Kiro em `~/.kiro/skills` (ele não lê `~/.agents/skills`). Uma fonte em `skills/`, um link por diretório, criados pelo
 `install.sh` a partir do `adapters/MANIFEST`.
 
 ## As skills deste repositório
@@ -56,7 +56,7 @@ Resultado aqui: o contexto fixo por sessão do Claude caiu de ~18 KB para ~9 KB.
 **Plugins que ficam no Claude:** só `commit-commands`. Saíram, por repetirem o que já existe: `superpowers`
 (skills copiadas), `frontend-design` (`impeccable`), `code-review` e `code-simplifier` (`/code-review` e
 `/simplify` nativos), `claude-md-management` (regra mora no `GLOBAL.md`, fato no ai-memory) e
-`security-guidance` (`security-audit` cobre nas quatro ferramentas). O `doctor.sh` acusa se algum voltar a
+`security-guidance` (`security-audit` cobre nas cinco ferramentas). O `doctor.sh` acusa se algum voltar a
 ligar.
 
 ## Pegadinhas
