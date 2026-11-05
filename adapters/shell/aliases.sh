@@ -24,4 +24,5 @@ alias xclaude="${_ai_slice}claude --dangerously-skip-permissions"
 alias xclaude2="CLAUDE_CONFIG_DIR=\$HOME/.claude2 ${_ai_slice}claude --dangerously-skip-permissions"
 alias xcodex='codex --yolo'
 alias xagy='agy --dangerously-skip-permissions'
+alias xkiro='kiro-cli chat --trust-all-tools'
 unset _ai_slice
