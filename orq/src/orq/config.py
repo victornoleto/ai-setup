@@ -12,7 +12,7 @@ from pathlib import Path
 ORQ_HOME = Path(os.environ.get("ORQ_HOME") or Path(__file__).resolve().parents[2])
 
 ROLES = ("planner", "executor", "reviewer", "voter", "tiebreak", "operator", "wizard")
-HARNESSES = ("claude", "codex", "opencode", "fake")
+HARNESSES = ("claude", "codex", "opencode", "kiro", "fake")
 
 # Nome legado (queue.conf / ambiente) → caminho no TOML.
 _LEGACY = {

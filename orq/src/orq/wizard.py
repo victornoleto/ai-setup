@@ -13,7 +13,7 @@ from . import config, harness as harness_mod
 from .context import title
 from .engine import render
 
-BIN = {"claude": "claude", "codex": "codex", "opencode": "opencode"}
+BIN = {"claude": "claude", "codex": "codex", "opencode": "opencode", "kiro": "kiro-cli"}
 BIG_TASK = 6000
 
 

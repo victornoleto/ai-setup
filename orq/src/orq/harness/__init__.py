@@ -15,6 +15,9 @@ def make(name: str, base_dir: Path | None = None) -> Harness:
     if name == "opencode":
         from .opencode import OpencodeHarness
         return OpencodeHarness()
+    if name == "kiro":
+        from .kiro import KiroHarness
+        return KiroHarness()
     if name == "fake":
         from .fake import FakeHarness
         return FakeHarness(base_dir)

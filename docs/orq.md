@@ -19,7 +19,7 @@ com papéis separados:
 | operador | o chat do painel: lê seu texto livre e propõe comandos | Claude Sonnet 5, effort medium |
 | wizard | o `orq new`: monta a fila com você, em sessão interativa | Claude Opus 5.5 |
 
-Cada papel escolhe harness e modelo: **claude**, **codex** ou **opencode** (e, por ele, OpenRouter).
+Cada papel escolhe harness e modelo: **claude**, **codex**, **opencode** (e, por ele, OpenRouter) ou **kiro**.
 
 O ciclo de uma tarefa:
 
@@ -179,9 +179,9 @@ O global fica em [`orq/orq.toml`](../orq/orq.toml). A fila repete só o que muda
 
 ```toml
 [roles.executor]                 # planner, executor, reviewer, voter (count), tiebreak, operator, wizard
-harness = "codex"                # claude | codex | opencode
-model = "gpt-5.6-sol"            # opencode: "provedor/modelo", ex. "openrouter/~deepseek/deepseek-v4-flash-latest"
-effort = "high"                  # claude: low…max · codex: minimal…high · opencode: --variant
+harness = "codex"                # claude | codex | opencode | kiro
+model = "gpt-5.6-sol"            # opencode: "provedor/modelo", ex. "openrouter/~deepseek/deepseek-v4-flash-latest" · kiro: nome do `kiro-cli chat --list-models`, ex. "claude-opus-5.5"
+effort = "high"                  # claude e kiro: low…max · codex: minimal…high · opencode: --variant
 
 [verify]
 command = "make test"            # vazio = desligado; roda via sh -c na raiz do repo, sem push
@@ -207,6 +207,9 @@ O `queue.conf` das filas antigas continua sendo lido: `ORQ_ACCOUNT`, `ORQ_RULES_
 | claude | `claude -p --output-format stream-json` | `--json-schema` | `--permission-mode plan` / `--dangerously-skip-permissions` |
 | codex | `codex exec --json` | `--output-schema` | `-s read-only` / `--dangerously-bypass-approvals-and-sandbox` |
 | opencode | `opencode run --format json` | schema no prompt + validação | `--agent plan` / `--auto` |
+| kiro | `kiro-cli chat --no-interactive --output-format stream-json` (prompt no stdin, retomada com `--resume-id`) | schema no prompt + validação | `--trust-tools=` só de leitura / `--trust-all-tools` |
+
+No kiro o gasto vem em créditos, não em US$: aparece no painel e em `calls/NOME.json`, e não entra no `max_run_cost`.
 
 ## Run dir
 

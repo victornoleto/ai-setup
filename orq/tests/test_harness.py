@@ -1,7 +1,7 @@
 import json
 import os
 
-from orq.harness import claude, codex, opencode
+from orq.harness import claude, codex, kiro, opencode
 from orq.harness.base import classify
 
 from .conftest import FIXTURES
@@ -125,3 +125,74 @@ async def test_codex_turn_failed_com_error_em_texto(tmp_path, monkeypatch):
                       calls_dir=tmp_path, read_only=False, session_id=None, resume=False, timeout=10)
     res = await codex.CodexHarness().call(req, lambda line: None)
     assert res.error == "fatal" and "falhou em texto" in res.message
+
+
+def _kiro_req(tmp_path, **kw):
+    from orq.config import Role
+    from orq.harness.base import CallRequest
+    base = dict(role=Role("executor", "kiro", "claude-sonnet-5.5", "high"), name="n", prompt="p",
+                schema={"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}},
+                cwd=tmp_path, calls_dir=tmp_path, read_only=False, session_id=None, resume=False, timeout=10)
+    return CallRequest(**{**base, **kw})
+
+
+def _kiro_chunk(kind, text):
+    return {"type": "sessionUpdate", "data": {"sessionId": "s", "update": {"sessionUpdate": kind,
+                                                                           "content": {"type": "text", "text": text}}}}
+
+
+def test_kiro_stream():
+    view = kiro.Stream()
+    shown = lines(FIXTURES / "kiro.jsonl", view.render)
+    assert shown == ["› $ ls", "› Read /repo/a.txt", "› Edit /repo/b.txt", "· 0,03 créditos"]
+    assert view.message == '{"a": "conteudo-a"}' and round(view.credits, 2) == 0.03
+    v = kiro.Stream()
+    evs = [_kiro_chunk("agent_thought_chunk", "pensa"), _kiro_chunk("agent_message_chunk", "Pronto.\n```json\n{\"a\": 1}"),
+           _kiro_chunk("agent_message_chunk", "\n```"), {"type": "runFinished", "data": {}}]
+    assert sum((v.render(e, True) for e in evs), []) == ["(pensando) pensa", "Pronto."]
+
+
+def test_kiro_argv(tmp_path):
+    req = _kiro_req(tmp_path, read_only=True)
+    a = kiro.KiroHarness().argv(req)
+    assert a[:5] == ["kiro-cli", "chat", "--no-interactive", "--output-format", "stream-json"]
+    assert a[a.index("--model") + 1] == "claude-sonnet-5.5" and a[a.index("--effort") + 1] == "high"
+    assert any(x.startswith("--trust-tools=read_file") for x in a) and "--trust-all-tools" not in a
+    req.read_only, req.resume, req.session_id = False, True, "sess_1"
+    a = kiro.KiroHarness().argv(req)
+    assert "--trust-all-tools" in a and a[-2:] == ["--resume-id", "sess_1"]
+
+
+def _fake_kiro(tmp_path, monkeypatch, events, rc=0):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    stream = tmp_path / "kiro-stream.jsonl"
+    stream.write_text("".join(json.dumps(e) + "\n" for e in events))
+    (bin_dir / "kiro-cli").write_text(
+        f"#!/bin/sh\ncat >/dev/null\necho '[INFO] kas.server.starting' >&2\ncat '{stream}'\nexit {rc}\n")
+    (bin_dir / "kiro-cli").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+
+
+async def test_kiro_call_resposta_e_sessao(tmp_path, monkeypatch):
+    fim = {"type": "runFinished", "data": {"sessionId": "sess_x", "status": "success",
+                                           "finalText": "Feito.\n```json\n{\"a\": 1}\n```", "finalTextTruncated": False}}
+    _fake_kiro(tmp_path, monkeypatch, [{"type": "runStarted", "data": {}}, _kiro_chunk("agent_message_chunk", "x"), fim])
+    seen = []
+    res = await kiro.KiroHarness().call(_kiro_req(tmp_path, on_session=seen.append), lambda line: None)
+    assert res.output == {"a": 1} and res.session_id == "sess_x" and res.error is None
+    assert seen == ["s", "sess_x"]
+
+
+async def test_kiro_call_erros(tmp_path, monkeypatch):
+    msg = ("The model 'x' is not available. (code -32000): "
+           '{"errorType":"InvalidModelError","retryErrorType":"CLIENT_ERROR"}')
+    _fake_kiro(tmp_path, monkeypatch, [{"type": "runError", "data": {"sessionId": "s1", "message": msg}}], rc=1)
+    res = await kiro.KiroHarness().call(_kiro_req(tmp_path), lambda line: None)
+    assert res.error == "fatal" and "not available" in res.message and "[INFO]" not in res.message
+    assert kiro.error_kind("ThrottlingException: Too many requests") == "limit"
+    assert kiro.error_kind("Error: 529 overloaded") == "transient"
+    fim = {"type": "runFinished", "data": {"sessionId": "s2", "finalText": "sem json", "finalTextTruncated": False}}
+    _fake_kiro(tmp_path, monkeypatch, [fim])
+    res = await kiro.KiroHarness().call(_kiro_req(tmp_path), lambda line: None)
+    assert res.error == "no_output" and res.session_id == "s2"
