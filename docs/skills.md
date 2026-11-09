@@ -26,7 +26,7 @@ agy pelo `~/.gemini/config/skills.json`, Kiro em `~/.kiro/skills` (ele não lê 
 | brainstorming, systematic-debugging, writing-plans, test-driven-development, verification-before-completion, receiving-code-review | [superpowers](https://github.com/obra/superpowers) | a seção "Skills" do `GLOBAL.md` diz quando carregar cada uma |
 | security-audit | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | *guidance mode* por padrão; auditoria completa só quando pedida |
 | impeccable | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | uma variante por harness: `impeccable` (agents) e `impeccable-claude` |
-| writing-for-agents, wizard, retro | [mattpocock/skills](https://github.com/mattpocock/skills) | `retro` só por comando (`/retro`) |
+| writing-for-agents, wizard, retro, grill-me | [mattpocock/skills](https://github.com/mattpocock/skills) | `retro` e `grill-me` só por comando; `/grill-me` entrevista em rodadas até fechar um plano, sem escrever arquivo |
 | diagram-design | [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) | |
 
 **Pessoais** ficam no seu `sync/skills/`, com uma linha no `sync/MANIFEST` (ver

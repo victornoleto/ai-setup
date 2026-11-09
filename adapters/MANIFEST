@@ -76,6 +76,9 @@ link	../skills/wizard	.kiro/skills/wizard
 link	../skills/retro	.claude/skills/retro
 link	../skills/retro	.agents/skills/retro
 link	../skills/retro	.kiro/skills/retro
+link	../skills/grill-me	.claude/skills/grill-me
+link	../skills/grill-me	.agents/skills/grill-me
+link	../skills/grill-me	.kiro/skills/grill-me
 link	../skills/spec-review	.claude/skills/spec-review
 link	../skills/spec-review	.agents/skills/spec-review
 link	../skills/spec-review	.kiro/skills/spec-review

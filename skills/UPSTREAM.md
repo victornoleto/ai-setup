@@ -16,6 +16,7 @@ a data abaixo passa disso.
 | writing-for-agents | github.com/mattpocock/skills (MIT, `LICENSE.mattpocock`) | 49dd158 | 2026-10-09 |
 | wizard | idem | 49dd158 | 2026-10-09 |
 | retro | idem | 49dd158 | 2026-10-09 |
+| grill-me (+ corpo do `grilling`) | idem | 4ae2317 | 2026-11-09 |
 | diagram-design | github.com/cathrynlavery/diagram-design (MIT, `LICENSE.diagram-design`) | 2.6 (cdfdc96) | 2026-10-09 |
 
 copiado-em: 2026-10-09
@@ -54,6 +55,11 @@ skill antes de qualquer resposta. A cópia chega aos quatro harnesses, e quem ro
    onde ficam os logs de sessão, `.ai/README.md` no lugar de `CODING_STANDARDS.md`, `GLOBAL.md` e
    `machine.md` como escopo global, e skills em `~/.ai-setup/skills/` ligadas pelo `MANIFEST`.
    `writing-for-agents` e `wizard`: nenhuma.
+6. `grill-me/SKILL.md`: no upstream, `grill-me` só invoca `grilling`; aqui o corpo do
+   `productivity/grilling/SKILL.md` foi copiado para dentro do `grill-me` (nome, descrição e
+   `disable-model-invocation` do `grill-me`). Três trechos marcados `(ai-setup)`: no máximo 5
+   perguntas por rodada; subagent só com 3+ frentes de busca (o agente busca o fato sozinho);
+   fecho com as decisões numeradas, uma por linha.
 
 ## Como atualizar
 
@@ -75,6 +81,8 @@ m=$(mktemp -d) && git clone --depth 1 https://github.com/mattpocock/skills "$m"
 diff -ru "$m/skills/productivity/writing-for-agents" ~/.ai-setup/skills/writing-for-agents
 diff -ru "$m/skills/engineering/wizard" ~/.ai-setup/skills/wizard
 diff -ru "$m/skills/engineering/retro" ~/.ai-setup/skills/retro
+diff -u "$m/skills/productivity/grilling/SKILL.md" ~/.ai-setup/skills/grill-me/SKILL.md
+diff -ru "$m/skills/productivity/grill-me/agents" ~/.ai-setup/skills/grill-me/agents
 
 g=$(mktemp -d) && git clone --depth 1 https://github.com/cathrynlavery/diagram-design "$g"
 diff -ru "$g/skills/diagram-design" ~/.ai-setup/skills/diagram-design
