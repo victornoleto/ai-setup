@@ -29,6 +29,11 @@ agy pelo `~/.gemini/config/skills.json`, Kiro em `~/.kiro/skills` (ele não lê 
 | writing-for-agents, wizard, retro, grill-me | [mattpocock/skills](https://github.com/mattpocock/skills) | `retro` e `grill-me` só por comando; `/grill-me` entrevista em rodadas até fechar um plano, sem escrever arquivo |
 | diagram-design | [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) | |
 
+**Da própria ferramenta:** `playwright-cli` vem dentro da CLI e acompanha a versão dela. O `install.sh` a recopia
+para `~/.agents/skills` (Claude e Kiro ganham link) e o `doctor.sh` acusa quando a CLI foi atualizada sem rodar o
+install. A config global fica em `adapters/playwright/cli.config.json` (`codegen: none` tira o bloco "Ran
+Playwright code" de toda ação; `console.level: warning` deixa os `console.log` de fora).
+
 **Pessoais** ficam no seu `sync/skills/`, com uma linha no `sync/MANIFEST` (ver
 [instrucoes.md](instrucoes.md#manifest-como-cada-arquivo-chega-ao-lugar)). Assim uma skill da empresa ou de um
 projeto seu não vai para este repositório público.

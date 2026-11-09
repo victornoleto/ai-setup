@@ -44,6 +44,8 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   ├── opencode/          opencode.jsonc, AGENTS.md
 │   ├── antigravity/       skills.json
 │   ├── kiro/              ai-memory.md (steering)
+│   ├── playwright/        cli.config.json (config global do playwright-cli)
+│   ├── git/ignore         gitignore global
 │   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy, xkiro
 ├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
 ├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia

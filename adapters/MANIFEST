@@ -19,6 +19,12 @@ copy	claude/settings.json	.claude/settings.json
 # A config é copy porque a TUI do ccstatusline reescreve o arquivo.
 copy	claude/ccstatusline/settings.json	.config/ccstatusline/settings.json
 link	claude/ccstatusline/reset-left.sh	.config/ccstatusline/reset-left.sh
+# playwright-cli: config global (mesclada sob a .playwright/cli.config.json do workspace, se houver).
+# A skill vem da própria CLI: o install.sh a instala, não este MANIFEST.
+link	playwright/cli.config.json	.playwright/cli.config.json
+# gitignore global (o git lê sem core.excludesFile); .playwright-cli/ era posto por workspace pelo
+# `playwright-cli install`, que a instalação global não faz.
+link	git/ignore	.config/git/ignore
 # codex/config.toml fica fora: mistura config portável com estado da máquina (trust de
 #   projetos, cache de modelos, estado de hooks) que o Codex reescreve o tempo todo.
 # Antigravity CLI (`agy`): não tem @import nem lista `instructions`, e lê exatamente

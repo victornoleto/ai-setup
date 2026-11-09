@@ -82,13 +82,23 @@ done <<EOF
 $(manifest_lines)
 EOF
 
-# --- status line do Claude: o settings.json chama `ccstatusline` pelo PATH ---
-if ! command -v ccstatusline >/dev/null 2>&1; then
-	if command -v npm >/dev/null 2>&1 && npm install -g ccstatusline >/dev/null; then
-		say "npm   ccstatusline instalado"
-	else
-		say "FALTA ccstatusline no PATH (status line do Claude): npm install -g ccstatusline"; rc=1
-	fi
+# --- CLIs do npm global ---
+npm_global() {   # binário pacote
+	command -v "$1" >/dev/null 2>&1 && return 0
+	if command -v npm >/dev/null 2>&1 && npm install -g "$2" >/dev/null; then say "npm   $2 instalado"
+	else say "FALTA $1 no PATH: npm install -g $2"; rc=1; return 1; fi
+}
+npm_global ccstatusline ccstatusline || :   # status line do Claude (statusLine.command)
+
+# A skill do playwright-cli acompanha a versão da CLI: recopiada a cada install. Cópia real só em
+# ~/.agents/skills (Codex, OpenCode, agy); Claude e Kiro ganham link, como as outras skills.
+if npm_global playwright-cli @playwright/cli; then
+	rm -rf "$HOME/.agents/skills/playwright-cli"
+	playwright-cli install --skills=agents --global </dev/null >/dev/null
+	for d in .claude .kiro; do
+		mkdir -p "$HOME/$d/skills"
+		ln -sfn "$HOME/.agents/skills/playwright-cli" "$HOME/$d/skills/playwright-cli"
+	done
 fi
 
 # --- segunda conta do Claude Code (opcional: só se ~/.claude2 existir) ---

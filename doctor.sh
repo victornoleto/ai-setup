@@ -167,6 +167,15 @@ else bad "sem xclip/wl-copy/pbcopy — a skill handoff não consegue copiar"; fi
 command -v ccstatusline >/dev/null && ok "ccstatusline no PATH (status line do Claude)" \
 	|| bad "ccstatusline ausente — a status line do Claude fica vazia: npm install -g ccstatusline"
 
+# A skill do playwright-cli é cópia da que vem na CLI; atualizar a CLI sem rodar o install a deixa velha.
+if command -v playwright-cli >/dev/null; then
+	pw=$(dirname "$(playwright-cli --help </dev/null 2>/dev/null | sed -n 's/^Agent skill: //p')")
+	if diff -rq "$pw" "$HOME/.agents/skills/playwright-cli" >/dev/null 2>&1 \
+		&& [ -e "$HOME/.claude/skills/playwright-cli" ] && [ -e "$HOME/.kiro/skills/playwright-cli" ]
+	then ok "playwright-cli: skill global igual à da CLI"
+	else bad "playwright-cli: skill global ausente ou de outra versão da CLI — rode install.sh"; fi
+else bad "playwright-cli ausente — npm install -g @playwright/cli"; fi
+
 jq -e '.entries[]?.path | select(startswith("/"))' "$HOME/.gemini/config/skills.json" >/dev/null 2>&1 \
 	&& ok "agy lê ~/.agents/skills" \
 	|| bad "~/.gemini/config/skills.json ausente ou com caminho relativo (o agy não aceita ~)"
