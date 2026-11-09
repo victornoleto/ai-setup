@@ -144,13 +144,14 @@ Antes de emitir, confira e corrija:
 7. Uma sessão sem esta conversa entenderia cada frase? Troque "isso", "aquele arquivo",
    "o problema de antes" pelo nome.
 
-## Passo 5 — Emitir
+## Passo 5 — Imprimir
 
-Numa única resposta:
+Escreva o handoff inteiro como texto da resposta, antes e fora de qualquer ferramenta: o
+heredoc do passo 6 não conta como impresso. Sem o documento na tela, não siga.
 
-1. **Imprima o handoff inteiro** na tela (o usuário lê e confere).
-2. **Copie**, na mesma ação, pelo script, com o mesmo texto num heredoc de delimitador citado
-   (o `'EOF'` impede que o shell expanda `$` e crases):
+## Passo 6 — Copiar e fechar
+
+1. Copie o mesmo texto pelo script, num heredoc citado (`'EOF'`: sem expandir `$` e crases):
 
 ```bash
 ~/.ai-setup/bin/handoff-copia <<'EOF'
@@ -159,9 +160,8 @@ EOF
 ```
 
    Se o texto contiver uma linha `EOF`, troque o delimitador (`HANDOFF_FIM`).
-3. **Feche com uma linha**: o resultado do script ("copiado: N linhas … arquivo: …") e
-   "Cole na sessão nova (Ctrl+V)". Se o script falhar, diga o código de saída e o caminho do
-   arquivo salvo; o texto já está na tela.
+2. Feche com uma linha: o resultado do script e "Cole na sessão nova (Ctrl+V)". Se falhar,
+   diga o código de saída e o caminho do arquivo salvo.
 
 Não chame `memory_handoff_begin`: ele entregaria o baton a qualquer sessão futura do projeto,
 relacionada ou não. O canal aqui é o clipboard.
