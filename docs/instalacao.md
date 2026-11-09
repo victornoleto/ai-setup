@@ -13,7 +13,7 @@ ai-memory. Juntos, a conta fecha assim:
 
 ## 1. Pré-requisitos
 
-- `git`, `jq` e Docker (este para o ai-memory).
+- `git`, `jq`, `npm` (para o `ccstatusline`, a status line do Claude) e Docker (este para o ai-memory).
 - Pelo menos um harness: Claude Code, Codex, OpenCode, Antigravity CLI (`agy`) ou Kiro CLI.
 - `gh` com login (`gh auth login`): é por ele que os agentes falam com o GitHub ([seguranca.md](seguranca.md)).
 

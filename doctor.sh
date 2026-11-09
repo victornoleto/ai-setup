@@ -164,6 +164,9 @@ if command -v xclip >/dev/null || command -v wl-copy >/dev/null || command -v pb
 then ok "clipboard: ferramenta para /handoff presente"
 else bad "sem xclip/wl-copy/pbcopy — a skill handoff não consegue copiar"; fi
 
+command -v ccstatusline >/dev/null && ok "ccstatusline no PATH (status line do Claude)" \
+	|| bad "ccstatusline ausente — a status line do Claude fica vazia: npm install -g ccstatusline"
+
 jq -e '.entries[]?.path | select(startswith("/"))' "$HOME/.gemini/config/skills.json" >/dev/null 2>&1 \
 	&& ok "agy lê ~/.agents/skills" \
 	|| bad "~/.gemini/config/skills.json ausente ou com caminho relativo (o agy não aceita ~)"

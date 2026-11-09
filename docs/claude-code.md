@@ -88,6 +88,10 @@ arquivo vivo. A referência em `adapters/claude/settings.json` guarda `@HOME@` n
 `doctor.sh` mostra a diferença quando o vivo muda (um `/effort`, um plugin novo) e imprime o comando para
 aceitar.
 
+A status line é o [ccstatusline](https://github.com/sirmalloc/ccstatusline) (npm global; o `install.sh`
+instala se faltar). A config fica em `adapters/claude/ccstatusline/`: `settings.json` é cópia (a TUI do
+ccstatusline reescreve), `reset-left.sh` é link e mostra quanto falta para o reset dos limites de 5 h e 7 dias.
+
 **Plugin interno de empresa não entra no `settings.json` versionado**, porque este repositório é público.
 Ligue por projeto, no repositório da empresa:
 

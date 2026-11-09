@@ -154,7 +154,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "@HOME@/.claude/hud/statusline.sh",
+    "command": "ccstatusline",
     "padding": 0
   },
   "enabledPlugins": {
@@ -188,5 +188,12 @@
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
-  "theme": "dark-ansi"
+  "theme": "dark-ansi",
+  "pluginConfigs": {
+    "cc-plugin-agents-md@builtin": {
+      "options": {
+        "instructionFiles": "claude-md-and-agents-md"
+      }
+    }
+  }
 }

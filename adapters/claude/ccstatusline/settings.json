@@ -1,0 +1,27 @@
+{
+  "version": 4,
+  "lines": [
+    [
+      { "id": "cwd", "type": "current-working-dir", "metadata": { "abbreviateHome": "true" } },
+      { "id": "s1", "type": "separator" },
+      { "id": "branch", "type": "git-branch" }
+    ],
+    [
+      { "id": "session", "type": "session-usage" },
+      { "id": "session-reset-label", "type": "custom-text", "customText": " ↻ " },
+      { "id": "session-reset", "type": "custom-command", "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh five_hour", "color": "brightBlue" },
+      { "id": "s2", "type": "separator" },
+      { "id": "weekly", "type": "weekly-usage" },
+      { "id": "weekly-reset-label", "type": "custom-text", "customText": " ↻ " },
+      { "id": "weekly-reset", "type": "custom-command", "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh seven_day", "color": "brightBlue" },
+      { "id": "s3", "type": "separator" },
+      { "id": "ctx", "type": "context-percentage" },
+      { "id": "s4", "type": "separator" },
+      { "id": "model", "type": "model" },
+      { "id": "s6", "type": "separator" },
+      { "id": "effort", "type": "thinking-effort" }
+    ],
+    []
+  ],
+  "flexMode": "full"
+}

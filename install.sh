@@ -82,6 +82,15 @@ done <<EOF
 $(manifest_lines)
 EOF
 
+# --- status line do Claude: o settings.json chama `ccstatusline` pelo PATH ---
+if ! command -v ccstatusline >/dev/null 2>&1; then
+	if command -v npm >/dev/null 2>&1 && npm install -g ccstatusline >/dev/null; then
+		say "npm   ccstatusline instalado"
+	else
+		say "FALTA ccstatusline no PATH (status line do Claude): npm install -g ccstatusline"; rc=1
+	fi
+fi
+
 # --- segunda conta do Claude Code (opcional: só se ~/.claude2 existir) ---
 # CLAUDE_CONFIG_DIR=~/.claude2 isola credencial e .claude.json; o resto é symlink para ~/.claude,
 # então instrução, settings, skills, plugins e histórico são os mesmos nas duas contas.

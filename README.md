@@ -39,7 +39,7 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 ├── doctor.sh              confere tudo, não conserta nada
 ├── adapters/
 │   ├── MANIFEST           o que é symlink, o que é cópia, e para onde
-│   ├── claude/            CLAUDE.md, settings.json
+│   ├── claude/            CLAUDE.md, settings.json, ccstatusline/ (status line)
 │   ├── codex/             AGENTS.md, hook SessionStart, perfil AppArmor
 │   ├── opencode/          opencode.jsonc, AGENTS.md
 │   ├── antigravity/       skills.json
