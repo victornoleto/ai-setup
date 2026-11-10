@@ -16,6 +16,7 @@ história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memo
 | **sync/**: seus arquivos pessoais e de empresa num repositório privado, sobrepostos a este na instalação | [docs/sync.md](docs/sync.md) |
 | **Claude Code**: duas contas logadas ao mesmo tempo, aliases (`claude2`, `xclaude`…) e teto de RAM | [docs/claude-code.md](docs/claude-code.md) |
 | **Skills**: comportamento numa fonte só, em vez de plugin | [docs/skills.md](docs/skills.md) |
+| **Catálogo**: o que o ai-setup tem e o que não tem (skills, regras absorvidas, plugins que saíram e skills que ficaram no pacote de origem) | [docs/catalogo.md](docs/catalogo.md) |
 | **Segurança**: GitHub pelo `gh`, permissões, credenciais negadas, sandbox do Codex | [docs/seguranca.md](docs/seguranca.md) |
 | **memory-ui**: o que o ai-memory guardou, no navegador, só leitura | [docs/memory-ui.md](docs/memory-ui.md) |
 

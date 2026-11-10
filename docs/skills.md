@@ -10,24 +10,8 @@ agy pelo `~/.gemini/config/skills.json`, Kiro em `~/.kiro/skills` (ele não lê 
 
 ## As skills deste repositório
 
-**Nossas:**
-
-| Skill | Para quê |
-|---|---|
-| `orq-setup` | monta a fila do [orq](orq.md) para uma atividade; é a sessão que o `orq new` abre |
-| `entrega` | relatório de leitura fácil do que uma branch, um commit ou um intervalo entregou, conferido contra o código (`bin/entrega-verifica`) |
-| `handoff` | `/handoff`: o handoff mais detalhado da sessão, impresso, copiado para o clipboard e salvo em `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50% |
-| `spec-review` | `/spec-review <ponto>`: confere o diff contra a issue, o plano ou o card que o pediu (o que falta, sobra ou está errado); complementa o `/code-review`, que caça bug |
-
-**Copiadas de fora** (origem, versão e edições locais em [`skills/UPSTREAM.md`](../skills/UPSTREAM.md)):
-
-| Skill | Origem | Observação |
-|---|---|---|
-| brainstorming, systematic-debugging, writing-plans, test-driven-development, verification-before-completion, receiving-code-review | [superpowers](https://github.com/obra/superpowers) | a seção "Skills" do `GLOBAL.md` diz quando carregar cada uma |
-| security-audit | [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) | *guidance mode* por padrão; auditoria completa só quando pedida |
-| impeccable | [pbakaus/impeccable](https://github.com/pbakaus/impeccable) | uma variante por harness: `impeccable` (agents) e `impeccable-claude` |
-| writing-for-agents, wizard, retro, grill-me | [mattpocock/skills](https://github.com/mattpocock/skills) | `retro` e `grill-me` só por comando; `/grill-me` entrevista em rodadas até fechar um plano, sem escrever arquivo |
-| diagram-design | [cathrynlavery/diagram-design](https://github.com/cathrynlavery/diagram-design) | |
+O que tem, o que ficou de fora e por quê está no [catálogo](catalogo.md). Origem, versão e edições locais das
+copiadas: [`skills/UPSTREAM.md`](../skills/UPSTREAM.md).
 
 **Da própria ferramenta:** `playwright-cli` vem dentro da CLI e acompanha a versão dela. O `install.sh` a recopia
 para `~/.agents/skills` (Claude e Kiro ganham link) e o `doctor.sh` acusa quando a CLI foi atualizada sem rodar o
@@ -58,11 +42,8 @@ O que foi feito aqui, e dá para repetir:
 
 Resultado aqui: o contexto fixo por sessão do Claude caiu de ~18 KB para ~9 KB.
 
-**Plugins que ficam no Claude:** só `commit-commands`. Saíram, por repetirem o que já existe: `superpowers`
-(skills copiadas), `frontend-design` (`impeccable`), `code-review` e `code-simplifier` (`/code-review` e
-`/simplify` nativos), `claude-md-management` (regra mora no `GLOBAL.md`, fato no ai-memory) e
-`security-guidance` (`security-audit` cobre nas cinco ferramentas). O `doctor.sh` acusa se algum voltar a
-ligar.
+**Plugins que ficam no Claude:** só `commit-commands`. Os que saíram, e o que ficou no lugar de cada um, estão
+no [catálogo](catalogo.md#plugins-do-claude-que-saíram). O `doctor.sh` acusa se algum voltar a ligar.
 
 ## Pegadinhas
 

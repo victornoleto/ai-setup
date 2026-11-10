@@ -194,6 +194,11 @@ grep -rqs '\.orca' "$HOME/.claude/settings.json" "$HOME/.codex/hooks.json" "$HOM
 g=$(wc -c < "$SETUP/sync/memory/GLOBAL.md")
 [ "$g" -le 4000 ] && ok "GLOBAL.md com $g bytes" || note "GLOBAL.md com $g bytes (> 4000): carrega em todo turno, enxugue"
 
+# Sem esta checagem o docs/catalogo.md envelhece na primeira skill nova.
+falta=$(for s in "$SETUP/skills"/*/; do n=$(basename "$s"); grep -qF "\`$n\`" "$SETUP/docs/catalogo.md" || printf '%s ' "$n"; done)
+[ -z "$falta" ] && ok "toda skill de skills/ está no docs/catalogo.md" \
+	|| note "AVISO skills fora do docs/catalogo.md: $falta"
+
 copiado=$(sed -n 's/^copiado-em: //p' "$SETUP/skills/UPSTREAM.md")
 idade=$(( ( $(date +%s) - $(date -d "$copiado" +%s) ) / 86400 ))
 [ "$idade" -le 90 ] && ok "skills copiadas revisadas há $idade dias" \
