@@ -2,24 +2,116 @@
   "version": 4,
   "lines": [
     [
-      { "id": "cwd", "type": "current-working-dir", "metadata": { "abbreviateHome": "true" } },
-      { "id": "s1", "type": "separator" },
-      { "id": "branch", "type": "git-branch" }
+      {
+        "id": "cwd",
+        "type": "current-working-dir",
+        "metadata": {
+          "abbreviateHome": "true"
+        }
+      },
+      {
+        "id": "s1",
+        "type": "separator"
+      },
+      {
+        "id": "branch",
+        "type": "git-branch"
+      }
     ],
     [
-      { "id": "session", "type": "session-usage" },
-      { "id": "session-reset-label", "type": "custom-text", "customText": " ↻ " },
-      { "id": "session-reset", "type": "custom-command", "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh five_hour", "color": "brightBlue" },
-      { "id": "s2", "type": "separator" },
-      { "id": "weekly", "type": "weekly-usage" },
-      { "id": "weekly-reset-label", "type": "custom-text", "customText": " ↻ " },
-      { "id": "weekly-reset", "type": "custom-command", "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh seven_day", "color": "brightBlue" },
-      { "id": "s3", "type": "separator" },
-      { "id": "ctx", "type": "context-percentage" },
-      { "id": "s4", "type": "separator" },
-      { "id": "model", "type": "model" },
-      { "id": "s6", "type": "separator" },
-      { "id": "effort", "type": "thinking-effort" }
+      {
+        "id": "session-label",
+        "type": "custom-text",
+        "customText": "5h Usage: "
+      },
+      {
+        "id": "session",
+        "type": "session-usage",
+        "rawValue": true,
+        "numberFormat": {
+          "style": "whole"
+        }
+      },
+      {
+        "id": "session-reset-gap",
+        "type": "custom-text",
+        "customText": " "
+      },
+      {
+        "id": "session-reset",
+        "type": "custom-command",
+        "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh five_hour"
+      },
+      {
+        "id": "s2",
+        "type": "separator",
+        "character": " │ "
+      },
+      {
+        "id": "weekly-label",
+        "type": "custom-text",
+        "customText": "7d Usage: "
+      },
+      {
+        "id": "weekly",
+        "type": "weekly-usage",
+        "rawValue": true,
+        "numberFormat": {
+          "style": "whole"
+        }
+      },
+      {
+        "id": "weekly-reset-gap",
+        "type": "custom-text",
+        "customText": " "
+      },
+      {
+        "id": "weekly-reset",
+        "type": "custom-command",
+        "commandPath": "@HOME@/.config/ccstatusline/reset-left.sh seven_day"
+      },
+      {
+        "id": "s3",
+        "type": "separator",
+        "character": " │ "
+      },
+      {
+        "id": "ctx-label",
+        "type": "custom-text",
+        "customText": "Context: "
+      },
+      {
+        "id": "ctx",
+        "type": "context-percentage",
+        "rawValue": true,
+        "numberFormat": {
+          "style": "whole"
+        }
+      },
+      {
+        "id": "ctx-suffix",
+        "type": "custom-text",
+        "customText": " Used"
+      },
+      {
+        "id": "s4",
+        "type": "separator",
+        "character": " │ "
+      },
+      {
+        "id": "model",
+        "type": "model"
+      },
+      {
+        "id": "effort-sep",
+        "type": "custom-text",
+        "customText": " · "
+      },
+      {
+        "id": "effort",
+        "type": "thinking-effort",
+        "rawValue": true
+      }
     ],
     []
   ],
