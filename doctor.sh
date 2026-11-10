@@ -169,7 +169,8 @@ command -v ccstatusline >/dev/null && ok "ccstatusline no PATH (status line do C
 
 # A skill do playwright-cli é cópia da que vem na CLI; atualizar a CLI sem rodar o install a deixa velha.
 if command -v playwright-cli >/dev/null; then
-	pw=$(dirname "$(playwright-cli --help </dev/null 2>/dev/null | sed -n 's/^Agent skill: //p')")
+	# O `--help` só mostra o caminho da skill com CLAUDECODE setada; aqui ele sai do próprio binário.
+	pw="$(dirname "$(realpath "$(command -v playwright-cli)")")/node_modules/playwright-core/lib/tools/skills/playwright-cli"
 	if diff -rq "$pw" "$HOME/.agents/skills/playwright-cli" >/dev/null 2>&1 \
 		&& [ -e "$HOME/.claude/skills/playwright-cli" ] && [ -e "$HOME/.kiro/skills/playwright-cli" ]
 	then ok "playwright-cli: skill global igual à da CLI"
