@@ -24,6 +24,8 @@
   let lastN = -1;
 
   const files = (n: number) => `${n} ${n === 1 ? "arquivo" : "arquivos"}`;
+  // O título costuma repetir o número da tarefa ("01 · Servidor"): na fila o número já vem na frente.
+  const bare = (title: string) => title.replace(/^\d+\s*[·.:–—-]\s*/, "");
   const OK = ["ok", "ok_takeover", "ok_usuario", "skipped"];
   function rowClass(t: TaskRow): string {
     if (t.status === "esperando você") return "wait";
@@ -125,7 +127,11 @@
     if (attention.length) lines.push({ strong: `${attention.length} ${attention.length === 1 ? "aviso" : "avisos"} para conferir`, rest: "" });
     return lines;
   });
-  const timeline = $derived(run ? [...run.timeline].reverse().slice(0, 120) : []);
+  // O resumo final é um texto longo em markdown: fica no Histórico e no journal, não na linha do tempo.
+  const timeline = $derived(run ? run.timeline.filter((e) => e.type !== "run_summary").reverse().slice(0, 120) : []);
+  $effect(() => {
+    if (sel && run) queueMicrotask(() => document.querySelector(".q[aria-current]")?.scrollIntoView({ block: "nearest" }));
+  });
 </script>
 
 {#snippet entrega(t: TaskView)}
@@ -199,7 +205,7 @@
           {#each run.tasks as t (t.id)}
             <li>
               <button class={`q ${rowClass(t)}`} aria-current={t.id === sel ? "true" : undefined} onclick={() => pick(t.id)}>
-                <span><b>{t.id.split("-")[0]}</b> {t.title}<small>{t.status}</small></span>
+                <span><b>{t.id.split("-")[0]}</b> {bare(t.title)}<small>{t.status}</small></span>
                 <span class="t num">{t.extra.split(" · ")[0].slice(0, 5)}</span>
               </button>
             </li>

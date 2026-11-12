@@ -170,3 +170,4 @@ a{color:inherit}
 .runrow:hover{background:var(--accent)}
 .runrow small{display:block;color:var(--muted-foreground);font-size:.88rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .runrow b{font-weight:600}
+.tl li>span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
