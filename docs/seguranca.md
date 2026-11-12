@@ -16,14 +16,15 @@ O controle do que o agente pode fazer é a permissão de shell de cada ferrament
 | | Onde | `gh api` |
 |---|---|---|
 | Claude | `permissions` no `adapters/claude/settings.json` | pede aprovação com `-X`, `--method`, `-f`, `-F` |
-| Codex | `~/.codex/rules/default.rules` | pede sempre (regra por prefixo não enxerga flag no meio) |
+| Codex | `~/.codex/rules/default.rules` (o Codex grava; fora deste repositório) | pede enquanto não houver regra `allow`; o `doctor.sh` acusa `git push` liberado ali |
 | OpenCode | `permission.bash` no `adapters/opencode/opencode.jsonc` | pede sempre |
 
 ## Credenciais
 
-Os arquivos de credencial (`~/.claude/.credentials.json`, `~/.codex/auth.json`, `~/.gemini/oauth_creds.json`,
-`~/.config/ai-memory/server.env`) têm leitura negada no Claude e no OpenCode. A regra vale para a ferramenta
-de leitura do agente, não para um `cat` no shell.
+Os arquivos de credencial (`~/.claude/.credentials.json`, o da conta 2 em `~/.claude2/`, `~/.codex/auth.json`,
+`~/.gemini/oauth_creds.json`, `~/.config/ai-memory/server.env`) têm leitura negada no Claude e no OpenCode. No
+Claude, comando de shell que cite um desses caminhos também é negado. É rede contra acidente: um caminho
+montado por variável ou glob passa.
 
 O `doctor.sh` procura token em texto puro (GitHub, Anthropic, OpenRouter) no `.claude.json` das duas contas,
 no `config.toml` do Codex, no `opencode.jsonc` e no `mcp_config.json` do agy.
@@ -49,6 +50,11 @@ O `doctor.sh` acusa hook do Orca IDE que volte aos configs (`hook do Orca voltou
 `orca` do Ubuntu é o leitor de tela do GNOME; o Orca IDE é o `orca-ide`.
 
 ## Agentes sem pedir permissão
+
+O `settings.json` público é neutro: o Claude pede permissão no padrão dele. `defaultMode: "auto"` e
+`skipDangerousModePermissionPrompt` são escolha de cada um e vão numa cópia pessoal em `sync/claude/settings.json`
+([sync.md](sync.md)). O `doctor.sh` também avisa quando o Codex confia em pasta temporária ou em pasta-mãe de
+projetos.
 
 Os aliases `x*` ([claude-code.md](claude-code.md)) rodam sem confirmação por ferramenta. O que segura:
 

@@ -21,6 +21,11 @@
     ],
     "deny": [
       "Read(~/.claude/.credentials.json)",
+      "Read(~/.claude2/.credentials.json)",
+      "Bash(*.credentials.json*)",
+      "Bash(*.codex/auth.json*)",
+      "Bash(*oauth_creds.json*)",
+      "Bash(*ai-memory/server.env*)",
       "Read(~/.codex/auth.json)",
       "Read(~/.gemini/oauth_creds.json)",
       "Read(~/.config/ai-memory/server.env)",
@@ -35,8 +40,7 @@
       "Bash(gh api --method *)",
       "Bash(gh api * -f *)",
       "Bash(gh api * -F *)"
-    ],
-    "defaultMode": "auto"
+    ]
   },
   "model": "opus",
   "hooks": {
@@ -194,6 +198,5 @@
   },
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
-  "skipDangerousModePermissionPrompt": true,
   "theme": "dark-ansi"
 }

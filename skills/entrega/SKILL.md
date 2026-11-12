@@ -204,7 +204,7 @@ O leitor não implementou nada e vai ouvir o texto, não estudá-lo.
 1. Frase de até 20 palavras. Parágrafo de até 6 frases, um assunto só.
 2. Voz ativa e tempo simples. "O sistema sugere", não "passou a ser sugerido".
 3. Sem pessoas. "A tela passa a mostrar", nunca "eu fiz" nem "foi pedido pelo
-   Diego".
+   cliente".
 4. Termo técnico ganha definição de até 10 palavras na primeira vez. Não defina
    nome de produto nem sigla que o leitor usa todo dia.
 5. Sem ponto e vírgula e sem travessão. Duas frases resolvem.
