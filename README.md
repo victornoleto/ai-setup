@@ -49,7 +49,7 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   ├── git/ignore         gitignore global
 │   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy, xkiro
 ├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
-├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia
+├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia, verbosidade
 ├── orq/                   o motor do orq e seus testes
 ├── memory-ui/             o servidor do memory-ui
 ├── docs/                  um doc por funcionalidade

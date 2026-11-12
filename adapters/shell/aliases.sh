@@ -2,7 +2,7 @@
 #   . "$HOME/.ai-setup/adapters/shell/aliases.sh"
 # O que cada um faz e por quê: docs/claude-code.md.
 
-# bin/: orq, memory-ui, entrega-verifica, handoff-copia. Sem duplicar ao recarregar o rc.
+# bin/: orq, memory-ui, entrega-verifica, handoff-copia, verbosidade. Sem duplicar ao recarregar o rc.
 case ":$PATH:" in
 	*":$HOME/.ai-setup/bin:"*) ;;
 	*) PATH="$HOME/.ai-setup/bin:$PATH"; export PATH ;;

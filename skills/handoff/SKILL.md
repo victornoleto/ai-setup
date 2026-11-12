@@ -44,7 +44,7 @@ git log --oneline -15
 - Transcript desta sessão, para o agente novo consultar quando faltar detalhe (Claude Code):
 
 ```bash
-ls -t ~/.claude/projects/"$(pwd | tr / -)"/*.jsonl | head -1
+ls -t ~/.claude/projects/"$(pwd | sed 's/[^A-Za-z0-9]/-/g')"/*.jsonl | head -1
 ```
 
   O mais recente é o desta sessão. Em outra ferramenta, omita a linha.
@@ -144,10 +144,10 @@ Antes de emitir, confira e corrija:
 7. Uma sessão sem esta conversa entenderia cada frase? Troque "isso", "aquele arquivo",
    "o problema de antes" pelo nome.
 
-## Passo 5 — Imprimir
+## Passo 5 — Não imprimir
 
-Escreva o handoff inteiro como texto da resposta, antes e fora de qualquer ferramenta: o
-heredoc do passo 6 não conta como impresso. Sem o documento na tela, não siga.
+O handoff não vai para a tela: o documento mora no arquivo que o script do passo 6 salva e no
+clipboard. Na resposta entra só a linha de fecho.
 
 ## Passo 6 — Copiar e fechar
 
@@ -155,12 +155,12 @@ heredoc do passo 6 não conta como impresso. Sem o documento na tela, não siga.
 
 ```bash
 ~/.ai-setup/bin/handoff-copia <<'EOF'
-<o handoff, byte a byte igual ao impresso>
+<o handoff inteiro>
 EOF
 ```
 
    Se o texto contiver uma linha `EOF`, troque o delimitador (`HANDOFF_FIM`).
-2. Feche com uma linha: o resultado do script e "Cole na sessão nova (Ctrl+V)". Se falhar,
+2. Feche com uma linha: o caminho do arquivo salvo e "Cole na sessão nova (Ctrl+V)". Se falhar,
    diga o código de saída e o caminho do arquivo salvo.
 
 Não chame `memory_handoff_begin`: ele entregaria o baton a qualquer sessão futura do projeto,

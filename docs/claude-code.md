@@ -2,7 +2,7 @@
 
 Os atalhos dos agentes moram em [`adapters/shell/aliases.sh`](../adapters/shell/aliases.sh), carregado pelo
 rc do shell. Ele também põe o `bin/` deste repositório no PATH (`orq`, `memory-ui`, `entrega-verifica`,
-`handoff-copia`). Uma linha liga tudo:
+`handoff-copia`, `verbosidade`). Uma linha liga tudo:
 
 ```sh
 echo '. "$HOME/.ai-setup/adapters/shell/aliases.sh"' >> ~/.bashrc   # ou ~/.zshrc
