@@ -34,6 +34,7 @@ class CallRequest:
     account_dir: str | None = None
     thinking: bool = False
     on_session: Callable[[str], None] | None = None
+    sandbox: bool = False     # [roles.X] sandbox = "home": o processo não enxerga as credenciais do HOME
 
 
 @dataclass
@@ -58,6 +59,28 @@ class Harness:
     def interactive_argv(self, role: Role, prompt: str) -> list[str]:
         """argv da sessão interativa do wizard."""
         raise NotImplementedError
+
+
+# Credenciais do HOME que um agente não precisa para trabalhar no repositório. As do próprio harness ficam.
+SANDBOX_HIDE = (".ssh", ".gnupg", ".aws", ".kube", ".config/gh", ".config/gcloud", ".docker/config.json", ".netrc",
+                ".git-credentials", ".npmrc")
+
+
+def sandboxed(argv: list[str], on: bool) -> list[str]:
+    """`sandbox = "home"`: o mesmo sistema de arquivos e a mesma worktree, com as credenciais do HOME escondidas
+    (diretório vira tmpfs vazio, arquivo vira /dev/null) e sem agente SSH nem keyring. Custo: `git fetch` de
+    repositório privado e `npm install` de registro privado deixam de funcionar dentro da sessão."""
+    if not on:
+        return argv
+    home = Path.home()
+    args = ["bwrap", "--dev-bind", "/", "/", "--die-with-parent"]
+    for rel in SANDBOX_HIDE:
+        p = home / rel
+        if p.is_dir():
+            args += ["--tmpfs", str(p)]
+        elif p.exists():
+            args += ["--ro-bind", "/dev/null", str(p)]
+    return [*args, "--unsetenv", "SSH_AUTH_SOCK", "--unsetenv", "DBUS_SESSION_BUS_ADDRESS", "--", *argv]
 
 
 def classify(text: str) -> str | None:

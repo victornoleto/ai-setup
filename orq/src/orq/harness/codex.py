@@ -5,7 +5,7 @@ import json
 import re
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, sandboxed, tool_line
 
 
 class CodexHarness(Harness):
@@ -47,7 +47,7 @@ class CodexHarness(Harness):
             for line in safe_render(render_event, ev, req.thinking):
                 on_line(line)
 
-        rc, timed_out, err = await run_process(self.argv(req, str(schema_file)), req.prompt, req.cwd, req.env,
+        rc, timed_out, err = await run_process(sandboxed(self.argv(req, str(schema_file)), req.sandbox), req.prompt, req.cwd, req.env,
                                                req.timeout, req.calls_dir / f"{req.name}.stream.jsonl", on_json)
         if timed_out:
             return CallResult(error="timeout", session_id=sid, message="timeout")

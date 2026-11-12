@@ -63,7 +63,7 @@ def test_push_block_covers_all_remote_names(tmp_path):
         subprocess.run(['git', '-C', str(path), 'remote', 'add', name, '/unused'], check=True)
     env = block_push_env([cfg.repo, repo])
     assert {v for k, v in env.items() if k.startswith('GIT_CONFIG_KEY_')} == {
-        'remote.origin.pushurl', 'remote.upstream.pushurl'}
+        'remote.origin.pushurl', 'remote.upstream.pushurl', 'url.blocked://orq-sem-push/.pushInsteadOf'}
 
 
 def test_resume_keeps_task_overrides(tmp_path, monkeypatch):

@@ -52,6 +52,7 @@ class Role:
     effort: str
     account: str = ""  # só o claude usa (CLAUDE_CONFIG_DIR)
     count: int = 1
+    sandbox: str = "off"  # off | home (esconde as credenciais do HOME; ver harness.base.sandboxed)
 
     def label(self) -> str:
         return f"{self.harness}:{self.model} {self.effort}"
@@ -266,7 +267,10 @@ def from_raw(raw: dict, queue_dir: Path) -> Config:
         if r["harness"] not in HARNESSES:
             raise ConfigError(f"papel {name}: harness '{r['harness']}' desconhecido ({', '.join(HARNESSES)})")
         cfg.roles[name] = Role(name=name, harness=r["harness"], model=str(r["model"]), effort=str(r["effort"]),
-                               account=str(r.get("account") or default_account), count=int(r.get("count", 1)))
+                               account=str(r.get("account") or default_account), count=int(r.get("count", 1)),
+                               sandbox=str(r.get("sandbox", "off")))
+        if cfg.roles[name].sandbox not in ("off", "home"):
+            raise ConfigError(f"papel {name}: sandbox '{cfg.roles[name].sandbox}' inválido (off, home)")
         if r["harness"] == "claude":
             cfg.account_dir(cfg.roles[name].account)
     for key in ("call_timeout", "limit_max_wait", "limit_poll"):

@@ -8,7 +8,10 @@ Diagnóstico: {{DIAGNOSIS}}
 Opções:
 {{OPTIONS}}
 
-Resposta do usuário: {{ANSWER}}
+Resposta do usuário:
+<resposta>
+{{ANSWER}}
+</resposta>
 
 - Basta (`sufficient = true`): numa decisão do conselho (`council`), `option_id` = a opção que ele quis; se não for
   nenhuma das opções, `option_id` vazio e `note` = a decisão dele em uma frase. Nos outros tipos, `action` + `note`

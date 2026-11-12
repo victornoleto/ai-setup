@@ -121,6 +121,7 @@ class RunStore:
     # --- criação ---------------------------------------------------------------------------------
     def create(self, queue_dir: Path, account: str, register: bool = True) -> None:
         self.dir.mkdir(parents=True, exist_ok=True)
+        self.dir.chmod(0o700)  # streams e logs guardam saída de ferramenta (pode ter .env): só o dono lê
         if self.state_path.exists():
             raise FileExistsError(f"{self.dir} já tem uma execução; use orq resume")
         write_atomic(self.state_path, json.dumps(

@@ -58,7 +58,8 @@ projetos.
 
 Os aliases `x*` ([claude-code.md](claude-code.md)) rodam sem confirmação por ferramenta. O que segura:
 
-- **`git push`** fica com você. No [orq](orq.md), é bloqueado de fato em todas as sessões (`pushurl` inválido
+- **`git push`** fica com você. No [orq](orq.md), é travado em todas as sessões contra o reflexo do agente, e bloqueado
+  de fato só com `sandbox = "home"` no papel (`pushurl` inválido
   no ambiente delas).
 - **Teto de RAM e CPU** pelo `claude.slice`, para um processo descontrolado não derrubar a máquina.
 - **Plugin ou dado de empresa** nunca entra neste repositório público: vai por projeto ou pelo `sync/`.

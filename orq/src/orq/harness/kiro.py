@@ -9,7 +9,7 @@ import json
 import re
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, sandboxed, tool_line
 from .opencode import SCHEMA_NOTE, extract_json, is_valid
 
 # Ferramentas de leitura do motor v3 (nomes do `usedTools` e do pacote do KAS); nome que não existe é ignorado.
@@ -52,7 +52,7 @@ class KiroHarness(Harness):
             for line in safe_render(view.render, ev, req.thinking):
                 on_line(line)
 
-        rc, timed_out, err = await run_process(self.argv(req), prompt, req.cwd, req.env, req.timeout,
+        rc, timed_out, err = await run_process(sandboxed(self.argv(req), req.sandbox), prompt, req.cwd, req.env, req.timeout,
                                                req.calls_dir / f"{req.name}.stream.jsonl", on_json)
         if timed_out:
             return CallResult(error="timeout", session_id=sid, message="timeout")

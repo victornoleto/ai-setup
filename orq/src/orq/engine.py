@@ -39,8 +39,13 @@ def schema(name: str) -> dict:
     return json.loads((ORQ_HOME / "schemas" / f"{name}.json").read_text())
 
 
+PUSH_URL_PREFIXES = ("https://", "http://", "ssh://", "git://", "git+ssh://", "file://", "git@", "/", "./", "../", "~")
+
+
 def block_push_env(repo: Path | list[Path]) -> dict:
-    """`git push` bloqueado nos processos filhos: pushurl inválido para cada remote, por GIT_CONFIG_*."""
+    """`git push` bloqueado nos processos filhos, por GIT_CONFIG_*: pushurl inválido para cada remote e, para
+    `git push <url>`, toda URL de push reescrita (pushInsteadOf) para um protocolo que não existe. O fetch não muda.
+    É trava contra o reflexo do agente, não contra quem limpa o ambiente de propósito: isso é do sandbox."""
     repos = [repo] if isinstance(repo, Path) else repo
     remotes = set()
     for path in repos:
@@ -51,6 +56,10 @@ def block_push_env(repo: Path | list[Path]) -> dict:
     for remote in sorted(remotes):
         env[f"GIT_CONFIG_KEY_{i}"] = f"remote.{remote}.pushurl"
         env[f"GIT_CONFIG_VALUE_{i}"] = "blocked://orq-sem-push"
+        i += 1
+    for prefix in PUSH_URL_PREFIXES:
+        env[f"GIT_CONFIG_KEY_{i}"] = "url.blocked://orq-sem-push/.pushInsteadOf"
+        env[f"GIT_CONFIG_VALUE_{i}"] = prefix
         i += 1
     env["GIT_CONFIG_COUNT"] = str(i)
     return env
@@ -229,7 +238,7 @@ class Engine:
             req = CallRequest(role=role, name=name, prompt=full_prompt, schema=schema(schema_name), cwd=self.task_config(t).repo,
                               calls_dir=calls_dir, read_only=read_only or role_name in ("voter", "tiebreak", "operator"),
                               session_id=sid, resume=resume, timeout=self.cfg.seconds("call_timeout"),
-                              env=self.task_env(t), thinking=self.thinking,
+                              env=self.task_env(t), thinking=self.thinking, sandbox=role.sandbox == "home",
                               on_session=save_session,
                               account_dir=self.cfg.claude_config_env(account) if role.harness == "claude" else None)
             self.s.active_start(tid)
@@ -453,10 +462,12 @@ class Engine:
                     phase = "plan"
 
                 elif phase == "plan":
+                    before = self.repo_mark(t)
                     out, sid = await self.call(t, "planner", "plan", "plan",
                                                prompt("plan", BASE=t.base_prompt, PLAN_FILE=t.plan_file))
                     if out is None:
                         raise Problem("failed", "O planejamento falhou (ver orq.log).", "plan")
+                    self.warn_if_wrote(t, "O planejador", before)
                     s.set(t.id, "planner_sid", sid)
                     (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))
                     s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md"})
@@ -626,6 +637,17 @@ class Engine:
             raise Problem("blocked", "A árvore continuou suja depois da arrumação: " + " ".join(dirty.splitlines()[:5]),
                           again)
 
+    def repo_mark(self, t: Task) -> tuple[str, str]:
+        repo = self.task_config(t).repo
+        return git(repo, "rev-parse", "HEAD"), git(repo, "status", "--porcelain")
+
+    def warn_if_wrote(self, t: Task, who: str, before: tuple[str, str]) -> None:
+        """Plano e revisão só leem; a regra está no prompt, não numa trava. Mexeu no repo: aviso no journal."""
+        after = self.repo_mark(t)
+        if after != before:
+            what = "commitou" if after[0] != before[0] else "deixou arquivos alterados: " + " ".join(after[1].splitlines()[:5])
+            self.s.notice("readonly_wrote", f"{who} alterou o repositório numa fase que só deveria ler ({what}).", t.id)
+
     async def verify(self, t: Task, cycle: int) -> tuple[bool, str]:
         """Roda o `[verify] command` na raiz do repo. → (passou?, texto para o prompt). Sem comando: passa calado."""
         cmd = self.task_config(t).verify_command
@@ -671,12 +693,14 @@ class Engine:
 
     async def review(self, t: Task, role: str, sid: str | None, resume: bool, report: str, actor: str, cycle: int,
                      sid_key: str | None = None) -> tuple[str, str]:
+        before = self.repo_mark(t)
         out, new_sid = await self.call(t, role, f"review-{cycle}-{hms()}", "review", prompt(
             "review", BASE=t.base_prompt, PLAN_FILE=t.plan_file, DECISIONS_FILE=t.decisions_file,
             BASE_SHA=self.s.get(t.id, "base"), ACTOR=actor, CYCLE=cycle, EXEC_REPORT=report,
             VERIFY=_read(t.dir / f"verify-{cycle}.md", "Nenhuma verificação automática configurada.")), sid, resume=resume)
         if out is None:
             raise Problem("failed", f"A revisão (ciclo {cycle}) falhou.", "review" if role == "planner" else "final_review")
+        self.warn_if_wrote(t, "O revisor", before)
         if sid_key:
             self.s.set(t.id, sid_key, new_sid)
         if self.cfg.get("test", "force_changes") and role == "planner":

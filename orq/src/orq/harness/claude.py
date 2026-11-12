@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from ..config import Role
-from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, tool_line
+from .base import CallRequest, CallResult, Harness, OnLine, classify, clip, run_process, safe_render, sandboxed, tool_line
 
 
 # nega subagent em background: ver no_background_agent.py
@@ -41,7 +41,7 @@ class ClaudeHarness(Harness):
                 on_line(line)
 
         raw = req.calls_dir / f"{req.name}.stream.jsonl"
-        rc, timed_out, err = await run_process(self.argv(req), req.prompt, req.cwd, env, req.timeout, raw, on_json)
+        rc, timed_out, err = await run_process(sandboxed(self.argv(req), req.sandbox), req.prompt, req.cwd, env, req.timeout, raw, on_json)
         (req.calls_dir / f"{req.name}.json").write_text(json.dumps(result, ensure_ascii=False))
         cost = float(result["total_cost_usd"]) if result.get("total_cost_usd") is not None else None
         if timed_out:

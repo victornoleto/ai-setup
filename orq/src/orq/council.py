@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from collections import Counter
 from datetime import datetime
@@ -41,7 +42,7 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
     """Decide uma dúvida; grava o evento e o decisions.md. → a linha de resposta, ou None em falha."""
     from .engine import prompt
 
-    qid = q["id"]
+    qid = re.sub(r"[^A-Za-z0-9_-]", "-", str(q["id"]))  # vem do modelo e entra em nome de arquivo
     ids = [o["id"] for o in q["options"]]
     options_md = "\n".join(f"- `{o['id']}` — {o['label']}: {o['detail']}" for o in q["options"])
     d = t.dir / "council" / f"{datetime.now():%H%M%S}-{qid}"
@@ -91,7 +92,7 @@ async def decide(eng: "Engine", t: "Task", source: str, q: dict) -> str | None:
             return None
         (d / "tiebreak.json").write_text(json.dumps(tb, ensure_ascii=False))
         choice, points, tb_rationale = tb["option_id"], 2.5, tb["rationale"]
-    eng.s.event("step", {"task": t.id, "role": "council", "call": f"council-{qid}", "qid": qid, "voters": n,
+    eng.s.event("step", {"task": t.id, "role": "council", "call": f"council-{qid}", "qid": q["id"], "voters": n,
                          "started": started_iso, "duration_s": round(time.time() - t0, 1)})
     return record(eng, t, source, q, votes, choice, points, tb_rationale)
 

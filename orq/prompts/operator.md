@@ -38,4 +38,6 @@ Pergunta que não pede mudança: responda e deixe `commands` vazio. Não invente
 
 ## Mensagem do usuário
 
+<mensagem>
 {{MESSAGE}}
+</mensagem>

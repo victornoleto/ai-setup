@@ -182,6 +182,7 @@ O global fica em [`orq/orq.toml`](../orq/orq.toml). A fila repete só o que muda
 harness = "codex"                # claude | codex | opencode | kiro
 model = "gpt-5.6-sol"            # opencode: "provedor/modelo", ex. "openrouter/~deepseek/deepseek-v4-flash-latest" · kiro: nome do `kiro-cli chat --list-models`, ex. "claude-opus-5.5"
 effort = "high"                  # claude e kiro: low…max · codex: minimal…high · opencode: --variant
+sandbox = "home"                 # off (padrão) | home: mesma worktree, sem enxergar ~/.ssh, gh, aws, .netrc, keyring
 
 [verify]
 command = "make test"            # vazio = desligado; roda via sh -c na raiz do repo, sem push
@@ -241,10 +242,18 @@ Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**,
 
 ## Proteções
 
-- **`git push` bloqueado**: cada remote ganha um `pushurl` inválido via `GIT_CONFIG_*` no ambiente das sessões,
-  sem alterar o repositório.
+- **`git push` travado**: via `GIT_CONFIG_*` no ambiente das sessões, cada remote ganha um `pushurl` inválido e
+  toda URL de push é reescrita para um protocolo que não existe (`git push <url>` também falha). O `fetch` segue
+  funcionando e o repositório não é alterado. É trava contra o reflexo do agente: quem limpa o ambiente de
+  propósito passa, e só o sandbox abaixo segura isso.
+- **Sandbox opcional por papel** (`sandbox = "home"`): a sessão roda no mesmo repositório e na mesma worktree,
+  mas sem enxergar as credenciais do HOME (`~/.ssh`, `~/.config/gh`, `~/.aws`, `.netrc`, agente SSH, keyring).
+  Sem chave, não há push nem leitura de segredo. Custo: `git fetch` de repositório privado e instalação de
+  pacote privado deixam de funcionar dentro da sessão. Desligado por padrão.
 - Conselho e operador rodam só leitura. Planejador, executor e revisor rodam com as permissões liberadas; o que
-  eles podem fazer é o que a tarefa e as regras dizem.
+  eles podem fazer é o que a tarefa e as regras dizem. Plano ou revisão que mexa no repositório vira
+  **[ESCRITA FORA DE HORA]** no journal.
+- O run dir é `0700`: streams e logs guardam saída de ferramenta.
 - Timeout por chamada (`call_timeout`, 4 h) e orçamento por tarefa e por execução (`[loop] max_task_time`,
   `max_run_cost`): estourou, a fila pergunta em vez de seguir gastando. Erro transitório tem nova tentativa. No limite de uso, espera o reset
   (até `limit_max_wait`, 8 h) ou troca de conta.
