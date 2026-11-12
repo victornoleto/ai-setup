@@ -9,7 +9,6 @@ Repositório `/tmp/repo` · conta 2 · planejador/revisor claude-opus-5-5 high �
 - **[FALHOU]** [02-dificil](02-dificil/report.md) — Nem o takeover passou.
 - **[DECISÃO 2 pts]** [01-hello](01-hello/report.md) — Nome do arquivo? → `a` hello.txt
 - **[DECISÃO 2,5 pts]** [02-dificil](02-dificil/report.md) — Qual lib? → `b` B
-- **[LIMITE DE USO]** [02-dificil](02-dificil/report.md) — Limite de uso na conta 2; esperando 30 min.
 - **[PENDÊNCIAS]** 1 pendência(s) e 1 destaque(s) da revisão: na seção de cada tarefa, abaixo.
 
 ## Resumo
@@ -34,4 +33,10 @@ Destaques da revisão:
 ### [02-dificil](02-dificil/report.md) — **FALHOU**
 
 102 min (ativa 30 min)
+
+## Operação
+
+Pausas, retomadas, esperas e erros já superados. Nada aqui pede ação.
+
+- **[LIMITE DE USO]** [02-dificil](02-dificil/report.md) — Limite de uso na conta 2; esperando 30 min.
 

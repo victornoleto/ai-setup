@@ -25,14 +25,15 @@ Uso:
   orq runs [-n 10]               as últimas execuções: estado, tarefas feitas/total, fila e run dir
   orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
   orq attach [run-dir]           reabre o painel (q desanexa; a execução continua)
-  orq status [run-dir]
+  orq status [run-dir]           tarefas, custo e a pergunta aberta, com o comando que a responde
+  orq review [run-dir]           o que conferir em cada tarefa: commits, como validar, pendências, diff
   orq send [run-dir] "/add …" | "/skip NN" | "/note …" | "/decision qid opção" | "/pause" | "/resume" | "/stop"
   orq decide "<pergunta>" --option id="rótulo: detalhe" --option id="…" [--context "…"] [--repo DIR]
   orq notify setup | test         ntfy no celular: cria o tópico (~/.config/orq/notify.toml) / manda um teste
   orq selftest
 
 Sem --headless (e num terminal), o motor roda em segundo plano e o painel abre por cima.
-Sem run dir, attach/status/send usam a execução mais recente que está rodando (ou a última); resume, a última.
+Sem run dir, attach/status/send usam a execução mais recente que está rodando (ou a última); resume e review, a última.
 <pasta>: a pasta da atividade (com orq/ dentro) ou a própria fila (NN-nome.md + orq.toml ou queue.conf).
 """
 
@@ -257,6 +258,22 @@ def cmd_status(args) -> int:
     print(f"motor: {'rodando' if store.engine_alive() else 'parado'} · custo US$ {store.cost():.2f}"
           + (" (parcial: há tentativas com custo não informado)" if store.unknown_costs() else ""))
     print(f"journal: {store.journal_path}")
+    ask = store.top("open_ask")
+    if ask:
+        print(f"\nPERGUNTA ABERTA ({ask['task']}): {ask['question']}")
+        if ask.get("diagnosis"):
+            print(f"  {ask['diagnosis']}")
+        for i, o in enumerate(ask.get("options") or [], 1):
+            print(f"  {i}. {o['label']}" + (" (recomendada)" if o["id"] == ask.get("recommended") else ""))
+        rec = next((i for i, o in enumerate(ask.get("options") or [], 1) if o["id"] == ask.get("recommended")), 1)
+        print(f'responda (troque o número se quiser outra opção): orq send {store.dir} "/answer {ask["id"]} {rec}"')
+    return 0
+
+
+def cmd_review(args) -> int:
+    store = pick_run(args.run_dir, prefer_alive=False)
+    print(journal.render_review(store.events()), end="")
+    print(f"journal: {store.journal_path}")
     return 0
 
 
@@ -369,6 +386,8 @@ def main(argv: list[str] | None = None) -> int:
     en.add_argument("--resumed", action="store_true")
     st = sub.add_parser("status")
     st.add_argument("run_dir", nargs="?")
+    rv = sub.add_parser("review")
+    rv.add_argument("run_dir", nargs="?")
     d = sub.add_parser("decide")
     d.add_argument("question")
     d.add_argument("--option", action="append", default=[])
@@ -386,7 +405,7 @@ def main(argv: list[str] | None = None) -> int:
     nt.add_argument("action", choices=["setup", "test"])
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "runs": cmd_runs, "resume": cmd_resume, "status": cmd_status, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
+    handlers = {"run": cmd_run, "runs": cmd_runs, "resume": cmd_resume, "status": cmd_status, "review": cmd_review, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")

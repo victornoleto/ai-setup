@@ -23,4 +23,6 @@ O plano está em `{{PLAN_FILE}}`; as decisões, em `{{DECISIONS_FILE}}` (se exis
 - Caso contrário `changes`, com cada problema em `issues` (`severity`, `where` = arquivo:linha, `what`, `fix` =
   o que o executor deve fazer).
 - `highlights`: até 5 coisas que o dono do projeto deve ler com atenção, mesmo com a entrega aprovada.
+- `validation`: de 1 a 3 passos que o dono do projeto faz à mão para conferir a entrega, cada um com o que fazer
+  (comando, tela ou arquivo) e o que deve aparecer. Passo de humano, não a suíte de testes. Reprovada: lista vazia.
 - `questions`: só se a correção depende de uma escolha que muda o resultado.

@@ -6,7 +6,8 @@
     "summary",
     "highlights",
     "issues",
-    "questions"
+    "questions",
+    "validation"
   ],
   "properties": {
     "verdict": {
@@ -107,6 +108,13 @@
             }
           }
         }
+      }
+    },
+    "validation": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string"
       }
     }
   }

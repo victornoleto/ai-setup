@@ -157,6 +157,24 @@ def _section(e: dict) -> str | None:
     return None
 
 
+# Aviso que pede conferência do dono, sempre; e aviso que só pede se a tarefa não terminou bem (erro já superado,
+# árvore já arrumada). O resto (pausa, retomada, espera de limite, troca de conta) é operação: fim do journal.
+ATTENTION = {"no_commits", "decision_no_user", "limit_giveup", "readonly_wrote", "orphans"}
+ATTENTION_IF_NOT_OK = {"error", "timeout", "dirty_tree", "background_killed"}
+OK_RESULTS = ("ok", "ok_takeover", OK_USER, "skipped")
+
+
+def needs_attention(e: dict, ends: dict) -> bool:
+    if e.get("kind") in ATTENTION:
+        return True
+    return e.get("kind") in ATTENTION_IF_NOT_OK and (ends.get(e.get("task")) or {}).get("result") not in OK_RESULTS
+
+
+def notice_line(e: dict) -> str:
+    return (f"- **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** " + (f"{link(e['task'])} — " if e.get("task") else "")
+            + esc(e["text"]))
+
+
 def render(ev: list[dict]) -> str:
     history = ev
     ev = current_events(ev)
@@ -183,9 +201,9 @@ def render(ev: list[dict]) -> str:
         + [f"- **[INTERVENÇÃO]** {link(e['task'])} — {esc(e['question'])} → {e.get('action')}"
            + (f": {esc(e['note'])}" if e.get("note") else "")
            for e in ev if e["type"] == "ask_answer" and e.get("kind") != "council"]
-        + [f"- **[{NOTICE_LABEL.get(e['kind'], 'AVISO')}]** " + (f"{link(e['task'])} — " if e.get("task") else "") + esc(e["text"])
-           for e in ev if e["type"] == "notice"]
+        + [notice_line(e) for e in ev if e["type"] == "notice" and needs_attention(e, ends)]
     )
+    operation = [notice_line(e) for e in ev if e["type"] == "notice" and not needs_attention(e, ends)]
     # pendências e destaques são leitura por tarefa (nas seções abaixo), não ação: aqui só a contagem
     n_pend = sum(len(e.get("pending") or []) for e in last_exec)
     n_high = sum(len(e.get("highlights") or []) for e in last_review)
@@ -250,13 +268,19 @@ def render(ev: list[dict]) -> str:
             lines += [esc(_clip(last["summary"], 400)), ""]
         if last.get("pending"):
             lines += ["Pendente:", *(f"- {esc(p)}" for p in last["pending"]), ""]
+        if review.get("validation"):
+            lines += ["Como validar:", *(f"- {esc(v)}" for v in review["validation"]), ""]
         if review.get("highlights"):
             lines += ["Destaques da revisão:", *(f"- {esc(h)}" for h in review["highlights"]), ""]
+    if operation:
+        lines += ["## Operação", "", "Pausas, retomadas, esperas e erros já superados. Nada aqui pede ação.", "",
+                  *operation, ""]
     return "\n".join(lines) + "\n"
 
 
 def render_task(ev: list[dict], t: str) -> str:
-    """O report.md de uma tarefa: início, cada evento dela em ordem e, no fim, a entrega (commits e arquivos)."""
+    """O report.md de uma tarefa, na ordem de quem valida: entrega (commits e arquivos), como validar, pendências e
+    destaques; depois o histórico, cada evento dela em ordem."""
     ev = current_events(ev)
     start = next((e for e in ev if e["type"] == "task_start" and e["task"] == t), None)
     end = next((e for e in reversed(ev) if e["type"] == "task_end" and e["task"] == t), None)
@@ -268,15 +292,51 @@ def render_task(ev: list[dict], t: str) -> str:
     # as seções usam caminhos relativos ao run dir; o report mora dentro da pasta da tarefa
     if start and start.get("repo"):
         lines += [f"Repositório: `{start['repo']}`", ""]
-    lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
-              if (sec := _section(e)) is not None]
-    lines += steps_md(steps(ev, t))
     d = (end or {}).get("delivery")
     if d:
         lines += ["## Entrega", "", *([f"- `{c}`" for c in d["commits"]] or ["Nenhum commit."]), ""]
         if d.get("stat"):
             lines += ["```", d["stat"], "```", ""]
+    review = next((e for e in reversed(ev) if e["type"] == "review" and e.get("task") == t), {})
+    last = next((e for e in reversed(ev) if e["type"] == "exec" and e.get("task") == t), {})
+    for title, items in (("Como validar", review.get("validation")), ("Pendente", last.get("pending")),
+                         ("Destaques da revisão", review.get("highlights"))):
+        if items:
+            lines += [f"## {title}", "", *(f"- {esc(i)}" for i in items), ""]
+    lines += ["## Histórico", ""]
+    lines += [sec.replace(f"]({t}/", "](") for e in ev if e.get("task") == t and e["type"] != "task_start"
+              if (sec := _section(e)) is not None]
+    lines += steps_md(steps(ev, t))
     return "\n".join(lines) + "\n"
+
+
+def render_review(ev: list[dict]) -> str:
+    """`orq review`: por tarefa, o que conferir e o comando que mostra o diff. Texto puro, sem cor."""
+    ev = current_events(ev)
+    out = []
+    for start in (e for e in ev if e["type"] == "task_start"):
+        t = start["task"]
+        end = next((e for e in reversed(ev) if e["type"] == "task_end" and e["task"] == t), None)
+        d = (end or {}).get("delivery") or {}
+        commits = d.get("commits") or []
+        stat = (d.get("stat") or "").splitlines()
+        head = f"{t} — {re.sub(r'[*]', '', result_label(end['result'])) if end else 'em andamento'}"
+        if commits:
+            head += f" · {len(commits)} commit(s)" + (f" · {stat[-1].strip()}" if stat else "")
+        out += [head]
+        if end and end.get("result") not in OK_RESULTS and end.get("reason"):
+            out += [f"  motivo: {_clip(end['reason'], 200)}"]
+        if commits:
+            out += [f"  ver: git -C {start.get('repo')} diff {start['base'][:9]}..{commits[0].split()[0]}"]
+        review = next((e for e in reversed(ev) if e["type"] == "review" and e.get("task") == t), {})
+        last = next((e for e in reversed(ev) if e["type"] == "exec" and e.get("task") == t), {})
+        decisions = [f"{e['question']} → {e['choice']} {e['label']} ({pts(e['points'])} pts)" for e in ev
+                     if e["type"] == "decision" and e.get("task") == t and e.get("points") is not None and e["points"] < 3]
+        for title, items in (("validar", review.get("validation")), ("decisão sem unanimidade", decisions),
+                             ("pendente", last.get("pending")), ("destaque", review.get("highlights"))):
+            out += [f"  {title}: {_clip(i, 300)}" for i in items or []]
+        out += [f"  detalhe: {t}/report.md", ""]
+    return "\n".join(out) if out else "nenhuma tarefa começou nesta execução\n"
 
 
 # --- tempo por etapa -----------------------------------------------------------------------------------------------

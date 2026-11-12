@@ -683,7 +683,7 @@ class Engine:
         self.s.event("verify", {"task": t.id, "cycle": cycle, "started": started_iso, "command": cmd, "ok": ok, "exit": rc,
                                 "timed_out": timed_out, "duration_s": secs, "log_rel": f"{t.id}/verify-{cycle}.log"})
         status = "passou" if ok else "estourou o timeout" if timed_out else f"falhou (código de saída {rc})"
-        tail = log.read_text(errors="replace").splitlines()[-(30 if ok else 80):]
+        tail = log.read_text(errors="replace").splitlines()[-(5 if ok else 80):]  # passou: o revisor só precisa saber o que rodou
         md = (f"Verificação automática `{cmd}`: {status}, em {secs} s. Últimas linhas da saída:\n\n```\n"
               + "\n".join(tail) + "\n```\n")
         (t.dir / f"verify-{cycle}.md").write_text(md)
@@ -728,7 +728,7 @@ class Engine:
         who = f"planejador, {self.cfg.roles['planner'].label()}" if role == "planner" \
             else f"revisor em sessão nova, {self.cfg.roles['reviewer'].label()}"
         self.s.event("review", {"task": t.id, "cycle": cycle, "reviewer": who, **{
-            k: out.get(k) for k in ("verdict", "summary", "highlights", "issues")}})
+            k: out.get(k) for k in ("verdict", "summary", "highlights", "issues", "validation")}})
 
     async def review_outcome(self, t: Task, role: str, cycle: int) -> tuple[str, str]:
         """Lê o parecer salvo, resolve as dúvidas do revisor. → (veredito, texto para o próximo prompt)."""

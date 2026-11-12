@@ -76,7 +76,8 @@ orq runs [-n 10]
 orq attach [run-dir]
 orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
 orq send [run-dir] "/comando …"
-orq status [run-dir]
+orq status [run-dir]            # tarefas, custo e a pergunta aberta, com o comando que a responde
+orq review [run-dir]            # o que conferir em cada tarefa: commits, como validar, pendências, diff
 orq decide "Pergunta?" --option a="Rótulo: detalhe" --option b="…" [--context "…"]
 orq notify setup | test
 orq selftest
@@ -216,10 +217,9 @@ No kiro o gasto vem em créditos, não em US$: aparece no painel e em `calls/NOM
 
 | Arquivo | O quê |
 |---|---|
-| `journal.md` | o resumo da execução, regenerado a cada evento: **"Leia primeiro"**, "O que foi entregue" (escrito
-pelo planejador no fim, só leitura) e uma linha por tarefa com link para o report |
-| `NN-tarefa/report.md` | o relatório da tarefa: plano, execuções, verificações, revisões, decisões, custo e a entrega
-(commits e arquivos alterados) |
+| `journal.md` | o resumo da execução, regenerado a cada evento: **"Leia primeiro"** (só o que pede ação sua), "O que foi entregue" (escrito
+pelo planejador no fim, só leitura), uma entrada por tarefa com "Como validar" e link para o report, e **"Operação"** no fim (pausas, esperas e erros já superados) |
+| `NN-tarefa/report.md` | o relatório da tarefa, na ordem de quem valida: entrega (commits e arquivos alterados), como validar (1 a 3 passos manuais escritos pelo revisor), pendências e destaques; depois o histórico (plano, execuções, verificações, revisões, decisões, custo) |
 | `events.jsonl` | a fonte do journal e da timeline |
 | `state.json` | fase, ciclo e sessões de cada tarefa (o que o `resume` lê) |
 | `stream.log` / `orq.log` | o stream dos harnesses / o log corrido |
