@@ -66,7 +66,10 @@ svg.i{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;s
 .card>header h2{font-size:1rem;font-weight:500;letter-spacing:-.01em}
 .card>header span{margin-left:auto;font-size:.93rem;color:var(--muted-foreground)}
 .scroll{overflow:auto;min-height:0;flex:1;padding:4px 16px 16px}
-.stack{display:grid;gap:16px;min-height:0;grid-template-rows:auto minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:16px;min-height:0}
+.stack>.card{flex:none;max-height:40%}
+.stack>.card:last-child{flex:1;max-height:none}
+.stack .in{overflow:auto;padding:16px}
 
 #queue{padding:4px 8px 8px !important}
 #queue ul{display:grid;gap:4px}
@@ -105,10 +108,23 @@ svg.i{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;s
 .btn.outline:hover{background:var(--accent)}
 
 .ask{background:var(--wait);color:var(--wait-fg);border-color:var(--wait-border)}
-.ask .in{padding:16px}
 .ask strong{display:block;font-size:1.05rem;line-height:1.4;font-weight:500}
 .ask p{margin:6px 0 14px}
-.ask .opts{display:grid;gap:8px}
+.opts{display:grid;gap:8px}
+.opts .btn{height:auto;min-height:36px;padding:8px 14px;white-space:normal;line-height:1.35}
+.btn.sm{height:28px;padding:0 10px;font-size:.93rem}
+.btn.on{background:var(--selected);border-color:transparent;box-shadow:none;font-weight:600}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.ctl{display:flex;gap:8px;align-items:center}
+.ctl+.sp{margin-left:0}
+.meta .btn{color:var(--foreground)}
+.dec{margin:.9em 0 1.3em;max-width:70ch}
+.confirm{display:block;padding:10px 12px;border-radius:calc(var(--radius) - 2px);background:var(--muted);line-height:1.45}
+.edit{display:block;width:100%;min-height:260px;padding:10px 12px;border:1px solid var(--input);border-radius:calc(var(--radius) - 2px);background:var(--background);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.9rem;line-height:1.55;resize:vertical}
+.op strong{display:block;font-weight:600}
+.op p{margin:6px 0 0;line-height:1.5;overflow-wrap:anywhere}
+.cmds{margin-top:10px;display:grid;gap:6px;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.86rem}
+.cmds li{padding:7px 10px;border-radius:calc(var(--radius) - 2px);background:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap}
 .ask .btn.outline{color:var(--foreground)}
 .since{display:grid;gap:7px;margin-bottom:18px}
 .since b{font-weight:500}
@@ -119,6 +135,10 @@ svg.i{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;s
 h3.sub{font-size:.93rem;color:var(--muted-foreground);margin:0 0 9px;font-weight:400}
 
 /* instrução */
+.say .fb{grid-column:1/-1;display:flex;gap:8px;align-items:baseline;padding:2px 4px 6px;font-size:.93rem;line-height:1.4}
+.say .fb span{flex:1;overflow-wrap:anywhere}
+.say .fb b{font-weight:600}
+.say button:disabled{opacity:.5;cursor:default}
 .say{background:var(--card);border:1px solid var(--input);border-radius:calc(var(--radius) + 2px);box-shadow:var(--shadow);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px}
 .say:focus-within{border-color:var(--ring);box-shadow:0 0 0 3px color-mix(in oklch,var(--ring) 50%,transparent)}
 .say .to{display:flex;align-items:center;gap:5px;height:32px;padding:0 10px;border-radius:calc(var(--radius) - 2px);background:var(--secondary);font-weight:500;font-size:.93rem;white-space:nowrap;align-self:end}

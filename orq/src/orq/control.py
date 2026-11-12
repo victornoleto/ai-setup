@@ -1,4 +1,4 @@
-"""Ajustes ao vivo: o painel (ou `orq send`) grava um comando por linha em inbox.jsonl; o motor lê a cada segundo,
+"""Ajustes ao vivo: o painel (ou `orq send`, ou a web) grava um comando por linha em inbox.jsonl; o motor lê a cada segundo,
 aplica e responde com o evento control_ack. Mudança na fila, nota e decisão valem já; pausa e parada, no próximo
 ponto seguro (entre duas chamadas de harness)."""
 from __future__ import annotations

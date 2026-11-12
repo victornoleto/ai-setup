@@ -6,6 +6,8 @@
     moon: "M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z",
     back: "M15 6l-6 6 6 6",
     x: "M6 6l12 12M18 6L6 18",
+    up: "M12 19V5M6 11l6-6 6 6",
+    swap: "M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7",
   };
   let { name }: { name: keyof typeof PATHS } = $props();
 </script>

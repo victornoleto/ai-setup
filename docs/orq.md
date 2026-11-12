@@ -252,8 +252,22 @@ como validar, Histórico, Ao vivo), a pergunta que espera você e a atividade, c
 visita. No topo, o trilho das cinco etapas da tarefa em curso, com harness e modelo. Tema claro e escuro.
 Estado nunca depende só de cor: cada item da fila traz a palavra do estado.
 
-Ela lê os mesmos arquivos do run dir que o painel (`orq/src/orq/web/view.py`); nesta versão é só leitura, e a
-pergunta aberta mostra o `orq send` que a responde. A fonte fica em `orq/web/` (Svelte 5 + Vite) e o resultado
+Ela lê os mesmos arquivos do run dir que o painel (`orq/src/orq/web/view.py`) e age como o `orq send`: cada
+ação vira um comando na caixa de entrada do motor, e a resposta dele aparece na barra de instrução.
+
+| Na tela | Comando |
+|---|---|
+| botão de uma opção na pergunta que espera você | `/answer` |
+| outra opção numa decisão do conselho (aba Plano), com confirmação | `/decision`; em tarefa concluída cria a tarefa de ajuste |
+| barra de instrução, com alvo "Tarefa NN" ou "Fila inteira" | `/ask`: o operador responde e propõe comandos; **Aplicar** os envia, **Descartar** fecha |
+| Pular, Devolver à fila (tarefa pendente) | `/skip`, `/unskip` |
+| Pausar, Retomar, Parar (com confirmação) | `/pause`, `/resume`, `/stop` |
+| Editar texto (tarefa pendente) | grava o arquivo da tarefa na fila, como o `/edit` do painel |
+
+Com o motor parado, o comando fica guardado e vale no próximo `orq resume`. O servidor só aceita ação com
+`Origin` local e um token que a página recebe ao ser servida: outra aba do navegador não comanda os agentes.
+
+A fonte fica em `orq/web/` (Svelte 5 + Vite) e o resultado
 compilado em `orq/web/dist/` vai no repositório: quem só usa não precisa de Node. Para alterar a tela:
 `cd orq/web && npm install && npm run build`. O `doctor.sh` acusa `dist/` mais velho que a fonte.
 

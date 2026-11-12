@@ -1,10 +1,13 @@
 """Servidor HTTP da interface web do orq. Um para todas as execuções registradas, só em 127.0.0.1.
-Lê os run dirs (view.py) e serve a página compilada de orq/web/dist."""
+Lê os run dirs (view.py) e serve a página compilada de orq/web/dist. As ações (POST) viram comando na inbox do
+motor, como o `orq send`: só com Origin local e o token que a página recebe ao ser servida."""
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
 import re
+import secrets
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,6 +24,10 @@ DIST = ORQ_HOME / "web" / "dist"
 CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 RUN_RE = re.compile(r"/api/runs/([0-9a-f]{12})(?:/(.*))?")
+# O que a página pode mandar ao motor. /edit não entra: o texto de tarefa pendente tem rota própria.
+COMMANDS = ("add", "skip", "unskip", "note", "decision", "pause", "resume", "stop", "ask", "answer")
+MAX_BODY = 64_000
+MAX_TEXT = 20_000
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -48,11 +55,67 @@ class Handler(BaseHTTPRequestHandler):
 
     def _not_allowed(self) -> None:
         self.send_response(405)
-        self.send_header("Allow", "GET")
+        self.send_header("Allow", "GET, POST")
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    do_POST = do_PUT = do_DELETE = do_PATCH = do_OPTIONS = _not_allowed
+    do_PUT = do_DELETE = do_PATCH = do_OPTIONS = _not_allowed
+
+    def do_POST(self) -> None:
+        """Um comando daqui dirige agentes sem supervisão. Host barra DNS rebinding; Origin e token barram outra
+        aba do navegador (ela não lê a página, então não tem o token); JSON evita formulário simples."""
+        port = self.server.server_port
+        self.close_connection = True  # resposta de erro pode sair sem ler o corpo
+        if not self._host_ok():
+            return self._json(403, {"error": f"Host não permitido: abra http://127.0.0.1:{port}/"})
+        if self.headers.get("Origin") not in (f"http://127.0.0.1:{port}", f"http://localhost:{port}"):
+            return self._json(403, {"error": "origem não permitida"})
+        token = getattr(self.server, "token", "")
+        if not token or not hmac.compare_digest(self.headers.get("X-Orq-Token", "").encode(), token.encode()):
+            return self._json(403, {"error": "token inválido: recarregue a página"})
+        if not self.headers.get("Content-Type", "").startswith("application/json"):
+            return self._json(415, {"error": "envie application/json"})
+        try:
+            size = int(self.headers.get("Content-Length", ""))
+            if not 0 < size <= MAX_BODY:
+                raise ValueError
+            body = json.loads(self.rfile.read(size))
+        except ValueError:
+            return self._json(400, {"error": "corpo inválido"})
+        try:
+            self._action(urlsplit(self.path).path, body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        except Exception as exc:
+            self._json(500, {"error": f"erro interno ({type(exc).__name__}): {exc}"})
+
+    def _action(self, path: str, body) -> None:
+        m = RUN_RE.fullmatch(path)
+        store = view.find_run(m.group(1)) if m else None
+        if not store:
+            return self._json(404, {"error": "execução não encontrada: confira `orq runs`"})
+        if not isinstance(body, dict) or not isinstance(body.get("text"), str):
+            return self._json(400, {"error": "falta o campo text"})
+        rest, text = m.group(2) or "", body["text"]
+        if len(text) > MAX_TEXT:
+            return self._json(400, {"error": f"texto longo demais (máximo {MAX_TEXT} caracteres)"})
+        if rest == "send":
+            cmd = re.match(r"/(\w+)", text.strip())
+            if not cmd or cmd.group(1).lower() not in COMMANDS:
+                return self._json(400, {"error": "comando não aceito pela web: " + ", ".join("/" + c for c in COMMANDS)})
+            op = body.get("op")
+            if op is not None and not (isinstance(op, str) and re.fullmatch(r"[0-9a-f]{1,32}", op)):
+                return self._json(400, {"error": "proposta inválida"})
+            sent = store.send(text.strip(), source=f"web:op:{op}" if op else "web")
+            return self._json(200, {"id": sent["id"], "alive": store.engine_alive()})
+        mt = re.fullmatch(r"tasks/([^/]+)/text", rest)
+        if mt:
+            try:
+                view.set_task_text(store, mt.group(1), text)
+            except view.TaskError as exc:
+                return self._json(exc.status, {"error": str(exc)})
+            return self._json(200, {"ok": True})
+        self._json(404, {"error": f"rota não encontrada: {path}"})
 
     def do_GET(self) -> None:
         if not self._host_ok():
@@ -141,10 +204,14 @@ class Handler(BaseHTTPRequestHandler):
         if not index.is_file():
             return self._send(503, "orq web: falta orq/web/dist (rode `npm run build` em orq/web)".encode(),
                               "text/plain; charset=utf-8")
-        self._send(200, index.read_bytes(), "text/html; charset=utf-8")
+        meta = f'<meta name="orq-token" content="{getattr(self.server, "token", "")}">'.encode()
+        html = index.read_bytes()
+        html = html.replace(b"<head>", b"<head>" + meta, 1) if b"<head>" in html else meta + html
+        self._send(200, html, "text/html; charset=utf-8")
 
 
 def serve(port: int = DEFAULT_PORT) -> ThreadingHTTPServer:
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv.token = secrets.token_urlsafe(32)  # vale enquanto o servidor vive; a página recarregada recebe o novo
     srv.daemon_threads = True  # conexões SSE abertas não seguram o encerramento
     return srv

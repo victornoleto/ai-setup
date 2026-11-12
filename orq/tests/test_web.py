@@ -33,15 +33,24 @@ def web(tmp_path):
     (srv.dist / "assets" / "app.js").write_text("console.log(1)")
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
-    def get(path, host=None, method="GET"):
+    srv.token = "segredo"
+
+    def get(path, host=None, method="GET", body=None, headers=None):
         conn = http.client.HTTPConnection("127.0.0.1", srv.server_port)
-        conn.request(method, path, headers={"Host": host} if host else {})
+        conn.request(method, path, body=body, headers={**({"Host": host} if host else {}), **(headers or {})})
         r = conn.getresponse()
         body = r.read()
         conn.close()
         return r.status, r.headers, body
 
+    def post(path, obj, **over):
+        headers = {"Origin": f"http://127.0.0.1:{srv.server_port}", "X-Orq-Token": "segredo",
+                   "Content-Type": "application/json", **over}
+        status, _, body = get(path, method="POST", body=json.dumps(obj), headers={k: v for k, v in headers.items() if v})
+        return status, json.loads(body or b"{}")
+
     get.port = srv.server_port
+    get.post = post
     yield get
     srv.shutdown()
     srv.server_close()
@@ -132,8 +141,101 @@ def test_serve_a_pagina_e_os_assets(web):
     assert web("/assets/../../etc/passwd")[0] == 404
 
 
-def test_so_get(web):
-    assert web("/api/runs", method="POST")[0] == 405
+def test_metodo_fora_do_contrato(web):
+    assert web("/api/runs", method="PUT")[0] == 405
+    assert web("/api/runs", method="DELETE")[0] == 405
+
+
+# --- ações (POST) -------------------------------------------------------------------------------------------------
+async def test_post_exige_origem_local_token_e_json(run, web):
+    url = f"/api/runs/{view.run_id(run.dir)}/send"
+    assert web.post(url, {"text": "/pause"}, Origin="http://evil.example")[0] == 403
+    assert web.post(url, {"text": "/pause"}, Origin="")[0] == 403
+    assert web.post(url, {"text": "/pause"}, **{"X-Orq-Token": "errado"})[0] == 403
+    assert web.post(url, {"text": "/pause"}, **{"X-Orq-Token": ""})[0] == 403
+    assert web.post(url, {"text": "/pause"}, **{"Content-Type": "text/plain"})[0] == 415
+    assert web(url, method="POST", host="evil.example")[0] == 403
+    assert run.take_inbox() == []
+
+
+async def test_send_grava_na_caixa_de_entrada(run, web):
+    url = f"/api/runs/{view.run_id(run.dir)}/send"
+    status, body = web.post(url, {"text": "/note cuidado com o cache --task 01"})
+    assert status == 200 and body["alive"] is False
+    cmd = run.take_inbox()[0]
+    assert (cmd["id"], cmd["text"], cmd["source"]) == (body["id"], "/note cuidado com o cache --task 01", "web")
+    status, body = web.post(url, {"text": "/skip 02", "op": "1a2b"})
+    assert status == 200 and run.take_inbox()[1]["source"] == "web:op:1a2b"
+
+
+async def test_send_recusa_o_que_nao_e_comando(run, web):
+    url = f"/api/runs/{view.run_id(run.dir)}/send"
+    assert web.post(url, {"text": "apague tudo"})[0] == 400
+    assert web.post(url, {"text": "/edit 01"})[0] == 400
+    assert web.post(url, {"text": "/pause", "op": "../x"})[0] == 400
+    assert web.post(url, {"text": "/note " + "x" * 30000})[0] == 400
+    assert web.post(url, ["/pause"])[0] == 400
+    assert web.post("/api/runs/naoexiste000/send", {"text": "/pause"})[0] == 404
+    assert run.take_inbox() == []
+
+
+def test_edita_o_texto_de_tarefa_pendente(tmp_path, web):
+    cfg = make_queue(tmp_path, {}, tasks=("01-a", "02-b"))
+    e = engine(tmp_path, cfg)
+    register_run(e.s.dir, cfg.queue_dir)
+    e.s.update_task("01-a", {"phase": "exec", "cycle": 1, "started": 1, "active_since": 1})
+    base = f"/api/runs/{view.run_id(e.s.dir)}/tasks"
+    status, body = web.post(f"{base}/02-b/text", {"text": "Tarefa nova\n\ncom detalhe"})
+    assert status == 200 and (cfg.queue_dir / "02-b.md").read_text() == "Tarefa nova\n\ncom detalhe\n"
+    assert any(x["type"] == "notice" and x.get("task") == "02-b" for x in e.s.events())
+    status, body = web.post(f"{base}/01-a/text", {"text": "x"})
+    assert status == 409 and "já começou" in body["error"]
+    assert web.post(f"{base}/02-b/text", {"text": "  "})[0] == 400
+    assert web.post(f"{base}/99-nada/text", {"text": "x"})[0] == 404
+    assert web.post(f"{base}/..%2Fstate/text", {"text": "x"})[0] == 404
+
+
+def test_pagina_recebe_o_token(web):
+    assert b'<meta name="orq-token" content="segredo">' in web("/")[2]
+
+
+def test_visao_traz_propostas_do_operador_e_acks(tmp_path):
+    cfg = make_queue(tmp_path, {}, tasks=("01-a",))
+    e = engine(tmp_path, cfg)
+    e.s.set_top("pending_ops", {"c9": "e a 01?", "tui": "do painel"})
+    for cid in ("aa", "bb", "c9"):
+        e.s.event("control_ack", {"id": cid, "command": "/ask …", "ok": True, "result": "consultado", "source": "web"})
+    e.s.event("control_ack", {"id": "zz", "command": "/ask …", "ok": True, "result": "consultado", "source": "painel"})
+    e.s.event("operator", {"id": "zz", "text": "do painel", "reply": "ok", "commands": ["/stop"]})
+    e.s.event("operator", {"id": "aa", "text": "pule a 01", "reply": "Vou pular.", "commands": ["/skip 01"]})
+    e.s.event("operator", {"id": "bb", "text": "pause", "reply": "Pauso.", "commands": ["/pause"]})
+    e.s.event("control_ack", {"id": "x1", "command": "/pause", "ok": True, "result": "pausa", "source": "web:op:bb"})
+    v = view.run_view(e.s)
+    assert v["alive"] is False
+    assert [(o["id"], o["applied"]) for o in v["ops"]] == [("aa", False), ("bb", True)]
+    assert v["ops"][0]["commands"] == ["/skip 01"] and v["ops"][0]["text"] == "pule a 01"
+    assert v["pending_ops"] == [{"id": "c9", "text": "e a 01?"}]
+    assert v["acks"][-1] == {"id": "x1", "command": "/pause", "ok": True, "result": "pausa"}
+
+
+def test_visao_da_tarefa_traz_decisoes_e_se_pode_editar(tmp_path):
+    cfg = make_queue(tmp_path, {}, tasks=("01-a", "02-b"))
+    e = engine(tmp_path, cfg)
+    opts = [{"id": "a", "label": "Opção A"}, {"id": "b", "label": "Opção B"}]
+    e.s.update_task("01-a", {"phase": "exec", "cycle": 1, "started": 1, "active_since": 1})
+    e.s.event("decision", {"task": "01-a", "source": "plan", "qid": "q1", "question": "Qual?", "context": "",
+                           "options": opts, "votes": [], "choice": "a", "label": "Opção A", "points": 3,
+                           "tiebreak": "", "why": "porque sim"})
+    d = view.task_view(e.s, "01-a")["decisions"]
+    assert d == [{"qid": "q1", "question": "Qual?", "options": opts, "choice": "a", "label": "Opção A",
+                  "why": "porque sim", "points": 3, "by_user": False}]
+    e.s.event("decision", {"task": "01-a", "source": "usuario", "qid": "q1", "question": "Qual?", "context": "",
+                           "options": opts, "votes": [], "choice": "b", "label": "Opção B", "points": None,
+                           "tiebreak": "", "why": "troquei"})
+    d = view.task_view(e.s, "01-a")["decisions"]
+    assert len(d) == 1 and (d[0]["choice"], d[0]["by_user"]) == ("b", True)
+    assert view.task_view(e.s, "01-a")["editable"] is False
+    assert view.task_view(e.s, "02-b")["editable"] is True
 
 
 async def test_stream_avisa_quando_ha_evento_novo(run, web):

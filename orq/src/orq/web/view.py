@@ -1,4 +1,5 @@
-"""O que a web mostra, em dict pronto para JSON. Lê o run dir como o painel (tui/model.py), sem escrever nada."""
+"""O que a web mostra, em dict pronto para JSON. Lê o run dir como o painel (tui/model.py). A única escrita é a
+do painel: o texto de uma tarefa pendente (set_task_text); o resto das ações vai pela inbox."""
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +8,7 @@ import time
 from pathlib import Path
 
 from .. import journal
-from ..store import RunStore, queue_label, registered_runs
+from ..store import RunStore, queue_label, registered_runs, write_atomic
 from ..tui import model
 
 # O trilho da barra de estado, na ordem em que uma tarefa passa por ele.
@@ -105,6 +106,22 @@ def run_view(store: RunStore, timeline: int = 300) -> dict:
         "tasks": tasks, "current": _current(st, rows) if not re_ else None, "stages": list(STAGES),
         "ask": st.get("open_ask"), "summary": summary, "n_events": len(events),
         "timeline": [x for i, e in enumerate(events) if (x := event_entry(i, e, ends))][-timeline:],
+        "alive": store.engine_alive(), **_operator(st, events),
+    }
+
+
+def _operator(st: dict, events: list[dict]) -> dict:
+    """Conversa com o operador: perguntas sem resposta, propostas (aplicada = há ack de comando enviado em nome
+    dela) e os últimos acks, para a tela dizer o que o motor respondeu a cada ação."""
+    acks = [e for e in events if e["type"] == "control_ack"]
+    applied = {a.get("source", "")[len("web:op:"):] for a in acks if a.get("source", "").startswith("web:op:")}
+    asked = {a["id"] for a in acks if a.get("source", "").startswith("web")}  # as do painel, o painel já tratou
+    return {
+        "pending_ops": [{"id": k, "text": v} for k, v in (st.get("pending_ops") or {}).items() if k in asked],
+        "ops": [{"id": e["id"], "ts": e["ts"], "text": e.get("text", ""), "reply": e.get("reply", ""),
+                 "commands": e.get("commands") or [], "applied": e["id"] in applied}
+                for e in events if e["type"] == "operator" and e.get("id") in asked][-10:],
+        "acks": [{k: a.get(k) for k in ("id", "command", "ok", "result")} for a in acks[-30:]],
     }
 
 
@@ -113,6 +130,37 @@ def _read(p: Path) -> str | None:
         return p.read_text(errors="replace")
     except (FileNotFoundError, IsADirectoryError):
         return None
+
+
+def _decisions(cur: list[dict], tid: str) -> list[dict]:
+    """Uma entrada por pergunta do conselho, com a escolha que vale hoje (a do usuário vence a do conselho)."""
+    out: dict[str, dict] = {}
+    for e in cur:
+        if e["type"] == "decision" and e.get("task") == tid:
+            out[e["qid"]] = {"qid": e["qid"], "question": e["question"], "options": e.get("options") or [],
+                             "choice": e["choice"], "label": e["label"], "why": e.get("why", ""),
+                             "points": e.get("points"), "by_user": journal.from_user(e)}
+    return list(out.values())
+
+
+class TaskError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+
+
+def set_task_text(store: RunStore, tid: str, text: str) -> None:
+    """O /edit do painel, pela web: só tarefa que ainda não começou, e nunca texto vazio."""
+    st = store.state()
+    f = Path(st["queue"]) / f"{tid}.md"
+    if not TASK_ID_RE.fullmatch(tid) or not f.is_file():
+        raise TaskError(404, "tarefa não encontrada nesta fila")
+    if st["tasks"].get(tid, {}).get("phase"):
+        raise TaskError(409, f"{tid} já começou; só tarefa pendente é editada")
+    if not isinstance(text, str) or not text.strip():
+        raise TaskError(400, "o texto da tarefa não pode ficar vazio")
+    write_atomic(f, text.rstrip() + "\n")
+    store.notice("control", "Texto da tarefa editado pela web.", tid)
 
 
 def task_view(store: RunStore, tid: str) -> dict | None:
@@ -133,6 +181,8 @@ def task_view(store: RunStore, tid: str) -> dict | None:
         "report_md": _read(d / "report.md"),
         "validation": review.get("validation") or [], "highlights": review.get("highlights") or [],
         "pending": last.get("pending") or [],
+        "decisions": _decisions(cur, tid), "editable": not st["tasks"].get(tid, {}).get("phase"),
+        "skipped": st["tasks"].get(tid, {}).get("result") == "skipped",
         "steps": [{k: s.get(k) for k in ("label", "kind", "cycle", "dur", "ok", "running", "open", "waited", "tools")}
                   for s in model.task_steps(store, events, tid)] if d.is_dir() else [],
         "diff": {"add": diff.add, "rem": diff.rem, "nfiles": diff.nfiles,

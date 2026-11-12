@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { api, type Entry, type RunView, type TaskRow, type TaskView } from "./lib/api";
+  import { api, type Decision, type Entry, type Op, type RunView, type TaskRow, type TaskView } from "./lib/api";
   import { ago, clock, dur, hms } from "./lib/fmt";
   import Icon from "./lib/Icon.svelte";
   import { md } from "./lib/md";
@@ -22,6 +22,72 @@
   // svelte-ignore state_referenced_locally (o componente é recriado a cada execução: {#key} no App)
   const seen = readSeen(id);
   let lastN = -1;
+
+  // --- ações: tudo vira comando do orq; o motor responde com um ack, que a tela mostra --------------------------
+  let say = $state("");
+  let target = $state<"task" | "queue">("task");
+  let feedback = $state<{ ok: boolean; text: string } | null>(null);
+  let confirming = $state<string | null>(null); // a ação que espera o segundo clique
+  let editing = $state(false);
+  let draft = $state("");
+  let closed = $state<string[]>(readClosed());
+  const watch = new Set<string>();
+
+  function readClosed(): string[] {
+    try {
+      return JSON.parse(localStorage.getItem(`orq:ops:${id}`) ?? "[]");
+    } catch {
+      return [];
+    }
+  }
+  function closeOp(op: string) {
+    closed = [...closed, op].slice(-50);
+    try {
+      localStorage.setItem(`orq:ops:${id}`, JSON.stringify(closed));
+    } catch {
+      /* navegação privada: a proposta volta ao recarregar */
+    }
+  }
+
+  async function act(text: string, op?: string): Promise<boolean> {
+    confirming = null;
+    try {
+      const r = await api.send(id, text, op);
+      if (r.alive) {
+        watch.add(r.id);
+        feedback = { ok: true, text: "Enviado. Aguardando o motor." };
+      } else {
+        feedback = { ok: true, text: "Motor parado: o comando fica guardado e vale no próximo `orq resume`." };
+      }
+      return true;
+    } catch (e) {
+      feedback = { ok: false, text: (e as Error).message };
+      return false;
+    }
+  }
+
+  async function sendSay() {
+    const text = say.trim();
+    if (!text) return;
+    const about = target === "task" && selRow ? `Sobre a tarefa \`${selRow.id}\` (${selRow.status}): ` : "";
+    if (await act(`/ask ${about}${text}`)) say = "";
+  }
+
+  async function applyOp(op: Op) {
+    for (const c of op.commands) if (!(await act(c, op.id))) return;
+  }
+
+  async function saveText() {
+    if (!sel) return;
+    try {
+      await api.setText(id, sel, draft);
+      editing = false;
+      feedback = { ok: true, text: "Texto da tarefa salvo." };
+      await loadTask();
+    } catch (e) {
+      feedback = { ok: false, text: (e as Error).message };
+    }
+  }
 
   const files = (n: number) => `${n} ${n === 1 ? "arquivo" : "arquivos"}`;
   // O título costuma repetir o número da tarefa ("01 · Servidor"): na fila o número já vem na frente.
@@ -48,6 +114,9 @@
       const r = await api.run(id);
       run = r;
       err = "";
+      for (const a of r.acks) {
+        if (watch.delete(a.id)) feedback = { ok: a.ok, text: a.result };
+      }
       if (!sel || !r.tasks.some((t) => t.id === sel)) {
         sel = r.ask?.task ?? r.current?.task ?? r.tasks.find((t) => !t.result)?.id ?? r.tasks.at(-1)?.id ?? null;
       }
@@ -62,6 +131,8 @@
   function pick(tid: string) {
     sel = tid;
     task = null;
+    editing = false;
+    confirming = null;
     activity = [];
     history.replaceState(null, "", `/run/${id}?t=${encodeURIComponent(tid)}`);
     loadTask();
@@ -111,6 +182,7 @@
   });
   const stageIndex = $derived(run?.current ? run.stages.indexOf(run.current.stage) : -1);
   const selRow = $derived(run?.tasks.find((t) => t.id === sel) ?? null);
+  const proposals = $derived(run ? run.ops.filter((o) => !o.applied && !closed.includes(o.id)) : []);
 
   const digest = $derived.by(() => {
     if (!since) return null;
@@ -163,6 +235,29 @@
   </div>
 {/snippet}
 
+{#snippet decision(d: Decision, finished: boolean)}
+  <div class="dec">
+    <p><b>{d.question}</b></p>
+    <div class="opts">
+      {#each d.options as o}
+        {#if o.id === d.choice}
+          <span class="btn outline on" aria-current="true"><Icon name="check" /> {o.label} ({d.by_user ? "escolha sua" : "escolhida"})</span>
+        {:else if confirming === `${d.qid}:${o.id}`}
+          <span class="confirm">
+            Trocar para "{o.label}"? {finished ? "A tarefa já terminou: cria uma tarefa de ajuste." : "Entra no próximo prompt da tarefa."}
+            <span class="row">
+              <button class="btn primary sm" onclick={() => act(`/decision ${d.qid} ${o.id}`)}>Confirmar</button>
+              <button class="btn outline sm" onclick={() => (confirming = null)}>Cancelar</button>
+            </span>
+          </span>
+        {:else}
+          <button class="btn outline" onclick={() => (confirming = `${d.qid}:${o.id}`)}>{o.label}</button>
+        {/if}
+      {/each}
+    </div>
+  </div>
+{/snippet}
+
 <header class="bar">
   <a class="brand" href="/" onclick={(e) => { e.preventDefault(); go("/"); }} title="Todas as execuções">orq</a>
   {#if run}
@@ -172,6 +267,18 @@
     {#if run.eta}<span class="num">termina <b>~{clock(run.eta)}</b></span>{/if}
     <span class="num">US$ <b>{run.cost.toFixed(2)}</b> {run.cost_partial ? "parcial" : "estimado"}</span>
     <span class="badge" class:wait={run.state === "esperando você"} class:run={run.state === "rodando"}>{run.paused && run.state === "rodando" ? "pausada" : run.state}</span>
+  {/if}
+  {#if run?.alive}
+    <span class="sp ctl">
+      {#if confirming === "stop"}
+        <span>Parar no próximo ponto seguro?</span>
+        <button class="btn primary sm" onclick={() => act("/stop")}>Parar</button>
+        <button class="btn outline sm" onclick={() => (confirming = null)}>Cancelar</button>
+      {:else}
+        <button class="btn outline sm" onclick={() => act(run?.paused ? "/resume" : "/pause")}>{run.paused ? "Retomar" : "Pausar"}</button>
+        <button class="btn outline sm" onclick={() => (confirming = "stop")}>Parar</button>
+      {/if}
+    </span>
   {/if}
   <ThemeToggle bind:theme />
 </header>
@@ -231,9 +338,21 @@
               <span><b>{task.status}</b></span>
               {#if selRow?.extra}<span class="num">{selRow.extra}</span>{/if}
               {#if task.diff}<span class="num"><b>+{task.diff.add} −{task.diff.rem}</b> em {files(task.diff.nfiles)}</span>{/if}
+              {#if task.skipped}
+                <button class="btn outline sm" onclick={() => act(`/unskip ${task?.id}`)}>Devolver à fila</button>
+              {:else if task.editable && !editing}
+                <button class="btn outline sm" onclick={() => { draft = task?.text ?? ""; editing = true; }}>Editar texto</button>
+                <button class="btn outline sm" onclick={() => act(`/skip ${task?.id}`)}>Pular</button>
+              {/if}
             </div>
             <div class="md" style="margin-top:14px">
-              {#if task.plan_md}
+              {#if editing}
+                <textarea class="edit" bind:value={draft} aria-label="Texto da tarefa"></textarea>
+                <div class="row">
+                  <button class="btn primary sm" onclick={saveText}>Salvar</button>
+                  <button class="btn outline sm" onclick={() => (editing = false)}>Cancelar</button>
+                </div>
+              {:else if task.plan_md}
                 {@html md(task.plan_md)}
               {:else}
                 <p class="empty">{task.report_md ? "Esta tarefa não tem plano gravado." : "O plano desta tarefa ainda não foi escrito."} O texto da tarefa:</p>
@@ -242,6 +361,10 @@
               {#if task.decisions_md}
                 <h2>Decisões</h2>
                 {@html md(task.decisions_md)}
+              {/if}
+              {#if task.decisions.length}
+                <h2>Trocar uma decisão</h2>
+                {#each task.decisions as d (d.qid)}{@render decision(d, !!selRow?.result)}{/each}
               {/if}
             </div>
           {:else if tab === "entrega"}
@@ -281,25 +404,63 @@
           </div>
         </section>
       {/if}
+
+      <form class="say" onsubmit={(e) => { e.preventDefault(); sendSay(); }}>
+        {#if feedback}
+          <p class="fb" role="status">
+            <Icon name={feedback.ok ? "check" : "alert"} /> <span><b>{feedback.ok ? "ok" : "recusado"}:</b> {feedback.text}</span>
+            <button type="button" class="linkbtn" onclick={() => (feedback = null)}>fechar</button>
+          </p>
+        {/if}
+        <button type="button" class="to" title="Trocar o alvo da instrução" disabled={!selRow}
+          onclick={() => (target = target === "task" ? "queue" : "task")}>
+          {target === "task" && selRow ? `Tarefa ${selRow.id.split("-")[0]}` : "Fila inteira"} <Icon name="swap" />
+        </button>
+        <textarea rows="1" bind:value={say} aria-label="Instrução para o operador"
+          placeholder={target === "task" && selRow ? "Diga o que mudar nesta tarefa" : "Diga o que mudar na fila"}
+          onkeydown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendSay(); } }}></textarea>
+        <button class="go" aria-label="Enviar ao operador" disabled={!say.trim()}><Icon name="up" /></button>
+      </form>
     </div>
 
-    <div class="stack" style={run.ask ? "" : "grid-template-rows:minmax(0,1fr)"}>
+    <div class="stack">
       {#if run.ask}
         <section class="card ask">
           <div class="in">
             <strong><Icon name="alert" /> Tarefa {run.ask.task.split("-")[0]} espera você: {run.ask.question}</strong>
             {#if run.ask.diagnosis}<p>{run.ask.diagnosis}</p>{/if}
-            <ol>
-              {#each run.ask.options as o}
-                <li>{o.label}{o.id === run.ask.recommended ? " (recomendada)" : ""}</li>
+            <div class="opts">
+              {#each run.ask.options as o, i}
+                <button class="btn" class:primary={o.id === run.ask.recommended} class:outline={o.id !== run.ask.recommended}
+                  onclick={() => act(`/answer ${run?.ask?.id} ${i + 1}`)}>
+                  {o.label}{o.id === run.ask.recommended ? " (recomendada)" : ""}
+                </button>
               {/each}
-            </ol>
-            {#if run.ask.deadline}<p>Segue sozinha com a recomendada às {clock(run.ask.deadline)}.</p>{/if}
-            <p class="hint">Responder pela tela chega na próxima entrega. Por enquanto, no terminal:</p>
-            <code>orq send {run.run} "/answer {run.ask.id} {Math.max(1, run.ask.options.findIndex((o) => o.id === run?.ask?.recommended) + 1)}"</code>
+            </div>
+            {#if run.ask.deadline}<p class="hint">Segue sozinha com a recomendada às {clock(run.ask.deadline)}.</p>{/if}
           </div>
         </section>
       {/if}
+      {#each run.pending_ops as p (p.id)}
+        <section class="card op"><div class="in"><strong>Operador analisando</strong><p>{p.text}</p></div></section>
+      {/each}
+      {#each proposals as op (op.id)}
+        <section class="card op">
+          <div class="in">
+            <strong>Proposta do operador</strong>
+            <p>{op.reply}</p>
+            {#if op.commands.length}
+              <ul class="cmds">{#each op.commands as c}<li>{c}</li>{/each}</ul>
+              <div class="row">
+                <button class="btn primary sm" onclick={() => applyOp(op)}>Aplicar {op.commands.length === 1 ? "o comando" : `os ${op.commands.length} comandos`}</button>
+                <button class="btn outline sm" onclick={() => closeOp(op.id)}>Descartar</button>
+              </div>
+            {:else}
+              <div class="row"><button class="btn outline sm" onclick={() => closeOp(op.id)}>Fechar</button></div>
+            {/if}
+          </div>
+        </section>
+      {/each}
       <section class="card">
         <header><h2>Atividade</h2><span>{run.state === "rodando" ? "ao vivo" : run.state}</span></header>
         <div class="scroll">

@@ -15,6 +15,8 @@ Repositório: {{REPO}} · run dir: {{RUN_DIR}}
 - `/pause` · `/resume` · `/stop`
 
 Mudança no rumo da tarefa em curso é `/note`; trabalho novo é `/add`; troca de escolha já feita é `/decision`.
+Mensagem que começa com `Sobre a tarefa NN` fala daquela tarefa: pendente recebe `/note --task NN`; concluída recebe
+um `/add --after <tarefa em curso>` de ajuste, com o que a NN entregou e o que deve mudar (sem tarefa em curso, no fim).
 Pergunta que não pede mudança: responda e deixe `commands` vazio. Não invente id de tarefa nem de decisão.
 `reply` diz o que os comandos **vão** fazer se o usuário confirmar; nunca diga que já fez.
 
