@@ -57,7 +57,9 @@ class ClaudeHarness(Harness):
         if rc == 0 and result and result.get("structured_output") is None and not result.get("is_error"):
             return CallResult(error="no_output", session_id=sid, message=clip(text, 300),
                               cost=cost)
-        return CallResult(error=classify(text) or "fatal", session_id=sid if result else None,
+        # Só o erro do CLI classifica: com is_error falso, `result` é texto do modelo (pode falar de "rate limit").
+        kind = classify(text if result.get("is_error") or not result else err)
+        return CallResult(error=kind or "fatal", session_id=sid if result else None,
                           message=clip(text, 300) or f"saída {rc}", cost=cost)
 
     def interactive_argv(self, role: Role, prompt: str) -> list[str]:

@@ -23,7 +23,7 @@ NOTICE_LABEL = {"limit_wait": "LIMITE DE USO", "limit_giveup": "LIMITE DE USO", 
                 "retry": "REFEITA", "paused": "PAUSA", "stopped": "PARADA", "control": "AJUSTE",
                 "note": "NOTA", "operator": "OPERADOR",
                 "dirty_tree": "ÁRVORE SUJA", "no_commits": "SEM COMMIT", "decision_no_user": "DECISÃO SEM USUÁRIO",
-                "background_killed": "BACKGROUND MORTO", "readonly_wrote": "ESCRITA FORA DE HORA"}
+                "background_killed": "BACKGROUND MORTO", "readonly_wrote": "ESCRITA FORA DE HORA", "orphans": "PROCESSO ÓRFÃO"}
 
 
 def esc(v) -> str:

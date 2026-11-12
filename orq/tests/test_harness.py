@@ -196,3 +196,30 @@ async def test_kiro_call_erros(tmp_path, monkeypatch):
     _fake_kiro(tmp_path, monkeypatch, [fim])
     res = await kiro.KiroHarness().call(_kiro_req(tmp_path), lambda line: None)
     assert res.error == "no_output" and res.session_id == "s2"
+
+
+async def _claude_falso(tmp_path, monkeypatch, result: dict, rc: int):
+    from orq.config import Role
+    from orq.harness.base import CallRequest
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "claude").write_text(f"#!/bin/sh\ncat >/dev/null\necho '{json.dumps(result)}'\nexit {rc}\n")
+    (bin_dir / "claude").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}:{os.environ['PATH']}")
+    req = CallRequest(role=Role("executor", "claude", "m", "high"), name="n", prompt="p", schema={}, cwd=tmp_path,
+                      calls_dir=tmp_path, read_only=False, session_id="s1", resume=False, timeout=10)
+    return await claude.ClaudeHarness().call(req, lambda line: None)
+
+
+async def test_claude_texto_do_modelo_nao_vira_limite_de_uso(tmp_path, monkeypatch):
+    """Tarefa que fala de rate limit ou de rede e falha: o erro é fatal, não espera de horas."""
+    res = await _claude_falso(tmp_path, monkeypatch, {
+        "type": "result", "session_id": "s1", "is_error": False,
+        "result": "Implementei o rate limit; o teste de network timed out resets at 3"}, rc=1)
+    assert res.error == "fatal"
+
+
+async def test_claude_erro_do_cli_continua_classificado(tmp_path, monkeypatch):
+    res = await _claude_falso(tmp_path, monkeypatch, {
+        "type": "result", "session_id": "s1", "is_error": True, "result": "Usage limit reached, resets 3am"}, rc=1)
+    assert res.error == "limit"

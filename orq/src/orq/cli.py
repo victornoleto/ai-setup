@@ -12,6 +12,7 @@ from pathlib import Path
 
 from . import config
 from .engine import Engine, Task
+from .harness import base as harness_base
 from .harness.base import kill_all
 from . import journal
 from .store import RunStore, queue_label, register_run, registered_runs
@@ -67,7 +68,7 @@ def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -
         eng = Engine(cfg, store)
         task = asyncio.current_task()
         loop = asyncio.get_running_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):  # SIGHUP: terminal fechado com o motor em primeiro plano
             loop.add_signal_handler(sig, task.cancel)
         try:
             return 0 if await eng.run() else 1
@@ -99,6 +100,12 @@ def run_engine(cfg: config.Config, store: RunStore, retries=(), resumed=False) -
                 store.set_top("control", {"paused": False, "stop": False})
                 store.event("run_resume")
             store.pid_path.write_text(str(os.getpid()))
+            harness_base.children_dir = store.dir / "children"
+            harness_base.children_dir.mkdir(exist_ok=True)
+            orphans = harness_base.kill_orphans(harness_base.children_dir)
+            if orphans:
+                store.notice("orphans", f"{orphans} processo(s) de harness de um motor anterior ainda rodavam e foram "
+                                        "encerrados: confira `git status` no repositório.")
             try:
                 return asyncio.run(main())
             finally:

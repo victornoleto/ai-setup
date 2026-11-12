@@ -469,7 +469,7 @@ class Engine:
                         raise Problem("failed", "O planejamento falhou (ver orq.log).", "plan")
                     self.warn_if_wrote(t, "O planejador", before)
                     s.set(t.id, "planner_sid", sid)
-                    (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    self.save_out(t, "plan.out.json", out)
                     s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md"})
                     phase = "plan_questions"
 
@@ -485,7 +485,7 @@ class Engine:
                                                  prompt("plan_update", ANSWERS=answers, PLAN_FILE=t.plan_file), psid, resume=True)
                         if out is None:
                             raise Problem("failed", "A atualização do plano falhou.", "plan_questions")
-                        (t.dir / "plan.out.json").write_text(json.dumps(out, ensure_ascii=False))  # volta a conferir perguntas
+                        self.save_out(t, "plan.out.json", out)  # volta a conferir perguntas
 
                 elif phase == "exec":
                     esid = s.get(t.id, "exec_sid")
@@ -501,8 +501,12 @@ class Engine:
                         raise Problem("failed", f"A execução (ciclo {cycle}) falhou.", "exec")
                     s.set(t.id, "exec_sid", sid)
                     s.set(t.id, "exec_mode", "resume")
-                    (t.dir / f"exec-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    self.save_out(t, f"exec-{cycle}.out.json", out)
                     self.exec_event(t, out, cycle, f"executor, {self.cfg.roles['executor'].label()}")
+                    phase = "exec_questions"
+
+                elif phase == "exec_questions":  # fase própria: `resume` com pergunta aberta não reexecuta
+                    out = json.loads(_read(t.dir / f"exec-{cycle}.out.json", "{}"))
                     phase = await self.after_exec(t, out, "exec_answers", "clean")
 
                 elif phase == "exec_answers":
@@ -522,7 +526,11 @@ class Engine:
 
                 elif phase == "review":
                     report = _read(t.dir / f"exec-{cycle}.out.json", "{}")
-                    verdict, review_md = await self.review(t, "planner", psid, True, report, "executor", cycle)
+                    await self.review(t, "planner", psid, True, report, "executor", cycle)
+                    phase = "review_questions"
+
+                elif phase == "review_questions":
+                    verdict, review_md = await self.review_outcome(t, "planner", cycle)
                     if verdict == "approved":
                         self.end(t, "ok", f"Aprovada pelo revisor no ciclo {cycle}.")
                     phase = self.reject(t, cycle, review_md)
@@ -532,8 +540,12 @@ class Engine:
                                              (t.dir / "takeover.prompt.md").read_text(), psid, resume=True)
                     if out is None:
                         raise Problem("failed", "O takeover do planejador falhou.", "takeover")
-                    (t.dir / "takeover.out.json").write_text(json.dumps(out, ensure_ascii=False))
+                    self.save_out(t, "takeover.out.json", out)
                     self.exec_event(t, out, cycle + 1, f"planejador assumiu, {self.cfg.roles['planner'].label()}")
+                    phase = "takeover_questions"
+
+                elif phase == "takeover_questions":
+                    out = json.loads(_read(t.dir / "takeover.out.json", "{}"))
                     phase = await self.after_exec(t, out, "takeover_answers", "final_clean")
 
                 elif phase == "takeover_answers":
@@ -556,8 +568,12 @@ class Engine:
                 elif phase == "final_review":
                     rsid = s.get(t.id, "final_review_sid")
                     report = _read(t.dir / "takeover.out.json", "{}")
-                    verdict, review_md = await self.review(t, "reviewer", rsid, bool(rsid), report,
-                                                           "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
+                    await self.review(t, "reviewer", rsid, bool(rsid), report,
+                                      "planejador, depois de assumir", cycle + 1, sid_key="final_review_sid")
+                    phase = "final_review_questions"
+
+                elif phase == "final_review_questions":
+                    verdict, review_md = await self.review_outcome(t, "reviewer", cycle + 1)
                     if verdict == "approved":
                         self.end(t, "ok_takeover", f"O executor não passou em {self.cfg.max_cycles} ciclos; "
                                                    "o planejador assumiu e um revisor novo aprovou.")
@@ -692,7 +708,8 @@ class Engine:
         return nxt
 
     async def review(self, t: Task, role: str, sid: str | None, resume: bool, report: str, actor: str, cycle: int,
-                     sid_key: str | None = None) -> tuple[str, str]:
+                     sid_key: str | None = None) -> None:
+        """A chamada do revisor; o veredito sai de review_outcome, na fase seguinte."""
         before = self.repo_mark(t)
         out, new_sid = await self.call(t, role, f"review-{cycle}-{hms()}", "review", prompt(
             "review", BASE=t.base_prompt, PLAN_FILE=t.plan_file, DECISIONS_FILE=t.decisions_file,
@@ -707,11 +724,15 @@ class Engine:
             out["verdict"] = "changes"
             out.setdefault("issues", []).append({"severity": "media", "where": "(teste)",
                                                  "what": "reprovação forçada por test.force_changes", "fix": "nada"})
-        (t.dir / f"review-{cycle}.out.json").write_text(json.dumps(out, ensure_ascii=False))
+        self.save_out(t, f"review-{cycle}.out.json", out)
         who = f"planejador, {self.cfg.roles['planner'].label()}" if role == "planner" \
             else f"revisor em sessão nova, {self.cfg.roles['reviewer'].label()}"
         self.s.event("review", {"task": t.id, "cycle": cycle, "reviewer": who, **{
             k: out.get(k) for k in ("verdict", "summary", "highlights", "issues")}})
+
+    async def review_outcome(self, t: Task, role: str, cycle: int) -> tuple[str, str]:
+        """Lê o parecer salvo, resolve as dúvidas do revisor. → (veredito, texto para o próximo prompt)."""
+        out = json.loads(_read(t.dir / f"review-{cycle}.out.json", "{}"))
         rc, answers = await self.resolve_questions(t, "revisor", out)
         if rc == 2:
             raise Problem("failed", "O conselho não decidiu uma dúvida do revisor.",
@@ -720,7 +741,16 @@ class Engine:
             f"- [{i['severity']}] {i['where']}: {i['what']} → {i['fix']}" for i in out.get("issues") or [])
         if rc == 0:
             md += "\n\nDecisões do conselho sobre as dúvidas do revisor:\n" + answers
-        return out.get("verdict", "changes"), md
+        verdict = out.get("verdict", "changes")
+        if verdict == "approved" and any(i.get("severity") in ("alta", "media") for i in out.get("issues") or []):
+            self.s.log(f"revisão {cycle}: 'approved' com problema alto ou médio aberto; vale como reprovação", t.id)
+            verdict = "changes"
+        return verdict, md
+
+    def save_out(self, t: Task, name: str, out: dict) -> None:
+        """Saída de uma chamada, lida pela fase de perguntas seguinte. Saída nova: as respostas parciais caducam."""
+        (t.dir / name).write_text(json.dumps(out, ensure_ascii=False))
+        self.s.set(t.id, "partial_answers", None)
 
     def last_decision(self, qid: str) -> dict:
         return next(e for e in reversed(self.s.events()) if e["type"] == "decision" and e.get("qid") == qid)
@@ -730,13 +760,18 @@ class Engine:
         qs = out.get("questions") or []
         if not qs:
             return 1, ""
-        rounds = self.s.get(t.id, "decision_rounds", 0) + 1
-        self.s.set(t.id, "decision_rounds", rounds)
+        done = self.s.get(t.id, "partial_answers")  # None: rodada nova · dict: `resume` no meio desta rodada
+        rounds = self.s.get(t.id, "decision_rounds", 0) + (done is None)
+        done = done or {}
+        self.s.update_task(t.id, {"decision_rounds": rounds, "partial_answers": done})
         if rounds > self.cfg.max_decision_rounds:
             self.s.notice("error", f"Passou de {self.cfg.max_decision_rounds} rodadas de conselho: laço de dúvidas.", t.id)
             return 2, ""
         answers = ""
         for q in qs:
+            if q["id"] in done:  # decidida antes da parada: não volta ao conselho
+                answers += done[q["id"]] + "\n"
+                continue
             open_ = self.s.top("open_ask") or {}
             if open_.get("kind") == "council" and open_.get("qid") == q["id"] and open_.get("task") == t.id:
                 a = await intervene.council(self, t, self.last_decision(q["id"]), ask=open_)  # resume: sem novo conselho
@@ -747,6 +782,8 @@ class Engine:
                 dec = self.last_decision(q["id"])
                 if self.cfg.intervene and dec.get("points") is not None and dec["points"] < 3:
                     a = await intervene.council(self, t, dec)
+            done[q["id"]] = a
+            self.s.set(t.id, "partial_answers", done)
             answers += a + "\n"
         return 0, answers
 

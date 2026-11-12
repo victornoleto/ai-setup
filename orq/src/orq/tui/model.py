@@ -16,7 +16,9 @@ from ..journal import _section, call_kind, cost_parts, current_events, event_lin
 from ..store import RunStore, active_seconds
 
 PHASE_LABEL = {"start": "começando", "plan": "planejando", "plan_questions": "conselho do plano",
-               "exec": "executando", "exec_answers": "executando", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
+               "exec": "executando", "exec_answers": "executando", "exec_questions": "conselho da execução",
+               "review_questions": "conselho da revisão", "takeover_questions": "conselho do takeover",
+               "final_review_questions": "conselho da revisão final", "clean": "arrumando a árvore", "verify": "verificando", "review": "revisando",
                "takeover": "planejador assumiu", "takeover_answers": "planejador assumiu",
                "final_clean": "arrumando a árvore", "final_verify": "verificação final", "final_review": "revisão final"}
 RESULT = {"ok": ("✓", "ok"), "ok_takeover": ("✓", "ok, assumida"), "ok_usuario": ("✓", "ok, aceita pelo usuário"), "failed": ("✗", "FALHOU"),
@@ -89,7 +91,7 @@ def task_rows(store: RunStore, events: list[dict], now: float | None = None, sta
             glyph = "⏸" if is_paused else "▶"
             status = PHASE_LABEL.get(phase, phase)
             cycle = t.get("cycle", 1)
-            if phase in ("exec", "exec_answers", "verify", "review") and cycle:
+            if phase in ("exec", "exec_answers", "exec_questions", "verify", "review", "review_questions") and cycle:
                 status += f" c{cycle}"
             extra = fmt_hms(active_seconds(t, now)) if t.get("started") else ""  # ativo: a espera não corre
         else:
@@ -228,7 +230,7 @@ def task_diff(st: dict, events: list[dict], tid: str) -> Diff | None:
         d = end.get("delivery") or {}
         return Diff.from_numstat(d["numstat"]) if "numstat" in d else Diff.from_stat(d.get("stat", ""))
     start = next((e for e in reversed(events) if e["type"] == "task_start" and e["task"] == tid), None)
-    repo = ((st.get("config") or {}).get("run") or {}).get("repo")
+    repo = (start or {}).get("repo") or ((st.get("config") or {}).get("run") or {}).get("repo")  # multi-repo: o da tarefa
     if not start or start.get("base") in (None, "none") or not repo:
         return None
     r = subprocess.run(["git", "-C", repo, "diff", "--numstat", start["base"]], capture_output=True, text=True)

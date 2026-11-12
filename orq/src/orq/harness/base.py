@@ -131,6 +131,21 @@ def tool_line(name: str, inp: dict) -> str | None:
 
 
 _active: set[asyncio.subprocess.Process] = set()
+children_dir: Path | None = None  # <run>/children: um marcador por grupo de processos vivo (ver kill_orphans)
+
+
+def kill_orphans(d: Path) -> int:
+    """Grupos de processos que um motor anterior deixou vivos (kill -9, OOM): encerra e apaga o marcador.
+    O nome do marcador é o pgid, que o sistema não reaproveita enquanto o grupo tiver algum processo. → quantos."""
+    n = 0
+    for mark in d.iterdir() if d.is_dir() else ():
+        try:
+            os.killpg(int(mark.name), signal.SIGTERM)
+            n += 1
+        except (ProcessLookupError, PermissionError, ValueError):
+            pass
+        mark.unlink(missing_ok=True)
+    return n
 
 
 def kill_all() -> None:
@@ -149,11 +164,17 @@ async def run_process(argv: list[str], stdin_text: str | None, cwd: Path, env: d
     raw_path.parent.mkdir(parents=True, exist_ok=True)
     err_path = raw_path.with_suffix(".err")
     with open(err_path, "w") as err_fh:
-        proc = await asyncio.create_subprocess_exec(
-            *argv, cwd=str(cwd), env={**os.environ, **env}, start_new_session=True,
-            stdin=asyncio.subprocess.PIPE if stdin_text is not None else asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE, stderr=err_fh, limit=64 * 1024 * 1024)
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv, cwd=str(cwd), env={**os.environ, **env}, start_new_session=True,
+                stdin=asyncio.subprocess.PIPE if stdin_text is not None else asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE, stderr=err_fh, limit=64 * 1024 * 1024)
+        except OSError as exc:  # CLI fora do PATH, argumento grande demais (E2BIG): erro da chamada, não do motor
+            return 127, False, f"não foi possível iniciar {argv[0]}: {exc}"
         _active.add(proc)
+        mark = children_dir / str(proc.pid) if children_dir else None
+        if mark:
+            mark.touch()
         timed_out = False
 
         async def pump():
@@ -203,4 +224,6 @@ async def run_process(argv: list[str], stdin_text: str | None, cwd: Path, env: d
             raise
         finally:
             _active.discard(proc)
+            if mark:
+                mark.unlink(missing_ok=True)
     return rc, timed_out, err_path.read_text(errors="replace")[-2000:]

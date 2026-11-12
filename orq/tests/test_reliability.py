@@ -432,3 +432,46 @@ async def test_registro_de_execucoes_e_comandos_sem_run_dir(tmp_path, capsys):
     assert cli.main(["send", "/pause"]) == 0
     assert "caixa de entrada" in capsys.readouterr().out
     assert e.s.take_inbox()[-1]["text"] == "/pause"
+
+
+async def test_cli_que_nao_inicia_vira_erro_e_nao_derruba_o_motor(tmp_path):
+    from orq.harness.base import run_process
+    rc, timed_out, err = await run_process(["/nao/existe/cli"], None, tmp_path, {}, 5, tmp_path / "x.jsonl", lambda ev: None)
+    assert rc == 127 and not timed_out and "/nao/existe/cli" in err
+
+
+def test_orfao_de_execucao_anterior_e_encerrado(tmp_path):
+    """Motor morto com kill -9 deixa o harness vivo; o próximo motor do mesmo run dir encerra o grupo."""
+    import os
+    import subprocess
+    import time
+    from orq.harness import base
+    child = subprocess.Popen(["sleep", "300"], start_new_session=True)
+    d = tmp_path / "children"
+    d.mkdir()
+    (d / str(child.pid)).touch()
+    (d / "999999999").touch()  # grupo que já não existe: só some o marcador
+    assert base.kill_orphans(d) == 1
+    for _ in range(50):
+        if child.poll() is not None:
+            break
+        time.sleep(0.05)
+    assert child.poll() is not None
+    assert not any(d.iterdir())
+
+
+def test_diff_ao_vivo_usa_o_repo_da_tarefa(tmp_path):
+    import subprocess
+    from orq.tui.model import task_diff
+    repos = {}
+    for name in ("principal", "outro"):
+        r = tmp_path / name
+        subprocess.run(["git", "init", "-q", str(r)], check=True)
+        (r / "a.txt").write_text("a\n")
+        subprocess.run(["git", "-C", str(r), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(r), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "i"], check=True)
+        repos[name] = (r, subprocess.run(["git", "-C", str(r), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip())
+    (repos["outro"][0] / "a.txt").write_text("a\nb\nc\n")
+    st = {"config": {"run": {"repo": str(repos["principal"][0])}}}
+    events = [{"type": "task_start", "task": "01-a", "repo": str(repos["outro"][0]), "base": repos["outro"][1]}]
+    assert task_diff(st, events, "01-a").add == 2
