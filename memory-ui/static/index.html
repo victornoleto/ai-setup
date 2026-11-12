@@ -243,15 +243,20 @@
     var slash = rest.indexOf("/");
     var projectPart = slash === -1 ? rest : rest.slice(0, slash);
     var pathPart = slash === -1 ? null : rest.slice(slash + 1);
-    var project = decodeURIComponent(projectPart);
-    var path = null;
-    if (pathPart) {
-      path = pathPart
-        .split("/")
-        .map(decodeURIComponent)
-        .join("/");
+    try {
+      var project = decodeURIComponent(projectPart);
+      var path = null;
+      if (pathPart) {
+        path = pathPart
+          .split("/")
+          .map(decodeURIComponent)
+          .join("/");
+      }
+      return { project: project, path: path };
+    } catch (e) {
+      // hash malformado (ex.: #/%E0): volta para a lista em vez de deixar a tela em branco
+      return { project: null, path: null };
     }
-    return { project: project, path: path };
   }
 
   function projectHref(project) {

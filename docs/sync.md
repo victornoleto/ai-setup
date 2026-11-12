@@ -70,8 +70,8 @@ Toda entrada pessoal é uma linha no `sync/MANIFEST`: modo, origem (relativa a `
 
 ```sh
 mkdir -p ~/.ai-setup/sync/skills/minha-skill && $EDITOR ~/.ai-setup/sync/skills/minha-skill/SKILL.md
-printf 'link\tskills/minha-skill\t.claude/skills/minha-skill\n' >> ~/.ai-setup/sync/MANIFEST
-printf 'link\tskills/minha-skill\t.agents/skills/minha-skill\n' >> ~/.ai-setup/sync/MANIFEST   # Codex e OpenCode
+printf 'skill\tskills/minha-skill\n' >> ~/.ai-setup/sync/MANIFEST   # Claude, ~/.agents (Codex, OpenCode, agy) e Kiro
+# só em parte das ferramentas: uma linha `link` por destino, ex. link<TAB>skills/minha-skill<TAB>.claude/skills/minha-skill
 sh ~/.ai-setup/install.sh
 ```
 

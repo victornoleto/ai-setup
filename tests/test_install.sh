@@ -15,7 +15,12 @@ novo() {
 	echo '# global' > "$t/repo/sync/memory/GLOBAL.md"
 	echo "$t"
 }
-instala() { HOME="$1/home" sh "$1/repo/install.sh" >/dev/null 2>&1; }
+# CLIs do npm de mentira no PATH: o teste não instala nada de verdade nesta máquina.
+instala() {
+	mkdir -p "$1/stub"
+	for b in npm ccstatusline playwright-cli; do printf '#!/bin/sh\n' > "$1/stub/$b"; chmod +x "$1/stub/$b"; done
+	HOME="$1/home" PATH="$1/stub:$PATH" sh "$1/repo/install.sh" >/dev/null 2>&1
+}
 
 # 1. Sem sync/MANIFEST: comportamento de sempre.
 t=$(novo)
@@ -75,6 +80,19 @@ HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | 
 	&& ok "doctor: kiro sem engine v3 acusa" || bad "doctor: kiro sem engine v3 passou"
 HOME="$t/home" PATH="/usr/bin:/bin" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^FALHA kiro' \
 	&& bad "doctor: acusou kiro sem kiro-cli" || ok "doctor: sem kiro-cli, sem FALHA do kiro"
+rm -rf "$t"
+
+# 7. Modo skill: uma linha vira o link nas três pastas de skills.
+t=$(novo)
+mkdir -p "$t/repo/sync/skills/minha"
+printf 'skill\tskills/minha\n' > "$t/repo/sync/MANIFEST"
+instala "$t"
+for h in .claude .agents .kiro; do
+	[ "$(readlink -f "$t/home/$h/skills/minha")" = "$t/repo/sync/skills/minha" ] \
+		&& ok "skill: link em $h/skills" || bad "skill: sem link em $h/skills"
+done
+HOME="$t/home" sh "$t/repo/doctor.sh" 2>/dev/null | grep -q '^ok    link  .kiro/skills/minha' \
+	&& ok "skill: doctor confere os três links" || bad "skill: doctor não viu o modo skill"
 rm -rf "$t"
 
 exit $falhas

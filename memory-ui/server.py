@@ -11,6 +11,10 @@ import wiki
 
 INDEX = Path(__file__).parent / "static" / "index.html"
 DEFAULT_PORT = 49380
+# O markdown das páginas é dado não confiável: o DOMPurify tira script, e a CSP impede que uma imagem ou um
+# link de estilo no texto faça o navegador buscar algo fora (vaza que a página foi aberta).
+CSP = ("default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; "
+       "img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'")
 
 
 class _Missing(Exception):
@@ -25,6 +29,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Content-Security-Policy", CSP)
         self.end_headers()
         self.wfile.write(body)
 
@@ -127,6 +132,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(400, {"error": f"parâmetro obrigatório ausente: {e.name}"})
         except (mcp.McpError, wiki.WikiError) as e:
             self._json(502, {"error": str(e)})
+        except Exception as e:  # sem isto a conexão cai sem resposta e a tela mostra um erro de JSON
+            self._json(500, {"error": f"erro interno ({type(e).__name__}): {e}"})
 
 
 def main() -> None:

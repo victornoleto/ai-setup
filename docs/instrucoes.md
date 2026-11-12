@@ -72,6 +72,8 @@ copy	claude/settings.json	.claude/settings.json
 ```
 
 - **`link`** quando só você edita o arquivo: o destino é symlink para o repositório.
+- **`skill`** é atalho de `link` para skill: `skill<TAB>../skills/nome`, sem destino, cria o link em
+  `~/.claude/skills`, `~/.agents/skills` e `~/.kiro/skills`.
 - **`copy`** quando a ferramenta reescreve sozinha (`/config`, aprovação de hook, instalação de plugin): um
   symlink sumiria na primeira reescrita. A cópia no repositório vira referência, e o `doctor.sh` acusa a
   diferença para você decidir qual lado vale.

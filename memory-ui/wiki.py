@@ -5,6 +5,7 @@ import subprocess
 
 PROJECTS_SCRIPT = r"""
 for m in /data/wiki/*/*/_meta.md; do
+  [ -e "$m" ] || continue
   d=${m%/_meta.md}
   name=$(sed -n 's/^project:[ ]*//p' "$m" | head -n 1)
   n=$(find "$d" -name '*.md' ! -path "$d/_pending/*" ! -name _meta.md | wc -l)

@@ -190,6 +190,25 @@ class TestServer(unittest.TestCase):
             "container ai-memory parado → docker start ai-memory",
         )
 
+    def test_erro_inesperado_responde_500_em_json(self):
+        with patch("wiki.list_projects", side_effect=ValueError("linha com tab")):
+            status, headers, body = self.get("/api/projects")
+        self.assertEqual(status, 500)
+        self.assertIn("ValueError", json.loads(body)["error"])
+
+    def test_csp_bloqueia_imagem_externa(self):
+        status, headers, body = self.get("/")
+        csp = headers["Content-Security-Policy"]
+        self.assertIn("img-src 'self' data:", csp)
+        self.assertIn("default-src 'none'", csp)
+
+    def test_projects_script_sem_wiki_nao_lista_projeto_vazio(self):
+        import subprocess, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            script = wiki.PROJECTS_SCRIPT.replace("/data/wiki", d)
+            out = subprocess.run(["sh", "-c", script], capture_output=True, text=True).stdout
+        self.assertEqual(out, "")
+
     def test_unknown_route(self):
         status, headers, body = self.get("/static/index.html")
         self.assertEqual(status, 404)

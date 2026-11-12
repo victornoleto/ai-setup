@@ -7,7 +7,7 @@ set -eu
 SETUP=$(cd "$(dirname "$0")/.." && pwd -P)
 dir="$SETUP/local/handoffs"
 mkdir -p "$dir"
-arq="$dir/$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$PWD").md"
+arq="$dir/$(date -u +%Y%m%dT%H%M%SZ)-$$-$(basename "$PWD").md"   # $$: dois handoffs no mesmo segundo
 
 cat > "$arq"
 [ -s "$arq" ] || { rm -f "$arq"; echo "handoff-copia: stdin vazio, nada salvo" >&2; exit 1; }
@@ -16,16 +16,18 @@ linhas=$(wc -l < "$arq")
 bytes=$(wc -c < "$arq")
 
 # xclip daemoniza para servir a seleção; sem redirecionar, prenderia quem o chamou.
+# `|| :` em cada cópia: com `set -e`, uma falha aqui sairia calada, sem dizer onde o arquivo ficou.
+# Quem acusa a falha é a conferência de bytes, no fim.
 if command -v xclip >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then
-	xclip -selection clipboard -i < "$arq" >/dev/null 2>&1
-	xclip -selection primary -i < "$arq" >/dev/null 2>&1
+	xclip -selection clipboard -i < "$arq" >/dev/null 2>&1 || :
+	xclip -selection primary -i < "$arq" >/dev/null 2>&1 || :
 	lido=$(xclip -selection clipboard -o 2>/dev/null | wc -c)
 elif command -v wl-copy >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then
-	wl-copy < "$arq" >/dev/null 2>&1
+	wl-copy < "$arq" >/dev/null 2>&1 || :
 	lido=$(wl-paste 2>/dev/null | wc -c)
 elif command -v pbcopy >/dev/null 2>&1; then
-	pbcopy < "$arq"
-	lido=$(pbpaste | wc -c)
+	pbcopy < "$arq" || :
+	lido=$(pbpaste 2>/dev/null | wc -c)
 else
 	echo "handoff-copia: sem xclip/wl-copy/pbcopy utilizável — não copiou | arquivo: $arq" >&2
 	exit 2

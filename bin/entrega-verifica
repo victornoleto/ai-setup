@@ -17,9 +17,9 @@ import sys
 from pathlib import Path
 
 ANCORA = re.compile(
-    r'^```[\w+-]*\s+title="([^":]+):(\d+)-(\d+)\s+@([0-9a-fA-F]{4,40}|HEAD)"\s*$'
+    r'^\s*```[\w+-]*\s+title="([^":]+):(\d+)-(\d+)\s+@([0-9a-fA-F]{4,40}|HEAD)"\s*$'
 )
-CERCA = re.compile(r"^(```+|~~~+)")
+CERCA = re.compile(r"^(\s*)(```+|~~~+)")  # a cerca pode vir indentada, dentro de um item de lista
 
 
 def raiz_git(doc: Path) -> str | None:
@@ -36,30 +36,31 @@ def real(raiz: str, sha: str, caminho: str, ini: int, fim: int):
         ["git", "-C", raiz, "show", f"{sha}:{caminho}"],
         capture_output=True,
         text=True,
+        errors="replace",
     )
     if r.returncode != 0:
         return None, r.stderr.strip().splitlines()[0] if r.stderr else "git show falhou"
-    linhas = r.stdout.split("\n")
-    if fim > len(linhas):
-        return None, f"arquivo tem {len(linhas)} linhas, ancora pede ate {fim}"
+    linhas = r.stdout.splitlines()
+    if not 1 <= ini <= fim <= len(linhas):
+        return None, f"arquivo tem {len(linhas)} linhas, ancora pede {ini}-{fim}"
     return "\n".join(linhas[ini - 1 : fim]), None
 
 
 def blocos(doc: Path):
     """Devolve (linha_da_cerca, ancora_ou_None, conteudo)."""
-    linhas = doc.read_text(encoding="utf-8").split("\n")
+    linhas = doc.read_text(encoding="utf-8", errors="replace").split("\n")
     i = 0
     while i < len(linhas):
         m_cerca = CERCA.match(linhas[i])
         if not m_cerca:
             i += 1
             continue
-        fecha = m_cerca.group(1)[0] * len(m_cerca.group(1))
+        recuo, fecha = m_cerca.group(1), m_cerca.group(2)
         ancora = ANCORA.match(linhas[i])
         abre = i + 1
         corpo, i = [], i + 1
-        while i < len(linhas) and not linhas[i].startswith(fecha):
-            corpo.append(linhas[i])
+        while i < len(linhas) and not linhas[i].lstrip().startswith(fecha):
+            corpo.append(linhas[i][len(recuo):] if linhas[i].startswith(recuo) else linhas[i].lstrip())
             i += 1
         i += 1
         yield abre, ancora, "\n".join(corpo)

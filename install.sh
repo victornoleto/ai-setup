@@ -41,8 +41,14 @@ manifest_lines() {
 	for base in "$SETUP/sync" "$SETUP/adapters"; do
 		[ -f "$base/MANIFEST" ] || continue
 		while IFS='	' read -r mode src dst; do
-			case "${mode:-}" in ''|\#*) continue ;; esac
-			printf '%s\t%s\t%s\n' "$mode" "$base/$src" "$dst"
+			case "${mode:-}" in
+			''|\#*) continue ;;
+			skill)   # uma linha, três links: Claude, ~/.agents (Codex, OpenCode, agy) e Kiro
+				for h in .claude .agents .kiro; do
+					printf 'link\t%s\t%s\n' "$base/$src" "$h/skills/$(basename "$src")"
+				done ;;
+			*) printf '%s\t%s\t%s\n' "$mode" "$base/$src" "$dst" ;;
+			esac
 		done < "$base/MANIFEST"
 	done | awk -F'\t' '!seen[$3]++'
 }

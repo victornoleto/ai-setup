@@ -1,6 +1,7 @@
 # Como cada arquivo de configuração chega ao lugar onde a ferramenta procura.
 # modo<TAB>origem (relativa a adapters/)<TAB>destino
 #
+# skill — atalho: `skill<TAB>origem`, sem destino. Vira um link em cada pasta de skills.
 # link — a fonte da verdade é este repositório; o destino é um symlink para cá.
 #        Só nós editamos esses arquivos, então o symlink é seguro.
 # copy — a ferramenta reescreve o arquivo sozinha (/config, aprovação de hook).
@@ -41,58 +42,28 @@ link	../sync/memory/GLOBAL.md	.kiro/steering/global.md
 link	../local/machine.md	.kiro/steering/machine.md
 link	kiro/ai-memory.md	.kiro/steering/ai-memory.md
 
-# Skills nossas: fonte em skills/, um link por harness. ~/.agents/skills serve Codex e
+# Skills nossas: fonte em skills/. `skill<TAB>origem` vale por três links (~/.claude/skills,
+# ~/.agents/skills e ~/.kiro/skills), com o nome da pasta. ~/.agents/skills serve Codex e
 # OpenCode; o agy chega lá pelo skills.json. As ai-memory-* são do instalador do ai-memory.
-link	../skills/brainstorming	.claude/skills/brainstorming
-link	../skills/brainstorming	.agents/skills/brainstorming
-link	../skills/brainstorming	.kiro/skills/brainstorming
-link	../skills/systematic-debugging	.claude/skills/systematic-debugging
-link	../skills/systematic-debugging	.agents/skills/systematic-debugging
-link	../skills/systematic-debugging	.kiro/skills/systematic-debugging
-link	../skills/writing-plans	.claude/skills/writing-plans
-link	../skills/writing-plans	.agents/skills/writing-plans
-link	../skills/writing-plans	.kiro/skills/writing-plans
-link	../skills/test-driven-development	.claude/skills/test-driven-development
-link	../skills/test-driven-development	.agents/skills/test-driven-development
-link	../skills/test-driven-development	.kiro/skills/test-driven-development
-link	../skills/verification-before-completion	.claude/skills/verification-before-completion
-link	../skills/verification-before-completion	.agents/skills/verification-before-completion
-link	../skills/verification-before-completion	.kiro/skills/verification-before-completion
-link	../skills/receiving-code-review	.claude/skills/receiving-code-review
-link	../skills/receiving-code-review	.agents/skills/receiving-code-review
-link	../skills/receiving-code-review	.kiro/skills/receiving-code-review
-link	../skills/security-audit	.claude/skills/security-audit
-link	../skills/security-audit	.agents/skills/security-audit
-link	../skills/security-audit	.kiro/skills/security-audit
+skill	../skills/brainstorming
+skill	../skills/systematic-debugging
+skill	../skills/writing-plans
+skill	../skills/test-driven-development
+skill	../skills/verification-before-completion
+skill	../skills/receiving-code-review
+skill	../skills/security-audit
 # impeccable: o upstream gera uma variante por harness (caminhos e `/` vs `$` diferem).
 link	../skills/impeccable-claude	.claude/skills/impeccable
 link	../skills/impeccable	.agents/skills/impeccable
 link	../skills/impeccable	.kiro/skills/impeccable
-link	../skills/entrega	.claude/skills/entrega
-link	../skills/entrega	.agents/skills/entrega
-link	../skills/entrega	.kiro/skills/entrega
-link	../skills/handoff	.claude/skills/handoff
-link	../skills/handoff	.agents/skills/handoff
-link	../skills/handoff	.kiro/skills/handoff
-link	../skills/orq-setup	.claude/skills/orq-setup
-link	../skills/orq-setup	.agents/skills/orq-setup
-link	../skills/orq-setup	.kiro/skills/orq-setup
-link	../skills/writing-for-agents	.claude/skills/writing-for-agents
-link	../skills/writing-for-agents	.agents/skills/writing-for-agents
-link	../skills/writing-for-agents	.kiro/skills/writing-for-agents
-link	../skills/wizard	.claude/skills/wizard
-link	../skills/wizard	.agents/skills/wizard
-link	../skills/wizard	.kiro/skills/wizard
-link	../skills/retro	.claude/skills/retro
-link	../skills/retro	.agents/skills/retro
-link	../skills/retro	.kiro/skills/retro
-link	../skills/grill-me	.claude/skills/grill-me
-link	../skills/grill-me	.agents/skills/grill-me
-link	../skills/grill-me	.kiro/skills/grill-me
-link	../skills/spec-review	.claude/skills/spec-review
-link	../skills/spec-review	.agents/skills/spec-review
-link	../skills/spec-review	.kiro/skills/spec-review
-link	../skills/diagram-design	.claude/skills/diagram-design
-link	../skills/diagram-design	.agents/skills/diagram-design
-link	../skills/diagram-design	.kiro/skills/diagram-design
+skill	../skills/entrega
+skill	../skills/revisao
+skill	../skills/handoff
+skill	../skills/orq-setup
+skill	../skills/writing-for-agents
+skill	../skills/wizard
+skill	../skills/retro
+skill	../skills/grill-me
+skill	../skills/spec-review
+skill	../skills/diagram-design
 copy	antigravity/skills.json	.gemini/config/skills.json

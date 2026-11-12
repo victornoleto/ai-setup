@@ -18,6 +18,7 @@ Skills pessoais ou de empresa ficam no `sync/` de cada um e não aparecem aqui.
 |---|---|---|---|
 | `orq-setup` | nossa | monta a fila do [orq](orq.md) para uma atividade; é a sessão que o `orq new` abre | por descrição |
 | `entrega` | nossa | relatório de leitura fácil do que uma branch, um commit ou um intervalo entregou, conferido contra o código (`bin/entrega-verifica`) | por descrição |
+| `revisao` | nossa | roteiro de validação de um diff em uma tela: por onde começar a ler, o que mudou de comportamento, o que ficou sem teste | por descrição |
 | `handoff` | nossa | o handoff mais detalhado da sessão, impresso, copiado para o clipboard e salvo em `local/handoffs/`, para colar numa sessão nova quando o contexto passar de ~50% | só por comando |
 | `spec-review` | nossa | `/spec-review <ponto>`: confere o diff contra a issue, o plano ou o card que o pediu; complementa o `/code-review`, que caça bug | só por comando |
 | `brainstorming` | [superpowers](https://github.com/obra/superpowers) | desenho aprovado antes de feature ou mudança não trivial | roteada |
