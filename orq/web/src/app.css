@@ -87,7 +87,7 @@ svg.i{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;s
 .q[aria-current],.q[aria-current]:hover{background:var(--selected);color:var(--foreground)}
 .q.run[aria-current]{background:color-mix(in oklch,var(--run) 82%,var(--run-fg))}
 .q.wait[aria-current]{background:color-mix(in oklch,var(--wait) 82%,var(--wait-fg))}
-.q.new small::after{content:"novo";margin-left:8px;color:var(--foreground);font-size:.78rem;font-weight:500;padding:0 7px;border-radius:999px;border:1px solid var(--border);background:var(--background)}
+.q.new small::after{content:"novo";margin-left:8px;color:var(--foreground);font-size:.78rem;font-weight:500;padding:1px 7px;border-radius:calc(var(--radius) - 2px);background:var(--selected)}
 
 .task h1{font-size:1.45rem;line-height:1.2;font-weight:500;letter-spacing:-.02em}
 .meta{display:flex;flex-wrap:wrap;gap:4px 16px;margin:8px 0 2px;color:var(--muted-foreground)}

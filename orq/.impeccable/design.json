@@ -1,0 +1,241 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T17:46:03+00:00",
+  "title": "Design System: orq web",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Tinta",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.15 0.0 0)",
+          "oklch(0.27 0.0 0)",
+          "oklch(0.39 0 0)",
+          "oklch(0.51 0 0)",
+          "oklch(0.63 0 0)",
+          "oklch(0.75 0.0 0)",
+          "oklch(0.87 0.0 0)",
+          "oklch(0.95 0.0 0)"
+        ]
+      },
+      "running-bg": {
+        "role": "secondary",
+        "displayName": "Azul de execução",
+        "canonical": "oklch(0.95 0.035 255)",
+        "tonalRamp": [
+          "oklch(0.15 0.044 258)",
+          "oklch(0.27 0.077 258)",
+          "oklch(0.39 0.11 258)",
+          "oklch(0.51 0.11 258)",
+          "oklch(0.63 0.11 258)",
+          "oklch(0.75 0.088 258)",
+          "oklch(0.87 0.055 258)",
+          "oklch(0.95 0.028 258)"
+        ]
+      },
+      "waiting-bg": {
+        "role": "secondary",
+        "displayName": "Âmbar de espera",
+        "canonical": "oklch(0.965 0.06 88)",
+        "tonalRamp": [
+          "oklch(0.15 0.052 84)",
+          "oklch(0.27 0.091 84)",
+          "oklch(0.39 0.13 84)",
+          "oklch(0.51 0.13 84)",
+          "oklch(0.63 0.13 84)",
+          "oklch(0.75 0.104 84)",
+          "oklch(0.87 0.065 84)",
+          "oklch(0.95 0.033 84)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel",
+        "canonical": "oklch(1 0 0)"
+      },
+      "page": {
+        "role": "neutral",
+        "displayName": "Página",
+        "canonical": "oklch(0.985 0 0)"
+      },
+      "mist": {
+        "role": "neutral",
+        "displayName": "Névoa",
+        "canonical": "oklch(0.97 0 0)"
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "Selecionado",
+        "canonical": "oklch(0.935 0 0)"
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Fio",
+        "canonical": "oklch(0.922 0 0)"
+      },
+      "quiet-text": {
+        "role": "neutral",
+        "displayName": "Texto quieto",
+        "canonical": "oklch(0.556 0 0)"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta de texto",
+        "canonical": "oklch(0.145 0 0)"
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Título da tarefa selecionada. Um por tela."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Cabeçalho de cartão e títulos dentro do markdown."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Plano, relatório, linha do tempo."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Etiquetas, abas, botões pequenos, segunda linha da fila."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Código, arquivos, comandos, atividade ao vivo."
+      }
+    },
+    "shadows": [
+      {
+        "name": "fio-de-sombra",
+        "value": "0 1px 2px 0 oklch(0 0 0 / .05)",
+        "purpose": "Cartões, botões de contorno, aba ativa."
+      },
+      {
+        "name": "anel-de-foco",
+        "value": "0 0 0 3px oklch(0.708 0 0 / .5)",
+        "purpose": "Foco pelo teclado em qualquer controle."
+      }
+    ],
+    "motion": [
+      {
+        "name": "pulse",
+        "value": "1.6s ease-in-out infinite (opacity 1 → .4)",
+        "purpose": "Etapa ativa do trilho; parado com prefers-reduced-motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1700px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botão principal",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A ação recomendada ou a confirmação.",
+      "html": "<button class=\"ds-btn-primary\">Começar a execução (recomendada)</button>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-btn-primary{height:36px;padding:0 14px;border:0;border-radius:4px;background:oklch(.205 0 0);color:oklch(.985 0 0);font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-btn-primary:hover{opacity:.9}.ds-btn-primary:focus-visible{outline:0;box-shadow:0 0 0 3px oklch(.708 0 0 / .5)}"
+    },
+    {
+      "name": "Botão de contorno",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Ação secundária e opções não recomendadas.",
+      "html": "<button class=\"ds-btn-outline\">Pular</button>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-btn-outline{height:36px;padding:0 14px;border:1px solid oklch(.922 0 0);border-radius:4px;background:oklch(1 0 0);color:oklch(.145 0 0);box-shadow:0 1px 2px 0 oklch(0 0 0 / .05);font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-btn-outline:hover{background:oklch(.97 0 0)}.ds-btn-outline:focus-visible{outline:0;box-shadow:0 0 0 3px oklch(.708 0 0 / .5)}"
+    },
+    {
+      "name": "Etiqueta de estado",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Estado da execução, sempre em palavra.",
+      "html": "<span class=\"ds-badge\">terminou</span> <span class=\"ds-badge ds-badge-run\">rodando</span> <span class=\"ds-badge ds-badge-wait\">esperando você</span>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-badge{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:4px;background:oklch(.935 0 0);color:oklch(.145 0 0);font:500 12px 'IBM Plex Sans',sans-serif}.ds-badge-run{background:oklch(.95 .035 255);color:oklch(.33 .11 262)}.ds-badge-wait{background:oklch(.965 .06 88);color:oklch(.34 .07 70)}"
+    },
+    {
+      "name": "Item da fila",
+      "kind": "custom",
+      "refersTo": "queue-item",
+      "description": "Número e título; embaixo, a palavra do estado. Seleção por fundo.",
+      "html": "<div class=\"ds-q ds-q-done\"><b>01</b> Servidor<small>ok</small></div><div class=\"ds-q ds-q-sel\"><b>02</b> Tela<small>pendente</small></div><div class=\"ds-q ds-q-run\"><b>03</b> Docs<small>executando c1</small></div><div class=\"ds-q ds-q-wait\"><b>04</b> Extra<small>esperando você</small></div>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-q{padding:8px 10px;border-radius:4px;border:1px solid transparent;margin-bottom:4px;width:240px;color:oklch(.145 0 0)}.ds-q b{font-weight:500}.ds-q small{display:block;font-size:12px;color:oklch(.556 0 0)}.ds-q:hover{background:oklch(.97 0 0)}.ds-q-done{color:oklch(.556 0 0)}.ds-q-sel,.ds-q-sel:hover{background:oklch(.935 0 0)}.ds-q-run{background:oklch(.95 .035 255);color:oklch(.33 .11 262);border-color:oklch(.82 .07 255)}.ds-q-run small{color:inherit}.ds-q-wait{background:oklch(.965 .06 88);color:oklch(.34 .07 70);border-color:oklch(.8 .14 82)}.ds-q-wait small{color:inherit}"
+    },
+    {
+      "name": "Abas",
+      "kind": "nav",
+      "refersTo": "tab-selected",
+      "description": "Pílulas sobre trilho névoa; a ativa em papel.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-on\">Plano</button><button class=\"ds-tab\">Histórico</button><button class=\"ds-tab\">Ao vivo</button></div>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-tabs{display:inline-flex;padding:3px;background:oklch(.97 0 0);border-radius:6px}.ds-tab{height:28px;padding:0 12px;border:0;border-radius:4px;background:none;color:oklch(.556 0 0);font:500 14px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-tab-on{background:oklch(1 0 0);color:oklch(.145 0 0);box-shadow:0 1px 2px 0 oklch(0 0 0 / .05)}"
+    },
+    {
+      "name": "Cartão",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Contêiner de altura total que rola por dentro.",
+      "html": "<section class=\"ds-card\"><header>Atividade</header><p>Linha do tempo da execução.</p></section>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-card{width:280px;background:oklch(1 0 0);border:1px solid oklch(.922 0 0);border-radius:8px;box-shadow:0 1px 2px 0 oklch(0 0 0 / .05);color:oklch(.145 0 0)}.ds-card header{padding:14px 16px 10px;font-weight:600}.ds-card p{margin:0;padding:4px 16px 16px;line-height:1.65}"
+    },
+    {
+      "name": "Barra de instrução",
+      "kind": "input",
+      "refersTo": "instruction-bar",
+      "description": "Alvo, texto que cresce e envio; fala com o operador.",
+      "html": "<div class=\"ds-say\"><button class=\"ds-say-to\">Tarefa 02</button><input class=\"ds-say-in\" placeholder=\"Diga o que mudar nesta tarefa\"><button class=\"ds-say-go\" aria-label=\"Enviar\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M12 19V5M6 11l6-6 6 6\"/></svg></button></div>",
+      "css": ":host{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px}.ds-say{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;width:420px;padding:9px;background:oklch(1 0 0);border:1px solid oklch(.922 0 0);border-radius:8px;box-shadow:0 1px 2px 0 oklch(0 0 0 / .05)}.ds-say:focus-within{border-color:oklch(.708 0 0);box-shadow:0 0 0 3px oklch(.708 0 0 / .5)}.ds-say-to{height:32px;padding:0 10px;border:0;border-radius:4px;background:oklch(.97 0 0);font:500 13px 'IBM Plex Sans',sans-serif;cursor:pointer}.ds-say-in{border:0;outline:0;background:none;font:14px 'IBM Plex Sans',sans-serif}.ds-say-go{width:32px;height:32px;border:0;border-radius:4px;background:oklch(.205 0 0);color:oklch(.985 0 0);display:grid;place-items:center;cursor:pointer}"
+    }
+  ],
+  "narrative": {
+    "northStar": "A mesa de quem valida",
+    "overview": "A tela é a bancada de quem confere o trabalho dos agentes. O dono chega, olha, e em uma tela sabe se precisa agir. O que pede decisão dele vem à frente; o que é operação fica quieto ao redor. Nada na tela existe para impressionar: ela existe para ser lida em um a três minutos e largada de novo.\n\nO tom é neutro, calmo e direto. A base é a identidade do shadcn/ui em cinzas sem matiz, com borda fina e quase nenhuma sombra. Pouco texto por bloco, a informação mais importante primeiro. A cor é rara de propósito: só dois estados a recebem, e por isso eles saltam.\n\nOs componentes são contidos e precisos: raio pequeno, contorno de um pixel, sem efeito. Um estado é sempre dito por fundo mais claro ou mais escuro e por uma palavra, nunca só por cor: o dono é daltônico.",
+    "keyCharacteristics": [
+      "Uma tela inteira, sem rolagem de página: cartões de altura total que rolam por dentro.",
+      "Neutro por padrão; azul só para \"em execução\", âmbar só para \"espera você\".",
+      "Estado em palavra e em fundo, nunca só em cor; vermelho contra verde não existe.",
+      "Tema claro e escuro com os mesmos papéis.",
+      "Toda mudança de rumo é proposta e confirmada antes de valer."
+    ],
+    "rules": [
+      {
+        "name": "A Regra das Duas Cores",
+        "body": "Só \"em execução\" e \"espera você\" têm matiz. Qualquer outro estado é cinza mais palavra. Um terceiro estado colorido precisa tirar um desses dois.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra da Palavra",
+        "body": "Todo estado aparece escrito. Fundo e cor reforçam; nunca são o único canal. Vermelho e verde nunca separam dois estados.",
+        "section": "colors"
+      },
+      {
+        "name": "A Regra do Peso Parado",
+        "body": "Selecionar, passar o mouse ou mudar de estado nunca muda peso nem tamanho de texto: o texto não pode se mexer. Números usam `tabular-nums`.",
+        "section": "typography"
+      },
+      {
+        "name": "A Regra do Plano",
+        "body": "Nada flutua. Não há sombra de elevação, brilho nem desfoque; hover troca o fundo.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do escrever o estado em palavra em todo lugar onde ele aparece.",
+      "Do marcar seleção por fundo (`oklch(0.935 0 0)` no claro), sem borda.",
+      "Do manter todos os cartões terminando na mesma linha de base; a página nunca rola.",
+      "Do pedir confirmação na própria linha antes de trocar decisão ou parar a execução.",
+      "Do usar o mesmo raio dos controles (4px) em etiquetas e botões."
+    ],
+    "donts": [
+      "Don't separar dois estados por vermelho contra verde, nem por cor sozinha.",
+      "Don't usar contorno escuro ou anel para marcar o item selecionado.",
+      "Don't mudar peso ou tamanho de texto em seleção ou hover.",
+      "Don't dar matiz a um terceiro estado: azul e âmbar já estão ocupados.",
+      "Don't usar etiqueta em pílula totalmente arredondada com borda."
+    ]
+  }
+}
