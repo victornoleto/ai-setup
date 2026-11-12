@@ -16,7 +16,8 @@ if TYPE_CHECKING:
     from .engine import Engine
 
 HELP = ("/add <texto> [--after NN] · /skip NN · /unskip NN · /note <texto> [--task NN] · "
-        "/decision <qid> <opção ou texto> · /pause · /resume · /stop · /ask <texto> (operador) · "
+        "/decision <qid> <opção ou texto> · /plan NN <instrução> (refaz o rascunho do plano) · "
+        "/pause · /resume · /stop · /ask <texto> (operador) · "
         "/answer <id> <nº ou texto> (responde a pergunta aberta)")
 
 
@@ -228,6 +229,22 @@ class Control:
             return True, "resposta recebida"
         if cmd == "decision":
             return self.decision(rest, cmd_id)
+        if cmd == "plan":
+            m = re.match(r"(\S+)\s+(.+)$", rest, re.S)
+            if not m:
+                return False, "uso: /plan NN <o que mudar no rascunho do plano>"
+            f = find_task(files, m.group(1))
+            if not f:
+                return False, f"tarefa '{m.group(1)}' não existe"
+            st = self.s.state()["tasks"].get(f.stem, {})
+            if st.get("phase"):
+                return False, f"{f.stem} já começou; mude o rumo dela com /note --task {f.stem.split('-')[0]}"
+            if not st.get("draft"):
+                return False, f"{f.stem} não tem rascunho de plano ([plan] ahead desligado ou rascunho ainda não escrito)"
+            if not cmd_id or not any(e["type"] == "plan_edit" and e.get("command_id") == cmd_id for e in self.s.events()):
+                self.s.event("plan_edit", {"task": f.stem, "instruction": m.group(2).strip(), "command_id": cmd_id})
+            self.eng.launch_redraft(f.stem)
+            return True, f"{f.stem}: o planejador vai refazer o rascunho com a instrução"
         if cmd == "pause":
             self.paused = True
             return True, "pausa no próximo ponto seguro (fim da chamada atual)"

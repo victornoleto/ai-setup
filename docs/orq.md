@@ -128,6 +128,7 @@ no mesmo worktree. `--retry` exige o nome exato da tarefa e arquiva seus relató
 | `/note <texto> [--task NN]` | instrução para o próximo prompt da tarefa em curso (ou da NN) e das seguintes |
 | `/answer <id> <nº ou texto>` | responde a pergunta aberta (no painel, basta digitar sem barra) |
 | `/decision <qid> <opção ou texto>` | troca uma decisão do conselho; se a tarefa já terminou, cria a tarefa de ajuste |
+| `/plan NN <instrução>` | o planejador refaz o rascunho do plano de uma tarefa pendente (só com `[plan] ahead`) |
 | `/cost [NN]` | custo estimado por papel (planejador, executor, revisor final, conselho, operador), total e por tarefa |
 | `/pause` · `/resume` · `/stop` | pausa ou para no próximo ponto seguro (entre duas chamadas); `orq resume` continua |
 | texto sem barra | vai ao **operador** (LLM, só leitura), que responde e propõe comandos; `y` aplica, `n` descarta |
@@ -193,6 +194,10 @@ timeout = "30m"
 [report]
 llm_summary = true               # no fim, o planejador (só leitura) escreve "O que foi entregue" no journal
 
+[plan]
+ahead = false                    # true: rascunha o plano de todas as tarefas antes da primeira execução
+approve_timeout = "30m"          # espera a sua aprovação dos rascunhos; depois começa sozinha. "0" não espera
+
 [intervene]
 enabled = true                   # false: falha/bloqueio encerram a tarefa, como antes
 decision_timeout = "1h"
@@ -213,6 +218,24 @@ O `queue.conf` das filas antigas continua sendo lido: `ORQ_ACCOUNT`, `ORQ_RULES_
 | kiro | `kiro-cli chat --no-interactive --output-format stream-json` (prompt no stdin, retomada com `--resume-id`) | schema no prompt + validação | `--trust-tools=` só de leitura / `--trust-all-tools` |
 
 No kiro o gasto vem em créditos, não em US$: aparece no painel e em `calls/NOME.json`, e não entra no `max_run_cost`.
+
+## Planos antecipados
+
+Com `[plan] ahead = true`, você lê e ajusta o plano de cada tarefa antes de a fila executar qualquer coisa.
+
+1. **Rascunho encadeado**: o planejador escreve o `plan.md` de cada tarefa, em ordem. Cada rascunho lê os
+   anteriores, assume que serão executados como planejado e abre com uma seção **Premissas**. Dúvida do rascunho
+   vai ao conselho (e a você, sem unanimidade) já nessa fase.
+2. **Aprovação com prazo**: a fila pergunta "Planos prontos. Começar a execução?" e espera `approve_timeout`. Sem
+   resposta, começa sozinha. "Parar a fila" encerra o motor; `orq resume` começa a executar sem perguntar de novo.
+3. **Seus ajustes**: na web, **Editar plano** grava o `plan.md` (evento `plan_edit`); a barra de instrução ou
+   `/plan NN <instrução>` pede ao planejador para refazer o rascunho. Os dois viram restrição da revalidação.
+4. **Revalidação**: quando a tarefa começa, a mesma sessão do planejador confere as premissas contra o que as
+   anteriores entregaram de fato e confirma ou atualiza o plano. Se falhar, a tarefa planeja do zero.
+
+Na aba Plano, a tarefa diz `rascunho`, `desatualizado` (a fila mudou depois dele: tarefa criada, pulada, decisão
+trocada, tarefa anterior que falhou) ou `revalidado`. Rascunho, refação e revalidação contam como tempo e custo de
+plano da própria tarefa. Rascunho que falha não derruba a fila: aquela tarefa e as seguintes planejam na hora.
 
 ## Run dir
 
@@ -263,6 +286,7 @@ ação vira um comando na caixa de entrada do motor, e a resposta dele aparece n
 | Pular, Devolver à fila (tarefa pendente) | `/skip`, `/unskip` |
 | Pausar, Retomar, Parar (com confirmação) | `/pause`, `/resume`, `/stop` |
 | Editar texto (tarefa pendente) | grava o arquivo da tarefa na fila, como o `/edit` do painel |
+| Editar plano (tarefa pendente com rascunho) | grava o `plan.md`; a revalidação respeita a edição |
 
 Com o motor parado, o comando fica guardado e vale no próximo `orq resume`. O servidor só aceita ação com
 `Origin` local e um token que a página recebe ao ser servida: outra aba do navegador não comanda os agentes.

@@ -1,4 +1,6 @@
 """O laço de uma tarefa: plano → (conselho) → execução → revisão → correção … → takeover → revisão final.
+Com `[plan] ahead`, antes da primeira execução o planejador rascunha o plano de todas as tarefas, em ordem, o dono
+aprova (com prazo) e cada tarefa revalida o próprio rascunho quando começa.
 Cada fase é gravada em state.json antes de rodar; `orq resume` recomeça da fase em curso, retomando as sessões.
 Porte fiel do loop.sh; as tentativas, a espera no limite de uso e a troca de conta valem para todo harness."""
 from __future__ import annotations
@@ -15,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from . import context, council, harness as harness_mod, intervene, notify
-from .config import ORQ_HOME, Config, ConfigError
+from .config import ORQ_HOME, Config, ConfigError, parse_duration
 from .control import Control, StopRun
 from .journal import OK_USER
 from .harness.base import CallRequest, Harness, run_process, shorten_paths
@@ -125,6 +127,7 @@ class Engine:
         self.stream_mode = str(cfg.get("ui", "stream", default="main"))
         self.thinking = bool(cfg.get("ui", "thinking", default=False))
         self.handled: set[str] = set()   # tarefas por que o laço já passou nesta execução
+        self.redrafts: dict[str, asyncio.Task] = {}  # /plan em curso, por tarefa: a revalidação espera
         self.control = Control(self)
         self.notifier = notify.load()  # None: sem ~/.config/orq/notify.toml, só o notify-send
 
@@ -347,8 +350,127 @@ class Engine:
                 job.cancel()
             await asyncio.gather(poller, *jobs, return_exceptions=True)
 
+    # --- planos antecipados ([plan] ahead) ------------------------------------------------------------
+    def drafted(self) -> list[Path]:
+        return [f for f in self.task_files() if self.s.get(f.stem, "draft")]
+
+    async def draft_plans(self) -> None:
+        """Rascunho encadeado: um plano por tarefa pendente, em ordem, cada um lendo os anteriores. Depois, a
+        aprovação do dono. Rascunho que falha não derruba nada: dali em diante as tarefas planejam na hora delas."""
+        if not self.cfg.get("plan", "ahead", default=False):
+            return
+        stage = (self.s.top("plan_ahead") or {}).get("phase")
+        if stage == "done":
+            return
+        if stage != "approve":
+            for f in self.task_files():
+                if self.s.get(f.stem, "phase") or self.s.get(f.stem, "draft"):
+                    continue
+                await self.checkpoint(None)
+                self.s.set_top("plan_ahead", {"phase": "draft", "task": f.stem, "since": time.time()})
+                if not await self.draft(self.make_task(f)):
+                    self.s.notice("error", "O rascunho do plano falhou; esta tarefa e as seguintes planejam quando "
+                                  "começarem (ver orq.log).", f.stem)
+                    break
+        self.s.set_top("plan_ahead", {"phase": "approve"})
+        try:
+            await self.approve_plans()
+        except StopRun:  # parar na aprovação também conta como visto: o resume começa a executar
+            self.s.set_top("plan_ahead", {"phase": "done"})
+            raise
+        self.s.set_top("plan_ahead", {"phase": "done"})
+
+    async def draft(self, t: Task) -> bool:
+        s = self.s
+        t.base_prompt = self.base_prompt(t)
+        prev = "\n".join(f"- `{f.stem}`: {s.dir / f.stem / 'plan.md'}" for f in self.drafted()) \
+            or "(nenhum: esta é a primeira tarefa da fila)"
+        before = self.repo_mark(t)
+        out, sid = await self.call(t, "planner", "plan-draft", "plan",
+                                   prompt("plan_draft", BASE=t.base_prompt, PLAN_FILE=t.plan_file, PREVIOUS=prev))
+        if out is None:
+            return False
+        self.warn_if_wrote(t, "O planejador", before)
+        s.set(t.id, "planner_sid", sid)
+        while True:  # dúvidas do rascunho vão ao conselho (e ao dono) já aqui, antes de a fila andar
+            rc, answers = await self.resolve_questions(t, "planejador", out)
+            if rc == 1:
+                break
+            if rc == 2:
+                return False
+            out, _ = await self.call(t, "planner", f"plan-update-{hms()}", "plan",
+                                     prompt("plan_update", ANSWERS=answers, PLAN_FILE=t.plan_file), sid, resume=True)
+            s.set(t.id, "partial_answers", None)
+            if out is None:
+                return False
+        s.update_task(t.id, {"draft": "draft", "decision_rounds": 0})
+        s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md", "draft": True})
+        return True
+
+    async def approve_plans(self) -> None:
+        timeout = parse_duration(self.cfg.get("plan", "approve_timeout", default="30m"))
+        drafted = self.drafted()
+        if not timeout or not drafted:
+            return
+        ask = self.s.top("open_ask") or {}
+        if ask.get("kind") != "plans":  # resume com a pergunta aberta: a mesma, com o prazo que ela já tinha
+            ask = intervene.new_ask(
+                drafted[0].stem, "plans", "plan", f"Planos de {len(drafted)} tarefa(s) prontos. Começar a execução?",
+                "Leia e ajuste os planos na interface web (aba Plano de cada tarefa) antes de responder. "
+                "Sem resposta, a execução começa sozinha no prazo.",
+                [{"id": "start", "label": "Começar a execução"},
+                 {"id": "stop", "label": "Parar a fila para eu revisar com calma (orq resume continua)"}],
+                "start", deadline=time.time() + timeout)
+        text = await intervene.wait(self, ask)
+        opt = intervene.match_option(ask, text) if text else None
+        if text and not opt:  # texto livre: vale como nota para todas as tarefas, e a fila começa
+            self.s.event("note", {"text": text, "for_task": "", "command_id": f"ask-{ask['id']}"})
+        intervene.close(self, ask, action="timeout" if text is None else (opt or {"id": "start"})["id"],
+                        note="" if opt or text is None else text)
+        if opt and opt["id"] == "stop":
+            raise StopRun
+
+    def plan_edits(self, t: Task) -> str:
+        lines = []
+        for e in self.s.events():
+            if e["type"] == "plan_edit" and e.get("task") == t.id:
+                lines.append(f"- ({e['ts'][11:16]}) " + (f"Instrução do dono: {e['instruction']}" if e.get("instruction") else
+                             "O dono editou o plano à mão: o texto que está no arquivo é dele."))
+        return "\n".join(lines) or "(nenhum)"
+
+    def revalidate_prompt(self, t: Task) -> str:
+        return prompt("plan_revalidate", PLAN_FILE=t.plan_file, TASK=t.text.rstrip("\n"), PROGRESS=self.progress(t),
+                      EDITS=self.plan_edits(t))
+
+    def launch_redraft(self, tid: str) -> None:
+        """/plan: o planejador refaz o rascunho em segundo plano (só escreve o arquivo do plano). Pedidos para a
+        mesma tarefa rodam em fila: a sessão é uma só."""
+        prev = self.redrafts.get(tid)
+
+        async def job():
+            if prev:
+                await asyncio.gather(prev, return_exceptions=True)
+            f = next((f for f in self.task_files() if f.stem == tid), None)
+            if not f or self.s.get(tid, "phase"):
+                return  # a tarefa começou antes: a instrução entra na revalidação (plan_edits)
+            t = self.make_task(f)
+            out, _ = await self.call(t, "planner", f"plan-redraft-{hms()}", "plan", self.revalidate_prompt(t),
+                                     self.s.get(tid, "planner_sid"), resume=True, gate=False)
+            if out is None:
+                self.s.notice("error", "O planejador não refez o rascunho; a instrução vale na revalidação.", tid)
+                return
+            # dúvida nova aqui não vai ao conselho: a revalidação, quando a tarefa começar, a levanta de novo
+            self.s.event("plan", {"task": tid, "summary": out["summary"], "plan_rel": f"{tid}/plan.md", "draft": True,
+                                  "revised": True})
+
+        task = asyncio.get_running_loop().create_task(job())
+        self.redrafts[tid] = task
+        self.control.background.add(task)
+        task.add_done_callback(self.control.background.discard)
+
     async def _run_queue(self) -> bool:
         failed, stop = 0, False
+        await self.draft_plans()
         while not stop:
             await self.checkpoint(None)
             todo = [f for f in self.task_files() if f.stem not in self.handled]  # relida a cada tarefa: /add entra aqui
@@ -462,15 +584,26 @@ class Engine:
                     phase = "plan"
 
                 elif phase == "plan":
+                    if t.id in self.redrafts:  # /plan ainda rodando na mesma sessão: espera terminar
+                        await asyncio.gather(self.redrafts.pop(t.id), return_exceptions=True)
                     before = self.repo_mark(t)
-                    out, sid = await self.call(t, "planner", "plan", "plan",
-                                               prompt("plan", BASE=t.base_prompt, PLAN_FILE=t.plan_file))
+                    out, revalidated = None, False
+                    if s.get(t.id, "draft") and psid:  # rascunho antecipado: a mesma sessão confere e atualiza
+                        out, sid = await self.call(t, "planner", "plan-revalidate", "plan", self.revalidate_prompt(t),
+                                                   psid, resume=True)
+                        revalidated = out is not None
+                        if not revalidated:
+                            s.notice("error", "A revalidação do rascunho falhou; planejando do zero.", t.id)
+                    if out is None:
+                        out, sid = await self.call(t, "planner", "plan", "plan",
+                                                   prompt("plan", BASE=t.base_prompt, PLAN_FILE=t.plan_file))
                     if out is None:
                         raise Problem("failed", "O planejamento falhou (ver orq.log).", "plan")
                     self.warn_if_wrote(t, "O planejador", before)
-                    s.set(t.id, "planner_sid", sid)
+                    s.update_task(t.id, {"planner_sid": sid, "draft": "revalidated" if revalidated else None})
                     self.save_out(t, "plan.out.json", out)
-                    s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md"})
+                    s.event("plan", {"task": t.id, "summary": out["summary"], "plan_rel": f"{t.id}/plan.md",
+                                     **({"revalidated": True} if revalidated else {})})
                     phase = "plan_questions"
 
                 elif phase == "plan_questions":

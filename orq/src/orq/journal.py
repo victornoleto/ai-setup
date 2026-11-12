@@ -99,7 +99,8 @@ def _last_per_task(evs: list[dict]) -> list[dict]:
 def _section(e: dict) -> str | None:
     t = e["type"]
     if t == "plan":
-        return f"### Plano\n\n{e['summary']}\n\nArquivo: [{e['plan_rel']}]({e['plan_rel']})\n"
+        kind = " (rascunho refeito)" if e.get("revised") else " (rascunho)" if e.get("draft") else " (revalidado)" if e.get("revalidated") else ""
+        return f"### Plano{kind}\n\n{e['summary']}\n\nArquivo: [{e['plan_rel']}]({e['plan_rel']})\n"
     if t == "decision":
         who = "usuário (pelo painel)" if from_user(e) else e["source"]
         head = "do usuário" if e.get("points") is None else f"**{pts(e['points'])} pontos**"
@@ -340,9 +341,10 @@ def render_review(ev: list[dict]) -> str:
 
 
 # --- tempo por etapa -----------------------------------------------------------------------------------------------
-KIND_LABEL = {"plan": "plano", "plan-update": "plano (atualização)", "clean": "arrumação", "takeover": "takeover",
+KIND_LABEL = {"plan": "plano", "plan-update": "plano (atualização)", "plan-draft": "plano (rascunho)",
+              "plan-revalidate": "plano (revalidação)", "plan-redraft": "plano (rascunho refeito)", "clean": "arrumação", "takeover": "takeover",
               "council": "conselho", "intervene": "diagnóstico", "resolve": "operador"}
-GROUP = {"plan": "plano", "plan-update": "plano", "exec": "exec", "clean": "exec", "verify": "verif",
+GROUP = {"plan": "plano", "plan-update": "plano", "plan-draft": "plano", "plan-revalidate": "plano", "plan-redraft": "plano", "exec": "exec", "clean": "exec", "verify": "verif",
          "review": "revisão", "takeover": "takeover", "council": "conselho", "wait": "espera"}
 
 
@@ -443,7 +445,10 @@ def event_line(e: dict) -> str | None:
         return f"{glyph} {task} terminou: {RESULT_LABEL.get(e['result'], e['result']).replace('**', '')} " \
                f"({dur_both(e)}, {e.get('cycles', 1)} ciclo(s)) — {_clip(e.get('reason', ''), 160)}"
     if t == "plan":
-        return f"[PLANO] {task}: {_clip(e['summary'], 300)}"
+        tag = "PLANO · rascunho" if e.get("draft") else "PLANO · revalidado" if e.get("revalidated") else "PLANO"
+        return f"[{tag}] {task}: {_clip(e['summary'], 300)}"
+    if t == "plan_edit":
+        return f"[PLANO · pedido do dono] {task}: " + (_clip(e["instruction"], 200) if e.get("instruction") else "editado à mão")
     if t == "exec":
         extra = f" · {len(e['pending'])} pendência(s)" if e.get("pending") else ""
         return (f"[EXECUÇÃO c{e['cycle']}] {task} ({e['actor']}): {STATUS_LABEL.get(e['status'], e['status']).replace('**', '')}"

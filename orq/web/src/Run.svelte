@@ -28,7 +28,7 @@
   let target = $state<"task" | "queue">("task");
   let feedback = $state<{ ok: boolean; text: string } | null>(null);
   let confirming = $state<string | null>(null); // a ação que espera o segundo clique
-  let editing = $state(false);
+  let editing = $state<false | "text" | "plan">(false);
   let draft = $state("");
   let closed = $state<string[]>(readClosed());
   const watch = new Set<string>();
@@ -80,9 +80,9 @@
   async function saveText() {
     if (!sel) return;
     try {
-      await api.setText(id, sel, draft);
+      await (editing === "plan" ? api.setPlan : api.setText)(id, sel, draft);
+      feedback = { ok: true, text: editing === "plan" ? "Plano salvo. A revalidação respeita a sua edição." : "Texto da tarefa salvo." };
       editing = false;
-      feedback = { ok: true, text: "Texto da tarefa salvo." };
       await loadTask();
     } catch (e) {
       feedback = { ok: false, text: (e as Error).message };
@@ -341,13 +341,24 @@
               {#if task.skipped}
                 <button class="btn outline sm" onclick={() => act(`/unskip ${task?.id}`)}>Devolver à fila</button>
               {:else if task.editable && !editing}
-                <button class="btn outline sm" onclick={() => { draft = task?.text ?? ""; editing = true; }}>Editar texto</button>
+                {#if task.draft && task.plan_md}
+                  <button class="btn outline sm" onclick={() => { draft = task?.plan_md ?? ""; editing = "plan"; }}>Editar plano</button>
+                {/if}
+                <button class="btn outline sm" onclick={() => { draft = task?.text ?? ""; editing = "text"; }}>Editar texto</button>
                 <button class="btn outline sm" onclick={() => act(`/skip ${task?.id}`)}>Pular</button>
               {/if}
             </div>
+            {#if task.draft}
+              <p class="draft">
+                <span class="badge">plano: {task.draft}</span>
+                {task.draft === "rascunho" ? "Escrito antes de a fila começar. É conferido de novo quando a tarefa começar."
+                  : task.draft === "desatualizado" ? "A fila mudou depois deste rascunho. Ele é refeito quando a tarefa começar."
+                  : "Conferido contra o que as tarefas anteriores entregaram."}
+              </p>
+            {/if}
             <div class="md" style="margin-top:14px">
               {#if editing}
-                <textarea class="edit" bind:value={draft} aria-label="Texto da tarefa"></textarea>
+                <textarea class="edit" bind:value={draft} aria-label={editing === "plan" ? "Plano da tarefa" : "Texto da tarefa"}></textarea>
                 <div class="row">
                   <button class="btn primary sm" onclick={saveText}>Salvar</button>
                   <button class="btn outline sm" onclick={() => (editing = false)}>Cancelar</button>
@@ -427,7 +438,7 @@
       {#if run.ask}
         <section class="card ask">
           <div class="in">
-            <strong><Icon name="alert" /> Tarefa {run.ask.task.split("-")[0]} espera você: {run.ask.question}</strong>
+            <strong><Icon name="alert" /> {run.ask.kind === "plans" ? "A fila espera você" : `Tarefa ${run.ask.task.split("-")[0]} espera você`}: {run.ask.question}</strong>
             {#if run.ask.diagnosis}<p>{run.ask.diagnosis}</p>{/if}
             <div class="opts">
               {#each run.ask.options as o, i}
@@ -438,6 +449,7 @@
               {/each}
             </div>
             {#if run.ask.deadline}<p class="hint">Segue sozinha com a recomendada às {clock(run.ask.deadline)}.</p>{/if}
+            {#if run.ask.kind === "plans"}<p class="hint">Para mudar um plano: escolha a tarefa na fila e use Editar plano, ou escreva na barra de instrução.</p>{/if}
           </div>
         </section>
       {/if}

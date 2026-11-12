@@ -12,9 +12,10 @@ Repositório: {{REPO}} · run dir: {{RUN_DIR}}
 - `/note <texto> [--task NN]` — instrução que entra no próximo prompt da tarefa em curso (ou da NN) e das seguintes.
 - `/decision <qid> <id da opção ou texto>` — troca uma decisão do conselho (tarefa em curso recebe no próximo prompt;
   tarefa concluída ganha uma tarefa de ajuste).
+- `/plan NN <instrução>` — o planejador refaz o rascunho do plano de uma tarefa **pendente** que já tem rascunho.
 - `/pause` · `/resume` · `/stop`
 
-Mudança no rumo da tarefa em curso é `/note`; trabalho novo é `/add`; troca de escolha já feita é `/decision`.
+Mudança no plano de tarefa que ainda não começou é `/plan`. Mudança no rumo da tarefa em curso é `/note`; trabalho novo é `/add`; troca de escolha já feita é `/decision`.
 Mensagem que começa com `Sobre a tarefa NN` fala daquela tarefa: pendente recebe `/note --task NN`; concluída recebe
 um `/add --after <tarefa em curso>` de ajuste, com o que a NN entregou e o que deve mudar (sem tarefa em curso, no fim).
 Pergunta que não pede mudança: responda e deixe `commands` vazio. Não invente id de tarefa nem de decisão.

@@ -17,7 +17,7 @@ export type Decision = { qid: string; question: string; options: { id: string; l
 export type Step = { label: string; kind: string; cycle: number | null; dur: number | null; ok: boolean | null; running?: boolean; open?: boolean; waited?: number; tools?: Record<string, number> };
 export type TaskView = {
   id: string; title: string; status: string; glyph: string; text: string; plan_md: string | null; decisions_md: string | null; report_md: string | null;
-  validation: string[]; highlights: string[]; pending: string[]; steps: Step[]; decisions: Decision[]; editable: boolean; skipped: boolean;
+  validation: string[]; highlights: string[]; pending: string[]; steps: Step[]; decisions: Decision[]; editable: boolean; skipped: boolean; draft: "rascunho" | "desatualizado" | "revalidado" | null;
   diff: { add: number; rem: number; nfiles: number; files: { add: number; rem: number; path: string }[] } | null;
 };
 
@@ -40,6 +40,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
 export const api = {
   send: (id: string, text: string, op?: string) => post<{ id: string; alive: boolean }>(`/api/runs/${id}/send`, { text, ...(op ? { op } : {}) }),
+  setPlan: (id: string, tid: string, text: string) => post<{ ok: true }>(`/api/runs/${id}/tasks/${encodeURIComponent(tid)}/plan`, { text }),
   setText: (id: string, tid: string, text: string) => post<{ ok: true }>(`/api/runs/${id}/tasks/${encodeURIComponent(tid)}/text`, { text }),
   runs: () => get<RunRow[]>("/api/runs"),
   run: (id: string) => get<RunView>(`/api/runs/${id}`),

@@ -70,6 +70,11 @@ def events_after(store: RunStore, after: int, limit: int = 500) -> list[dict]:
 def _current(st: dict, rows: list[model.TaskRow]) -> dict | None:
     """A tarefa em curso: etapa do trilho e, durante uma chamada, papel, harness e modelo."""
     row = next((r for r in rows if r.glyph in "▶⏸" and st["tasks"].get(r.id, {}).get("phase") not in (None, "done")), None)
+    ahead = st.get("plan_ahead") or {}
+    if not row and ahead.get("phase") == "draft" and ahead.get("task"):  # rascunho antecipado: a tarefa ainda não começou
+        cfg = ((st.get("config") or {}).get("roles") or {}).get("planner", {})
+        return {"task": ahead["task"], "phase": "plan", "label": "rascunhando o plano", "stage": "plano", "cycle": 1,
+                "role": "planner", "harness": cfg.get("harness"), "model": cfg.get("model"), "since": ahead.get("since")}
     if not row:
         return None
     t = st["tasks"][row.id]
@@ -143,6 +148,29 @@ def _decisions(cur: list[dict], tid: str) -> list[dict]:
     return list(out.values())
 
 
+# Depois do rascunho, o que muda a fila ou o que as tarefas anteriores entregam deixa o rascunho para trás.
+STALE_COMMANDS = ("/add", "/skip", "/unskip", "/decision")
+
+
+def draft_state(st: dict, events: list[dict], ids: list[str], tid: str) -> str | None:
+    """rascunho · desatualizado · revalidado, ou None (tarefa sem plano antecipado)."""
+    d = st["tasks"].get(tid, {}).get("draft")
+    if not d:
+        return None
+    if d == "revalidated":
+        return "revalidado"
+    at = max((i for i, e in enumerate(events) if e["type"] == "plan" and e.get("task") == tid and e.get("draft")), default=-1)
+    before = set(ids[: ids.index(tid)]) if tid in ids else set()
+    for e in events[at + 1:]:
+        t = e["type"]
+        if (t == "control_ack" and e.get("ok") and str(e.get("command", "")).startswith(STALE_COMMANDS)
+                or t == "task_end" and e.get("result") not in ("ok", "ok_takeover")
+                or t == "plan_edit" and e.get("task") in before
+                or t == "notice" and e.get("kind") == "control" and e.get("task") in before | {tid}):
+            return "desatualizado"
+    return "rascunho"
+
+
 class TaskError(Exception):
     def __init__(self, status: int, message: str):
         super().__init__(message)
@@ -161,6 +189,22 @@ def set_task_text(store: RunStore, tid: str, text: str) -> None:
         raise TaskError(400, "o texto da tarefa não pode ficar vazio")
     write_atomic(f, text.rstrip() + "\n")
     store.notice("control", "Texto da tarefa editado pela web.", tid)
+
+
+def set_plan_text(store: RunStore, tid: str, text: str) -> None:
+    """O dono edita o rascunho do plano: vale como restrição na revalidação (evento plan_edit)."""
+    st = store.state()
+    plan = store.dir / tid / "plan.md"
+    if not TASK_ID_RE.fullmatch(tid) or not (Path(st["queue"]) / f"{tid}.md").is_file():
+        raise TaskError(404, "tarefa não encontrada nesta fila")
+    if st["tasks"].get(tid, {}).get("phase"):
+        raise TaskError(409, f"{tid} já começou; o plano não é mais editado, mande uma instrução")
+    if not st["tasks"].get(tid, {}).get("draft"):
+        raise TaskError(409, f"{tid} ainda não tem rascunho de plano")
+    if not isinstance(text, str) or not text.strip():
+        raise TaskError(400, "o plano não pode ficar vazio")
+    write_atomic(plan, text.rstrip() + "\n")
+    store.event("plan_edit", {"task": tid, "manual": True})
 
 
 def task_view(store: RunStore, tid: str) -> dict | None:
@@ -183,6 +227,7 @@ def task_view(store: RunStore, tid: str) -> dict | None:
         "pending": last.get("pending") or [],
         "decisions": _decisions(cur, tid), "editable": not st["tasks"].get(tid, {}).get("phase"),
         "skipped": st["tasks"].get(tid, {}).get("result") == "skipped",
+        "draft": draft_state(st, cur, sorted(p.stem for p in Path(st["queue"]).glob("[0-9]*.md")), tid),
         "steps": [{k: s.get(k) for k in ("label", "kind", "cycle", "dur", "ok", "running", "open", "waited", "tools")}
                   for s in model.task_steps(store, events, tid)] if d.is_dir() else [],
         "diff": {"add": diff.add, "rem": diff.rem, "nfiles": diff.nfiles,

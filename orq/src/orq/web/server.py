@@ -25,7 +25,7 @@ CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' dat
        "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 RUN_RE = re.compile(r"/api/runs/([0-9a-f]{12})(?:/(.*))?")
 # O que a página pode mandar ao motor. /edit não entra: o texto de tarefa pendente tem rota própria.
-COMMANDS = ("add", "skip", "unskip", "note", "decision", "pause", "resume", "stop", "ask", "answer")
+COMMANDS = ("add", "skip", "unskip", "note", "decision", "plan", "pause", "resume", "stop", "ask", "answer")
 MAX_BODY = 64_000
 MAX_TEXT = 20_000
 
@@ -108,10 +108,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(400, {"error": "proposta inválida"})
             sent = store.send(text.strip(), source=f"web:op:{op}" if op else "web")
             return self._json(200, {"id": sent["id"], "alive": store.engine_alive()})
-        mt = re.fullmatch(r"tasks/([^/]+)/text", rest)
+        mt = re.fullmatch(r"tasks/([^/]+)/(text|plan)", rest)
         if mt:
             try:
-                view.set_task_text(store, mt.group(1), text)
+                (view.set_task_text if mt.group(2) == "text" else view.set_plan_text)(store, mt.group(1), text)
             except view.TaskError as exc:
                 return self._json(exc.status, {"error": str(exc)})
             return self._json(200, {"ok": True})

@@ -119,6 +119,7 @@ svg.i{width:1em;height:1em;vertical-align:-.14em;fill:none;stroke:currentColor;s
 .ctl+.sp{margin-left:0}
 .meta .btn{color:var(--foreground)}
 .dec{margin:.9em 0 1.3em;max-width:70ch}
+.draft{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 0;color:var(--muted-foreground);line-height:1.45}
 .confirm{display:block;padding:10px 12px;border-radius:calc(var(--radius) - 2px);background:var(--muted);line-height:1.45}
 .edit{display:block;width:100%;min-height:260px;padding:10px 12px;border:1px solid var(--input);border-radius:calc(var(--radius) - 2px);background:var(--background);font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.9rem;line-height:1.55;resize:vertical}
 .op strong{display:block;font-weight:600}

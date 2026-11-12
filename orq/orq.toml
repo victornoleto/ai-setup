@@ -59,6 +59,10 @@ max_run_cost = 0           # US$ estimados da execução inteira; passou, pergun
 command = ""               # ex. "make test": roda na raiz do repo depois de cada execução; falhou = reprovada (gasta ciclo)
 timeout = "30m"
 
+[plan]
+ahead = false              # true: antes da primeira execução, o planejador rascunha o plano de todas as tarefas, em ordem
+approve_timeout = "30m"    # espera você aprovar os rascunhos; sem resposta, a execução começa sozinha. "0" não espera
+
 [intervene]
 enabled = true             # a fila pausa e pergunta ao usuário (painel + ntfy) em vez de falhar/bloquear
 decision_timeout = "1h"    # decisão sem unanimidade: segue com a escolha do conselho depois disso
