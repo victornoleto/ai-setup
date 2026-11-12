@@ -5,6 +5,7 @@ import argparse
 import asyncio
 import os
 import signal
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -21,9 +22,10 @@ USAGE = """\
 Uso:
   orq new <pasta> [--repo DIR]   cria <pasta>/orq/ e abre o wizard (sessão interativa com a skill orq-setup)
   orq check <pasta>              confere a fila antes de rodar
-  orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
+  orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless] [--tui]
   orq runs [-n 10]               as últimas execuções: estado, tarefas feitas/total, fila e run dir
-  orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
+  orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless] [--tui]
+  orq web [--port N] [--no-open] a interface web (todas as execuções), só em 127.0.0.1
   orq attach [run-dir]           reabre o painel (q desanexa; a execução continua)
   orq status [run-dir]           tarefas, custo e a pergunta aberta, com o comando que a responde
   orq review [run-dir]           o que conferir em cada tarefa: commits, como validar, pendências, diff
@@ -32,7 +34,8 @@ Uso:
   orq notify setup | test         ntfy no celular: cria o tópico (~/.config/orq/notify.toml) / manda um teste
   orq selftest
 
-Sem --headless (e num terminal), o motor roda em segundo plano e o painel abre por cima.
+Sem --headless (e num terminal), o motor roda em segundo plano e a interface web abre no navegador; --tui abre o
+painel no terminal.
 Sem run dir, attach/status/send usam a execução mais recente que está rodando (ou a última); resume e review, a última.
 <pasta>: a pasta da atividade (com orq/ dentro) ou a própria fila (NN-nome.md + orq.toml ou queue.conf).
 """
@@ -132,7 +135,6 @@ def start(store: RunStore, cfg: config.Config, args) -> int:
     if args.headless or not sys.stdout.isatty():
         store.echo = True
         return run_engine(cfg, store, getattr(args, "retry", None) or [], getattr(args, "cmd", None) == "resume")
-    import subprocess
     import time
     with open(store.dir / "engine.out", "a") as out:
         subprocess.Popen([sys.executable, "-m", "orq.cli", "_engine", str(store.dir), *engine_flags(args)],
@@ -147,7 +149,79 @@ def start(store: RunStore, cfg: config.Config, args) -> int:
         if not ended:  # morreu ao subir (configuração, regras…): o erro está no engine.out, não no painel
             tail = (store.dir / "engine.out").read_text(errors="replace").strip().splitlines()[-8:]
             die("o motor não subiu" + (":\n  " + "\n  ".join(tail) if tail else f" (ver {store.dir / 'engine.out'})"))
-    return attach(store)
+    if getattr(args, "tui", False):
+        return attach(store)
+    return open_web(store)
+
+
+# --- web ---------------------------------------------------------------------------------------------------------
+def web_state_file() -> Path:
+    return Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "orq" / "web.json"
+
+
+def web_alive(port: int) -> bool:
+    import urllib.request
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/ping", timeout=1) as r:
+            return r.status == 200
+    except OSError:
+        return False
+
+
+def ensure_web() -> int:
+    """A porta do servidor web: o que já está de pé ou um novo, desanexado (um só para todas as execuções)."""
+    import json
+    import time
+    from .web.server import DEFAULT_PORT
+    try:
+        port = int(json.loads(web_state_file().read_text())["port"])
+    except (OSError, ValueError, KeyError):
+        port = DEFAULT_PORT
+    if web_alive(port):
+        return port
+    subprocess.Popen([sys.executable, "-m", "orq.cli", "web", "--no-open", f"--port={port}"], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(50):
+        if web_alive(port):
+            return port
+        time.sleep(0.1)
+    die(f"o servidor web não subiu na porta {port} (rode `orq web` para ver o erro)")
+
+
+def open_web(store: RunStore | None) -> int:
+    import webbrowser
+    from .web.view import run_id
+    url = f"http://127.0.0.1:{ensure_web()}/" + (f"run/{run_id(store.dir)}" if store else "")
+    print(f"orq web: {url}")
+    if store:
+        print(f"O motor segue em segundo plano. Painel no terminal: orq attach {store.dir}")
+    webbrowser.open(url)
+    return 0
+
+
+def cmd_web(args) -> int:
+    import json
+    from .web.server import serve
+    if args.no_open is False and web_alive(args.port):
+        return open_web(None)  # já há um servidor: só abre a aba
+    try:
+        srv = serve(args.port)
+    except OSError as exc:
+        die(f"porta {args.port} ocupada ({exc}): use --port")
+    web_state_file().parent.mkdir(parents=True, exist_ok=True)
+    web_state_file().write_text(json.dumps({"port": args.port, "pid": os.getpid()}))
+    url = f"http://127.0.0.1:{args.port}/"
+    print(f"orq web: {url}", flush=True)
+    if not args.no_open:
+        import webbrowser
+        webbrowser.open(url)
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        srv.server_close()
+    return 0
 
 
 def attach(store: RunStore) -> int:
@@ -369,6 +443,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--account")
     r.add_argument("--run-dir")
     r.add_argument("--headless", action="store_true")
+    r.add_argument("--tui", action="store_true")
     rn = sub.add_parser("runs")
     rn.add_argument("-n", "--limit", type=int, default=10)
     rs = sub.add_parser("resume")
@@ -376,6 +451,10 @@ def main(argv: list[str] | None = None) -> int:
     rs.add_argument("--account")
     rs.add_argument("--retry", action="append")
     rs.add_argument("--headless", action="store_true")
+    rs.add_argument("--tui", action="store_true")
+    wb = sub.add_parser("web")
+    wb.add_argument("--port", type=int, default=49390)
+    wb.add_argument("--no-open", action="store_true")
     at = sub.add_parser("attach")
     at.add_argument("run_dir", nargs="?")
     en = sub.add_parser("_engine")
@@ -405,7 +484,7 @@ def main(argv: list[str] | None = None) -> int:
     nt.add_argument("action", choices=["setup", "test"])
     sub.add_parser("selftest")
     args = p.parse_args(argv)
-    handlers = {"run": cmd_run, "runs": cmd_runs, "resume": cmd_resume, "status": cmd_status, "review": cmd_review, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
+    handlers = {"run": cmd_run, "runs": cmd_runs, "resume": cmd_resume, "status": cmd_status, "review": cmd_review, "web": cmd_web, "send": cmd_send, "attach": cmd_attach, "_engine": cmd_engine, "decide": cmd_decide, "new": cmd_new, "check": cmd_check, "notify": cmd_notify,
                 "selftest": cmd_selftest}
     if args.cmd not in handlers:
         print(USAGE, end="")

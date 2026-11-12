@@ -50,7 +50,7 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy, xkiro
 ├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
 ├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia, verbosidade
-├── orq/                   o motor do orq e seus testes
+├── orq/                   o motor do orq, a interface web (orq/web) e os testes
 ├── memory-ui/             o servidor do memory-ui
 ├── docs/                  um doc por funcionalidade
 ├── tests/                 test_install.sh (install.sh com HOME falso)

@@ -33,7 +33,7 @@ O ciclo de uma tarefa:
    responder em 1 h).
 6. Cada sessão recebe o **progresso** da fila: o que já foi feito (resumo e commits), a atual e o que falta.
 
-Você acompanha por um **painel** no terminal (o motor roda desanexado: fechar o painel não para a fila) e
+Você acompanha pela **interface web** ou por um **painel** no terminal (o motor roda desanexado: fechar a tela não para a fila) e
 recebe no celular, pelo ntfy, só o que precisa de você. **`git push` é bloqueado** em todas as sessões.
 
 **Use quando** o trabalho se divide em tarefas de 20 a 90 min de agente, cada uma com "pronto quando"
@@ -44,7 +44,7 @@ e uma verificação. **Não use** para exploração aberta ou para algo que cabe
 ```sh
 orq new docs/.local/specs/fire-hotspot/2026-09-30-painel   # wizard: monta <pasta>/orq/ com você
 orq check docs/.local/specs/fire-hotspot/2026-09-30-painel # confere antes de rodar
-orq run docs/.local/specs/fire-hotspot/2026-09-30-painel   # motor em segundo plano + painel
+orq run docs/.local/specs/fire-hotspot/2026-09-30-painel   # motor em segundo plano + interface web
 ```
 
 A `<pasta>` pode ter qualquer origem (card do Notion, spec, anotações). O `orq new` cria `<pasta>/orq/` e abre o
@@ -71,10 +71,11 @@ pronta, quando a branch das regras não é a atual do repositório e quando não
 ```sh
 orq new <pasta> [--repo DIR]
 orq check <pasta>
-orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless]
+orq run <pasta> [--repo DIR] [--account N] [--run-dir DIR] [--headless] [--tui]
+orq web [--port N] [--no-open]  # a interface web, uma para todas as execuções, só em 127.0.0.1
 orq runs [-n 10]
 orq attach [run-dir]
-orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless]
+orq resume [run-dir] [--account N] [--retry NN-tarefa]... [--headless] [--tui]
 orq send [run-dir] "/comando …"
 orq status [run-dir]            # tarefas, custo e a pergunta aberta, com o comando que a responde
 orq review [run-dir]            # o que conferir em cada tarefa: commits, como validar, pendências, diff
@@ -239,6 +240,22 @@ Etiquetas do journal e da timeline: **[PRECISA DE VOCÊ]**, **[INTERVENÇÃO]**,
 **[DECISÃO 2 pts]**/**[DECISÃO 2,5 pts]** (sem unanimidade: vale conferir), **[DECISÃO DO USUÁRIO]**, **[PENDÊNCIAS]**
 (só a contagem: o texto de cada pendência e destaque fica na seção da tarefa), **[LIMITE DE USO]**, **[TROCA DE CONTA]**, **[TIMEOUT]**, **[ERRO]**, **[INTERROMPIDO]**, **[PAUSA]**,
 **[AJUSTE]**, **[OPERADOR]**, **[ÁRVORE SUJA]**, **[SEM COMMIT]** (terminou ok sem commit: confira).
+
+## Interface web
+
+`orq run` e `orq resume` sobem o motor em segundo plano e abrem a interface web no navegador (`--tui` abre o
+painel no terminal; `orq attach` também). `orq web` sobe só o servidor: um para todas as execuções registradas,
+em `http://127.0.0.1:49390`, sem login e sem acesso de fora da máquina.
+
+A tela cabe inteira na janela, em cartões que rolam por dentro: a fila, a tarefa selecionada (Plano, Entrega e
+como validar, Histórico, Ao vivo), a pergunta que espera você e a atividade, com o que mudou desde a sua última
+visita. No topo, o trilho das cinco etapas da tarefa em curso, com harness e modelo. Tema claro e escuro.
+Estado nunca depende só de cor: cada item da fila traz a palavra do estado.
+
+Ela lê os mesmos arquivos do run dir que o painel (`orq/src/orq/web/view.py`); nesta versão é só leitura, e a
+pergunta aberta mostra o `orq send` que a responde. A fonte fica em `orq/web/` (Svelte 5 + Vite) e o resultado
+compilado em `orq/web/dist/` vai no repositório: quem só usa não precisa de Node. Para alterar a tela:
+`cd orq/web && npm install && npm run build`. O `doctor.sh` acusa `dist/` mais velho que a fonte.
 
 ## Proteções
 

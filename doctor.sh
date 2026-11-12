@@ -219,6 +219,10 @@ g=$(wc -c < "$SETUP/sync/memory/GLOBAL.md")
 # Tamanho das respostas finais do Claude nos últimos 14 dias (meta: mediana <= 80 palavras).
 v=$("$SETUP/bin/verbosidade" 2>/dev/null) && note "verbosidade: $v"
 
+# A tela do orq vai compilada no repositório: fonte alterada sem novo build deixa o dist/ velho.
+if [ "$(sh "$SETUP/orq/web/stamp.sh" 2>/dev/null)" = "$(cat "$SETUP/orq/web/dist/src.hash" 2>/dev/null)" ]; then ok "orq web: dist/ bate com a fonte"
+else bad "orq web: dist/ mais velho que a fonte — cd orq/web && npm install && npm run build"; fi
+
 # Sem esta checagem o docs/catalogo.md envelhece na primeira skill nova.
 falta=$(for s in "$SETUP/skills"/*/; do n=$(basename "$s"); grep -qF "\`$n\`" "$SETUP/docs/catalogo.md" || printf '%s ' "$n"; done)
 [ -z "$falta" ] && ok "toda skill de skills/ está no docs/catalogo.md" \
