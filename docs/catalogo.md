@@ -94,6 +94,12 @@ O resto é fluxo que não usamos aqui: [lista no repositório](https://github.co
 impeccable ficou de fora o plugin, que põe hook em toda edição e só existe no Claude; o detector liga por projeto
 com `/impeccable hooks on`.
 
+### Avaliados e adiados
+
+| O quê | Por que não, e quando reabrir |
+|---|---|
+| [AG-UI](https://github.com/ag-ui-protocol/ag-ui) (protocolo de eventos agente → app, 1.0, avaliado em 2026-11) | é protocolo com SDK, não ferramenta de setup. O orq web já faz o mesmo papel com `stream-json` → SSE, e a integração só cobre Claude (`claude-agent-sdk`) e Antigravity, ficando de fora Codex, OpenCode e Kiro. Reabrir quando surgir um segundo cliente para os mesmos agentes (mobile, Slack, CopilotKit): aí trocar o formato próprio do orq pelo AG-UI se paga |
+
 ## Manter atualizado
 
 Skill nova em `skills/` ganha uma linha em "O que tem"; plugin removido, uma em "Plugins do Claude que saíram". O
