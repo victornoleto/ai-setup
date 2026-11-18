@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.2.0/chartjs-plugin-zoom.min.js"></script>
 <style>
 /* Linguagem visual do orq (orq/DESIGN.md): cinzas sem matiz, borda de 1px, quase sem sombra.
    Âmbar só para "precisa de atenção" (alto, esgotado, esgota antes do reset). Estado sempre em palavra. */
@@ -118,6 +119,13 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; display: grid
 .charts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
 .chart { position: relative; height: 280px; }
 .chart .none { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted-foreground); }
+.zoombar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 32px; color: var(--muted-foreground); font-size: .88rem; }
+.zoombar b { color: var(--foreground); font-weight: 500; }
+.zoombar button { height: 32px; padding: 0 11px; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px);
+  background: var(--background); box-shadow: var(--shadow); color: var(--foreground); font: inherit; font-weight: 500; }
+.zoombar button:hover { background: var(--accent); }
+.zoombar .hint { margin-left: auto; }
+.zoombar input[type=range] { flex: 1 1 220px; max-width: 420px; accent-color: var(--foreground); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 16px 8px; font-size: .88rem; color: var(--muted-foreground); }
 .legend span { display: inline-flex; align-items: center; gap: 7px; }
 .legend b { color: var(--foreground); font-weight: 500; }
@@ -163,6 +171,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; display: grid
   <div class="banner" id="banner" role="alert" hidden></div>
   <section class="accounts" id="cards" aria-label="Uso agora, por conta"></section>
 
+  <div class="zoombar" id="zoombar">
+    <span id="zoom-range" hidden></span><button type="button" id="zoom-reset" hidden>Ver período inteiro</button>
+    <input type="range" id="zoom-pan" aria-label="Mover o trecho visível no tempo" hidden>
+    <span class="hint">roda: zoom · Shift + roda ou barra: mover · arrastar: recortar · duplo clique: voltar</span>
+  </div>
   <section class="charts">
     <article class="card">
       <header><h2>Sessão de 5h</h2><span class="aside" id="aside-5h"></span></header>
@@ -396,7 +409,7 @@ function renderChart(k, rows, gapMs) {
     + (datasets.length ? `<span>${lineSvg(quiet, [1, 3], 1)}alerta em 80%</span>` : '');
   $(k === '5h' ? '#aside-5h' : '#aside-week').textContent = !resets.size ? '' : resets.size <= 12
     ? `${resets.size} ${resets.size > 1 ? 'resets' : 'reset'} no período (tracejado vertical)` : `${resets.size} resets no período`;
-  const [min, max] = bounds(), { ticks, step } = timeTicks(min, max);
+  const [min, max] = bounds();
   const canvas = $(k === '5h' ? '#chart-5h' : '#chart-week');
   canvas.parentElement.querySelector('.none')?.remove();
   if (!datasets.length) canvas.insertAdjacentHTML('afterend', '<p class="none">Sem dados desta janela no período.</p>');
@@ -410,15 +423,19 @@ function renderChart(k, rows, gapMs) {
       layout: { padding: { top: 6, right: 8 } },
       scales: {
         x: { type: 'linear', min, max, grid: { color: grid, drawTicks: false }, border: { display: false },
-          afterBuildTicks: (ax) => { ax.ticks = ticks.map((value) => ({ value })); },
+          // Ticks recalculados a cada zoom, em hora cheia para o intervalo visível.
+          afterBuildTicks: (ax) => { const t = timeTicks(ax.min, ax.max); ax.tickStep = t.step; ax.ticks = t.ticks.map((value) => ({ value })); },
           ticks: { color: quiet, padding: 8, maxRotation: 0, autoSkip: false, font,
-            callback: (v) => step >= D || new Date(v).getHours() === 0 ? dayLabel(v) : hhmm(v) } },
+            callback(v) { return this.tickStep >= D || new Date(v).getHours() === 0 ? dayLabel(v) : hhmm(v); } } },
         y: { min: 0, max: 100, border: { display: false }, grid: { color: grid, drawTicks: false },
           ticks: { stepSize: 20, color: quiet, padding: 8, font, callback: (v) => v + '%' } },
       },
       plugins: {
         legend: { display: false },
         resetLines: { at: [...resets] },
+        zoom: { limits: { x: { min, max, minRange: 15 * 60e3 } },
+          zoom: { mode: 'x', wheel: { enabled: true }, onZoomComplete: ({ chart }) => syncZoom(chart),
+            drag: { enabled: true, backgroundColor: css('--selected'), borderColor: css('--muted-foreground'), borderWidth: 1 } } },
         tooltip: { backgroundColor: css('--card'), titleColor: fg, bodyColor: fg, borderColor: css('--input'), borderWidth: 1,
           padding: 10, usePointStyle: true, boxPadding: 4, titleFont: { ...font, weight: 600 }, bodyFont: font,
           callbacks: { title: (it) => whenText(it[0].parsed.x), label: (it) => ` ${it.dataset.label}: ${Math.round(it.parsed.y)}%` } },
@@ -426,6 +443,47 @@ function renderChart(k, rows, gapMs) {
     },
   });
 }
+
+// Zoom/recorte do eixo x: o que acontece num gráfico vale para o outro, e o período visível aparece em texto.
+let syncing = false;  // zoomScale no outro gráfico não pode disparar a sincronização de volta
+function syncZoom(src) {
+  if (syncing) return;
+  syncing = true;
+  const { min, max } = src.scales.x;
+  for (const c of Object.values(charts)) if (c !== src) c.zoomScale('x', { min, max }, 'none');
+  syncing = false;
+  showZoom();
+}
+function showZoom() {
+  const c = Object.values(charts)[0], zoomed = !!c && c.isZoomedOrPanned(), pan = $('#zoom-pan');
+  $('#zoom-reset').hidden = $('#zoom-range').hidden = pan.hidden = !zoomed;
+  if (!zoomed) return;
+  const { min, max } = c.scales.x, { min: lo, max: hi } = c.options.plugins.zoom.limits.x;
+  $('#zoom-range').innerHTML = `Vendo <b class="num">${whenText(min)} – ${whenText(max)}</b>`;
+  // Barra de rolagem: o valor é o início do trecho visível, de lo até hi - largura do trecho.
+  Object.assign(pan, { min: lo, max: hi - (max - min), step: 60e3 });
+  pan.value = min;
+}
+$('#zoom-pan').addEventListener('input', (e) => {
+  const c = Object.values(charts)[0]; if (!c) return;
+  const span = c.scales.x.max - c.scales.x.min, min = +e.target.value;
+  for (const ch of Object.values(charts)) ch.zoomScale('x', { min, max: min + span }, 'none');
+  $('#zoom-range').innerHTML = `Vendo <b class="num">${whenText(min)} – ${whenText(min + span)}</b>`;
+});
+// Shift + roda (ou deslize horizontal do trackpad) move o trecho em vez de dar zoom. Escuta na
+// captura, no contêiner, para chegar antes do plugin de zoom, que escuta no canvas.
+for (const id of ['#chart-5h', '#chart-week']) $(id).parentElement.addEventListener('wheel', (e) => {
+  const dx = e.shiftKey ? (e.deltaX || e.deltaY) : Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : 0;
+  const c = Object.values(charts).find((ch) => ch.canvas === e.target);
+  if (!dx || !c) return;
+  e.preventDefault(); e.stopPropagation();
+  if (!c.isZoomedOrPanned()) return;
+  c.pan({ x: -dx }, undefined, 'none');
+  syncZoom(c);
+}, { capture: true, passive: false });
+function resetZoom() { for (const c of Object.values(charts)) c.resetZoom('none'); showZoom(); }
+$('#zoom-reset').addEventListener('click', resetZoom);
+for (const id of ['#chart-5h', '#chart-week']) $(id).addEventListener('dblclick', resetZoom);
 
 // --- mapa de calor -----------------------------------------------------------
 // Consumo = soma dos aumentos do % da sessão de 5h (depois de um reset, conta o valor novo inteiro), por dia × hora.
@@ -493,7 +551,7 @@ async function refresh() {
     $('#banner').hidden = true;
     const gap = Math.max(10 * 60e3, 3 * (meta.interval_seconds || 300) * 1000);  // mais que isso sem coleta = buraco
     renderStatus(now); renderCards(now);
-    renderChart('5h', period, gap); renderChart('week', period, gap); renderHeat(period);
+    renderChart('5h', period, gap); renderChart('week', period, gap); showZoom(); renderHeat(period);
   } catch (e) { fail(e); }
 }
 
