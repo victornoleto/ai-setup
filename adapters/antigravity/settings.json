@@ -2,7 +2,7 @@
   "clearScrollbackOnResize": false,
   "colorScheme": "colorblind-friendly dark",
   "enableTerminalSandbox": true,
-  "model": "Gemini 4 Argon (High)",
+  "model": "Orchestrator (Carbon)",
   "permissions": {
     "allow": [
       "command(gh auth status)",

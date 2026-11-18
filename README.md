@@ -15,6 +15,7 @@ história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memo
 | **ai-memory**: memória de longo prazo compartilhada entre as ferramentas, e as escolhas para ele conviver com este repositório | [docs/ai-memory.md](docs/ai-memory.md) |
 | **sync/**: seus arquivos pessoais e de empresa num repositório privado, sobrepostos a este na instalação | [docs/sync.md](docs/sync.md) |
 | **Claude Code**: duas contas logadas ao mesmo tempo, aliases (`claude2`, `xclaude`…) e teto de RAM | [docs/claude-code.md](docs/claude-code.md) |
+| **Antigravity CLI** (`agy`): qual modelo Gemini para qual tarefa, cota e modo de permissão (`auto`, `xagy`) | [docs/antigravity.md](docs/antigravity.md) |
 | **Skills**: comportamento numa fonte só, em vez de plugin | [docs/skills.md](docs/skills.md) |
 | **Catálogo**: o que o ai-setup tem e o que não tem (skills, regras absorvidas, plugins que saíram e skills que ficaram no pacote de origem) | [docs/catalogo.md](docs/catalogo.md) |
 | **Segurança**: GitHub pelo `gh`, permissões, credenciais negadas, sandbox do Codex | [docs/seguranca.md](docs/seguranca.md) |
