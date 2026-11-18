@@ -42,7 +42,7 @@ sh ~/.ai-setup/install.sh
 
 Cria os links e cópias do `adapters/MANIFEST` (e do `sync/MANIFEST`, se houver), um
 `sync/memory/machine/<hostname>.md` em branco e o `local/machine.md` apontando para ele. Arquivo seu que
-estiver no caminho vira `<nome>.pre-ai-setup`. Pode rodar de novo quantas vezes quiser.
+estiver no caminho vai para `local/backups/<destino>.pre-ai-setup`. Pode rodar de novo quantas vezes quiser.
 
 Depois, preencha o `machine/<hostname>.md` com o que só vale nesta máquina (como o root funciona, onde mora a
 documentação dela).

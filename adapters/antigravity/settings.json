@@ -1,0 +1,38 @@
+{
+  "clearScrollbackOnResize": false,
+  "colorScheme": "colorblind-friendly dark",
+  "enableTerminalSandbox": true,
+  "model": "Gemini 4 Argon (High)",
+  "permissions": {
+    "allow": [
+      "command(gh auth status)",
+      "command(gh issue list)",
+      "command(gh issue view)",
+      "command(gh pr checks)",
+      "command(gh pr diff)",
+      "command(gh pr list)",
+      "command(gh pr view)",
+      "command(gh run list)",
+      "command(gh run view)",
+      "mcp(ai-memory/*)"
+    ],
+    "ask": [
+      "command(gh pr merge)",
+      "command(gh repo delete)",
+      "command(git push)",
+      "command(regex:gh api .*(-X|--method|-f|-F).*)"
+    ],
+    "deny": [
+      "command(regex:.*(\\.credentials\\.json|\\.codex/auth\\.json|oauth_creds\\.json|ai-memory/server\\.env|plugin-secrets\\.json).*)",
+      "read_file(@HOME@/.claude/.credentials.json)",
+      "read_file(@HOME@/.claude2/.credentials.json)",
+      "read_file(@HOME@/.codex/auth.json)",
+      "read_file(@HOME@/.config/ai-memory/server.env)",
+      "read_file(@HOME@/.config/antigravity/plugin-secrets.json)",
+      "read_file(@HOME@/.gemini/oauth_creds.json)",
+      "write_file(@HOME@/.config/ai-memory/server.env)"
+    ]
+  },
+  "showFeedbackSurvey": false,
+  "showTips": false
+}

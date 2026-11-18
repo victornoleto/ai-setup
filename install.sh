@@ -64,9 +64,11 @@ while IFS='	' read -r mode src dst; do
 		if [ -L "$to" ] && [ "$(readlink -f "$to")" = "$from" ]; then
 			continue
 		fi
+		# Backup fora do destino: ao lado dele, numa pasta de skills, viraria skill duplicada.
 		if [ -e "$to" ] && [ ! -L "$to" ]; then
-			mv "$to" "$to.pre-ai-setup"
-			say "guardado $dst.pre-ai-setup (era arquivo real)"
+			bak="$SETUP/local/backups/$dst.pre-ai-setup"
+			mkdir -p "$(dirname "$bak")" && rm -rf "$bak" && mv "$to" "$bak"
+			say "guardado local/backups/$dst.pre-ai-setup (era arquivo real)"
 		fi
 		ln -sfn "$from" "$to"
 		say "link  $dst"

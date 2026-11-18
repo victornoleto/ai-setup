@@ -29,7 +29,15 @@ manifest_lines() {
 }
 
 # --- adaptadores ---
-governadas='{permissions, hooks, env, autoMemoryEnabled, statusLine, enabledPlugins}'
+# Quem reescreve o próprio settings.json (model, tema, effort, diretórios confiáveis) só é comparado
+# nas chaves que este repositório governa; o resto é escolha de cada sessão.
+governadas() {
+	case "$1" in
+	.claude/settings.json) echo '{permissions, hooks, env, autoMemoryEnabled, statusLine, enabledPlugins}' ;;
+	.gemini/antigravity-cli/settings.json) echo '{permissions, enableTerminalSandbox, colorScheme, clearScrollbackOnResize, showTips, showFeedbackSurvey}' ;;
+	*) return 1 ;;
+	esac
+}
 while IFS='	' read -r mode src dst; do
 	from="$src"; to="$HOME/$dst"; rel=${src#"$SETUP"/}
 	case "$mode" in
@@ -40,9 +48,7 @@ while IFS='	' read -r mode src dst; do
 	copy)
 		if [ ! -e "$to" ]; then bad "copy  $dst ausente — rode install.sh"
 		elif sed "s|@HOME@|$HOME|g" "$from" | cmp -s - "$to"; then ok "copy  $dst igual à referência"
-		# O Claude reescreve o settings.json a cada /model e /config: só as chaves que este
-		# repositório governa contam; o resto (model, tema, effort) é escolha de cada sessão.
-		elif [ "$dst" = .claude/settings.json ] && [ "$(sed "s|@HOME@|$HOME|g" "$from" | jq -S "$governadas" 2>/dev/null)" = "$(jq -S "$governadas" "$to" 2>/dev/null)" ]; then
+		elif g=$(governadas "$dst") && [ "$(sed "s|@HOME@|$HOME|g" "$from" | jq -S "$g" 2>/dev/null)" = "$(jq -S "$g" "$to" 2>/dev/null)" ]; then
 			ok "copy  $dst igual à referência nas chaves governadas"
 		else
 			bad "copy  $dst difere de $rel"
@@ -147,6 +153,14 @@ else bad "bwrap sem user namespace — o Codex roda sem sandbox: sudo install -m
 if [ -f /etc/apparmor.d/codex-bwrap ] && ! cmp -s /etc/apparmor.d/codex-bwrap "$SETUP/adapters/codex/apparmor/codex-bwrap"; then
 	note "/etc/apparmor.d/codex-bwrap difere da referência do repositório"
 fi
+# O sandbox de terminal do agy (e o modo auto) também precisa de user namespace; perfil próprio.
+if command -v agy >/dev/null 2>&1; then
+	aa="$SETUP/adapters/antigravity/apparmor/agy-userns"
+	if [ "$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns 2>/dev/null)" != 1 ]; then ok "agy: kernel não restringe user namespace"
+	elif cmp -s /etc/apparmor.d/agy-userns "$aa"; then ok "agy: perfil AppArmor do sandbox instalado"
+	elif [ -f /etc/apparmor.d/agy-userns ]; then note "/etc/apparmor.d/agy-userns difere da referência do repositório"
+	else bad "agy sem sandbox nem modo auto (AppArmor barra user namespace): sudo install -m 644 $aa /etc/apparmor.d/agy-userns && sudo apparmor_parser -r /etc/apparmor.d/agy-userns"; fi
+fi
 
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
@@ -167,6 +181,12 @@ for s in "$HOME/.claude/skills"/*/; do
 	n=$(basename "$s")
 	case "$n" in ai-memory-*|synced) continue ;; esac
 	[ -L "${s%/}" ] || { bad "skill copiada em .claude/skills/$n — troque por link"; dup=1; }
+done
+# Backup do install.sh deixado numa pasta de skills vira skill com o mesmo `name:` e pode vencer a real
+# (o agy carregou security-audit.pre-ai-setup no lugar do link). O agy também lê ~/.gemini/config/skills.
+for s in "$HOME"/.claude/skills/*.pre-ai-setup "$HOME"/.agents/skills/*.pre-ai-setup "$HOME"/.kiro/skills/*.pre-ai-setup "$HOME"/.gemini/config/skills/*/; do
+	[ -e "$s" ] || continue
+	bad "skill fora do lugar: ${s#"$HOME"/} — apague se for cópia, ou mova para ~/.agents/skills"; dup=1
 done
 [ $dup = 0 ] && ok "skills sem cópia duplicada"
 

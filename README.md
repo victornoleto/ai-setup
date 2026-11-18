@@ -43,7 +43,7 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   ├── claude/            CLAUDE.md, settings.json, ccstatusline/ (status line)
 │   ├── codex/             AGENTS.md, hook SessionStart, perfil AppArmor
 │   ├── opencode/          opencode.jsonc, AGENTS.md
-│   ├── antigravity/       skills.json
+│   ├── antigravity/       skills.json, settings.json, apparmor/ (sandbox), plugin/ (regras e hook só do agy)
 │   ├── kiro/              ai-memory.md (steering)
 │   ├── playwright/        cli.config.json (config global do playwright-cli)
 │   ├── git/ignore         gitignore global

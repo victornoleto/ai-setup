@@ -18,11 +18,13 @@ O controle do que o agente pode fazer é a permissão de shell de cada ferrament
 | Claude | `permissions` no `adapters/claude/settings.json` | pede aprovação com `-X`, `--method`, `-f`, `-F` |
 | Codex | `~/.codex/rules/default.rules` (o Codex grava; fora deste repositório) | pede enquanto não houver regra `allow`; o `doctor.sh` acusa `git push` liberado ali |
 | OpenCode | `permission.bash` no `adapters/opencode/opencode.jsonc` | pede sempre |
+| agy | `permissions` no `adapters/antigravity/settings.json` | pede com `-X`, `--method`, `-f`, `-F` (regra `regex:`) |
 
 ## Credenciais
 
 Os arquivos de credencial (`~/.claude/.credentials.json`, o da conta 2 em `~/.claude2/`, `~/.codex/auth.json`,
-`~/.gemini/oauth_creds.json`, `~/.config/ai-memory/server.env`) têm leitura negada no Claude e no OpenCode. No
+`~/.gemini/oauth_creds.json`, `~/.config/ai-memory/server.env`) têm leitura negada no Claude, no OpenCode e no
+agy (no agy, com caminho absoluto: `read_file()` não expande `~`). No
 Claude, comando de shell que cite um desses caminhos também é negado. É rede contra acidente: um caminho
 montado por variável ou glob passa.
 
@@ -37,10 +39,12 @@ como o `server.env` do [ai-memory](ai-memory.md#3-o-servidor).
 `trust_level = "trusted"` em `/home` (ou no `$HOME` inteiro) faz todo diretório da máquina herdar confiança.
 Confie por projeto. O `doctor.sh` acusa.
 
-## Sandbox do Codex no Ubuntu 24.04
+## Sandbox do Codex e do agy no Ubuntu 24.04
 
 O sandbox do Codex usa bubblewrap, que precisa de user namespace. O Ubuntu 24.04 bloqueia isso por AppArmor, e
-o sandbox fica inerte (com um aviso em toda abertura). O perfil que libera só os dois `bwrap` está em
+o sandbox fica inerte (com um aviso em toda abertura). O agy tem o mesmo problema: sem user namespace, o
+sandbox de terminal e o modo `auto` se desligam (o log diz `Terminal sandbox unavailable`). O perfil dele é
+[`adapters/antigravity/apparmor/agy-userns`](../adapters/antigravity/apparmor/agy-userns). O perfil que libera só os dois `bwrap` está em
 [`adapters/codex/apparmor/codex-bwrap`](../adapters/codex/apparmor/codex-bwrap); o `doctor.sh` imprime o
 comando de instalação (precisa de `sudo`, no seu terminal).
 

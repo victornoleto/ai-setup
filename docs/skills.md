@@ -49,6 +49,9 @@ no [catálogo](catalogo.md#plugins-do-claude-que-saíram). O `doctor.sh` acusa s
 
 - **agy não aceita `~` no `skills.json`**, apesar da documentação: o caminho tem que ser absoluto (o erro só
   aparece em `~/.gemini/antigravity-cli/log/`). Aqui ele é `copy` com `@HOME@`.
+- **Duas pastas com o mesmo `name:` no frontmatter: o agy carrega uma só, e pode ser a errada.** Um
+  `security-audit.pre-ai-setup` esquecido em `~/.agents/skills` venceu o link da skill real. O agy também lê
+  `~/.gemini/config/skills` (o Maestri instala lá). O `doctor.sh` acusa as duas coisas.
 - **Skill de terceiro instalada por fora** (um `npx skills add`, por exemplo) costuma cair como cópia em
   `~/.claude/skills`. O `doctor.sh` acusa (`skill copiada`): mova a cópia real para `~/.agents/skills` e
   deixe um link em `~/.claude/skills`.

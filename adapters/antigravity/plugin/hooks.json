@@ -1,0 +1,11 @@
+{
+  "ai-setup": {
+    "SessionStart": [
+      {
+        "type": "command",
+        "command": "./session-start.sh",
+        "timeout": 5
+      }
+    ]
+  }
+}

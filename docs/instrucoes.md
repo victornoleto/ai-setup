@@ -39,7 +39,7 @@ Nenhuma depende de o modelo lembrar de ler algo: cada uma usa o mecanismo nativo
 | Claude Code | `@import` no `CLAUDE.md` (com `~`) | nativo |
 | Codex | hook `SessionStart` (em `~/.codex/hooks.json`) que imprime os dois arquivos | não tem `@import` nem lista de instruções |
 | OpenCode | lista `instructions` no `opencode.jsonc` | nativo |
-| agy | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais (medido; `context.fileName` com lista maior não surte efeito) |
+| agy | `~/.gemini/GEMINI.md` → `GLOBAL.md`, `~/.gemini/AGENTS.md` → `machine.md` | lê exatamente esses dois arquivos globais (medido; `context.fileName` com lista maior não surte efeito). O que vale só no agy vai no plugin local `adapters/antigravity/plugin` (`rules/AGENTS.md`), cujo hook `SessionStart` também injeta o `.ai/README.md` do projeto |
 | Kiro CLI | `~/.kiro/steering/{global,machine,ai-memory}.md` por link | lê todo `.md` do steering global, symlink inclusive, nas engines v2 e v3 (medido em 2026-11-05, 3.0.0) |
 
 A ligação com o ai-memory (hooks, MCP, bloco `<!-- ai-memory:start -->`) é gravada pelo próprio
@@ -95,7 +95,7 @@ Como criar o repositório privado, levar para outra máquina e trocar um arquivo
 ## Os scripts
 
 **`install.sh`** lê os dois MANIFESTs e põe cada arquivo no lugar. Idempotente. Arquivo real no caminho de um
-link vira `<nome>.pre-ai-setup`. Também monta a conta 2 do Claude, se `~/.claude2` existir
+link vai para `local/backups/<destino>.pre-ai-setup`. Também monta a conta 2 do Claude, se `~/.claude2` existir
 ([claude-code.md](claude-code.md)), e lembra das linhas que faltam no rc do shell.
 
 **`doctor.sh`** só verifica, nunca conserta, e diz o comando que resolve:

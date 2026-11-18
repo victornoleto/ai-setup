@@ -67,3 +67,9 @@ skill	../skills/grill-me
 skill	../skills/spec-review
 skill	../skills/diagram-design
 copy	antigravity/skills.json	.gemini/config/skills.json
+# settings.json do agy: copy porque o agy reescreve o arquivo (model a cada /model, trustedWorkspaces
+# ao confiar num diretório, e tira chave com valor de fábrica). O doctor.sh compara só as chaves governadas.
+copy	antigravity/settings.json	.gemini/antigravity-cli/settings.json
+# Plugin local do agy: o terceiro lugar de instrução dele (rules/AGENTS.md, só o que é do agy) e o hook
+# SessionStart que injeta o .ai/README.md do projeto. Não repete nada de GLOBAL.md nem de skills/.
+link	antigravity/plugin	.gemini/config/plugins/ai-setup

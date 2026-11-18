@@ -1,0 +1,11 @@
+# Ubuntu 24.04 bloqueia user namespace sem privilégio (kernel.apparmor_restrict_unprivileged_userns=1).
+# O sandbox de terminal do agy (e o modo auto, que depende dele) cria o namespace a partir do próprio
+# binário e se desliga quando o processo roda como `unconfined`. Este perfil só libera userns.
+# Limite: herda tudo que o agy executa (os comandos que ele roda também podem criar namespace).
+abi <abi/4.0>,
+include <tunables/global>
+
+profile agy-userns /home/*/.local/bin/agy flags=(unconfined) {
+  userns,
+  include if exists <local/agy-userns>
+}

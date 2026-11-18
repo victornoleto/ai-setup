@@ -47,7 +47,8 @@ git log --oneline -15
 ls -t ~/.claude/projects/"$(pwd | sed 's/[^A-Za-z0-9]/-/g')"/*.jsonl | head -1
 ```
 
-  O mais recente é o desta sessão. Em outra ferramenta, omita a linha.
+  O mais recente é o desta sessão. No agy: `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript.jsonl`.
+  Em outra ferramenta, omita a linha.
 - Para cada caminho que você vai citar: `test -e <caminho>`. Não cite o que não existe.
 
 ## Passo 2 — Reler a conversa inteira
@@ -116,7 +117,7 @@ Ações destrutivas, itens que aguardam aprovação do usuário.
 > 1. Rode os comandos da § 6 e confie neles acima do texto se divergirem — o texto é uma
 >    fotografia de quando o handoff foi escrito.
 > 2. Não refaça o que está na § 5. Não reabra o que está na § 4 sem um motivo novo.
-> 3. Carregue as instruções do projeto (`.ai/README.md`, `CLAUDE.md`) e as skills da § 10.
+> 3. Carregue as instruções do projeto (`.ai/README.md`, `AGENTS.md` ou `CLAUDE.md`) e as skills da § 10.
 > 4. Comece pela **Próxima ação** da § 7.
 > 5. Se faltar um detalhe, faça `grep` no transcript do cabeçalho antes de perguntar ao
 >    usuário.

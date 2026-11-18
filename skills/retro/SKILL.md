@@ -10,7 +10,7 @@ The user has asked for a **retrospective**. You are suggesting improvements to t
 
 1. Call the Skill tool with `writing-for-agents` for the writing style guide.
 
-2. Read the primary sources for the session the user specifies. This may mean searching through session logs on this machine. If the user doesn't specify a session, default to the current one. (ai-setup) Logs live in `~/.claude/projects/<cwd-slug>/<session-id>.jsonl` (Claude Code) and `~/.codex/sessions/` (Codex); ai-memory's `memory_read_session_observations` gives the sanitized lifecycle view of any harness.
+2. Read the primary sources for the session the user specifies. This may mean searching through session logs on this machine. If the user doesn't specify a session, default to the current one. (ai-setup) Logs live in `~/.claude/projects/<cwd-slug>/<session-id>.jsonl` (Claude Code), `~/.codex/sessions/` (Codex) and `~/.gemini/antigravity-cli/brain/<conversation-id>/.system_generated/logs/transcript.jsonl` (agy); ai-memory's `memory_read_session_observations` gives the sanitized lifecycle view of any harness.
 
 3. Look for candidates for improvement in these categories.
 

@@ -58,7 +58,7 @@ aceitar=$(HOME="$t/home" sh "$t/repo/doctor.sh" 2>/dev/null | grep -A1 'Para ace
 	&& ok "doctor: aceitar grava @HOME@" || bad "doctor: aceitar deixou caminho real ($(cat "$t/repo/sync/cfg/f.txt"))"
 rm -rf "$t"
 
-# 5. Kiro: steering e skills por link; diretório real pré-existente vira .pre-ai-setup.
+# 5. Kiro: steering e skills por link; diretório real pré-existente vai para local/backups/.
 t=$(novo)
 mkdir -p "$t/home/.kiro/skills/brainstorming"
 instala "$t"
@@ -67,7 +67,8 @@ for f in global machine ai-memory; do
 done
 [ "$(readlink -f "$t/home/.kiro/skills/brainstorming")" = "$t/repo/skills/brainstorming" ] \
 	&& ok "kiro: skill linkada" || bad "kiro: skill não linkada"
-[ -d "$t/home/.kiro/skills/brainstorming.pre-ai-setup" ] && ok "kiro: diretório real guardado" || bad "kiro: diretório real perdido"
+[ -d "$t/repo/local/backups/.kiro/skills/brainstorming.pre-ai-setup" ] && ok "kiro: diretório real guardado" || bad "kiro: diretório real perdido"
+[ ! -e "$t/home/.kiro/skills/brainstorming.pre-ai-setup" ] && ok "kiro: backup fora da pasta de skills" || bad "kiro: backup ficou na pasta de skills"
 rm -rf "$t"
 
 # 6. doctor: Kiro presente sem hooks acusa; Kiro ausente não acusa.
