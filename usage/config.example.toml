@@ -1,0 +1,20 @@
+# ai-usage-monitor — copie para ~/.config/ai-usage/config.toml (o `ai-usage-monitor install` faz isso).
+interval_seconds = 300                    # de quantos em quantos segundos coletar (mínimo 30)
+db = "~/.local/share/ai-usage/usage.db"
+port = 49381                              # página web em http://127.0.0.1:<port>
+
+# Uma seção por conta. O nome da seção é o que aparece no histórico.
+# Tipos: claude (precisa de config_dir), codex, agy, openrouter.
+[accounts.claude]
+type = "claude"
+config_dir = "~/.claude"
+
+[accounts.claude2]
+type = "claude"
+config_dir = "~/.claude2"
+
+# [accounts.codex]
+# type = "codex"
+
+# [accounts.agy]
+# type = "agy"

@@ -162,6 +162,12 @@ if command -v agy >/dev/null 2>&1; then
 	else bad "agy sem sandbox nem modo auto (AppArmor barra user namespace): sudo install -m 644 $aa /etc/apparmor.d/agy-userns && sudo apparmor_parser -r /etc/apparmor.d/agy-userns"; fi
 fi
 
+# --- ai-usage-monitor (opcional: só se o serviço foi instalado) ---
+if [ -f "$HOME/.config/systemd/user/ai-usage-monitor.service" ]; then
+	systemctl --user is-active --quiet ai-usage-monitor && ok "ai-usage-monitor ativo" \
+		|| bad "ai-usage-monitor parado: journalctl --user -u ai-usage-monitor -n 20"
+fi
+
 # --- pendências que só o usuário resolve ---
 # Token em texto puro em config de harness vaza para todo backup que um instalador grava ao
 # lado. GitHub vai pelo `gh` (token no keyring), não por MCP com header.

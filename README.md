@@ -19,6 +19,7 @@ história vai para memória ([ai-memory](https://github.com/akitaonrails/ai-memo
 | **Catálogo**: o que o ai-setup tem e o que não tem (skills, regras absorvidas, plugins que saíram e skills que ficaram no pacote de origem) | [docs/catalogo.md](docs/catalogo.md) |
 | **Segurança**: GitHub pelo `gh`, permissões, credenciais negadas, sandbox do Codex | [docs/seguranca.md](docs/seguranca.md) |
 | **memory-ui**: o que o ai-memory guardou, no navegador, só leitura | [docs/memory-ui.md](docs/memory-ui.md) |
+| **ai-usage-monitor** (opcional): uso das assinaturas (Claude, Codex, agy…) em SQLite, com histórico filtrável no navegador | [docs/usage.md](docs/usage.md) |
 
 ## Instalar
 
@@ -49,9 +50,10 @@ Passo a passo, com o ai-memory e a segunda conta do Claude: [docs/instalacao.md]
 │   ├── git/ignore         gitignore global
 │   └── shell/aliases.sh   claude2, xclaude, xclaude2, xcodex, xagy, xkiro
 ├── skills/                skills nossas e copiadas (UPSTREAM.md: origem e versão)
-├── bin/                   orq, memory-ui, entrega-verifica, handoff-copia, verbosidade
+├── bin/                   orq, memory-ui, ai-usage, ai-usage-monitor, entrega-verifica, handoff-copia, verbosidade
 ├── orq/                   o motor do orq, a interface web (orq/web) e os testes
 ├── memory-ui/             o servidor do memory-ui
+├── usage/                 coletores do ai-usage, o ai-usage-monitor e a página dele
 ├── docs/                  um doc por funcionalidade
 ├── tests/                 test_install.sh (install.sh com HOME falso)
 ├── sync/                  seu repositório privado, ignorado por este

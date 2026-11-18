@@ -1,0 +1,4 @@
+#!/bin/sh
+# ai-usage: limites de uso de cada harness no terminal. Código: ~/.ai-setup/usage/collectors.py
+dir=$(dirname "$(readlink -f "$0")")
+exec python3 "$dir/../usage/collectors.py" "$@"

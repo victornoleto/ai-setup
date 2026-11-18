@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uso das assinaturas</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Linguagem visual do orq (orq/DESIGN.md): cinzas sem matiz, borda de 1px, quase sem sombra.
+   Âmbar só para "precisa de atenção" (alto, esgotado, esgota antes do reset). Estado sempre em palavra. */
+:root {
+  --radius: .375rem;
+  --background: oklch(1 0 0); --foreground: oklch(.145 0 0); --card: oklch(1 0 0);
+  --primary: oklch(.205 0 0); --primary-foreground: oklch(.985 0 0);
+  --muted-foreground: oklch(.5 0 0); --accent: oklch(.97 0 0);
+  --border: oklch(.922 0 0); --input: oklch(.89 0 0); --ring: oklch(.708 0 0);
+  --page: oklch(.985 0 0); --selected: oklch(.935 0 0);
+  --track: oklch(.94 0 0); --fill: oklch(.205 0 0); --ghost: oklch(.205 0 0 / .22);
+  --wait: oklch(.965 .06 88); --wait-fg: oklch(.34 .07 70); --wait-fill: oklch(.72 .15 75);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / .05);
+  --heat-0: oklch(.955 0 0); --heat-max: oklch(.2 0 0);
+  /* Cor por janela nos gráficos: azul = 5h, laranja = semana (par legível para daltônico); 2ª conta mais clara. */
+  --c5h: oklch(.5 .16 255); --c5h-2: oklch(.7 .1 250); --cweek: oklch(.58 .16 50); --cweek-2: oklch(.76 .1 60);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: oklch(.145 0 0); --foreground: oklch(.985 0 0); --card: oklch(.205 0 0);
+    --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+    --muted-foreground: oklch(.72 0 0); --accent: oklch(.269 0 0);
+    --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 16%); --ring: oklch(.556 0 0);
+    --page: oklch(.145 0 0); --selected: oklch(.32 0 0);
+    --track: oklch(.28 0 0); --fill: oklch(.93 0 0); --ghost: oklch(.93 0 0 / .25);
+    --wait: oklch(.3 .05 80); --wait-fg: oklch(.93 .07 88); --wait-fill: oklch(.78 .14 82);
+    --shadow: 0 1px 2px 0 oklch(0 0 0 / .3);
+    --heat-0: oklch(.25 0 0); --heat-max: oklch(.96 0 0);
+    --c5h: oklch(.72 .13 250); --c5h-2: oklch(.55 .09 255); --cweek: oklch(.76 .14 55); --cweek-2: oklch(.58 .09 50);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --background: oklch(.145 0 0); --foreground: oklch(.985 0 0); --card: oklch(.205 0 0);
+  --primary: oklch(.922 0 0); --primary-foreground: oklch(.205 0 0);
+  --muted-foreground: oklch(.72 0 0); --accent: oklch(.269 0 0);
+  --border: oklch(1 0 0 / 10%); --input: oklch(1 0 0 / 16%); --ring: oklch(.556 0 0);
+  --page: oklch(.145 0 0); --selected: oklch(.32 0 0);
+  --track: oklch(.28 0 0); --fill: oklch(.93 0 0); --ghost: oklch(.93 0 0 / .25);
+  --wait: oklch(.3 .05 80); --wait-fg: oklch(.93 .07 88); --wait-fill: oklch(.78 .14 82);
+  --shadow: 0 1px 2px 0 oklch(0 0 0 / .3);
+  --heat-0: oklch(.25 0 0); --heat-max: oklch(.96 0 0);
+    --c5h: oklch(.72 .13 250); --c5h-2: oklch(.55 .09 255); --cweek: oklch(.76 .14 55); --cweek-2: oklch(.58 .09 50);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; margin: 0; }
+html { font-size: 14px; }
+body { font-family: "IBM Plex Sans", system-ui, sans-serif; background: var(--page); color: var(--foreground); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 50%, transparent); }
+::selection { background: var(--primary); color: var(--primary-foreground); }
+* { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Barra */
+.bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 20px; padding: 10px 16px; min-height: 56px;
+  background: var(--background); border-bottom: 1px solid var(--border); }
+.brand { font-weight: 700; font-size: 1.15rem; letter-spacing: -.02em; }
+.status { color: var(--muted-foreground); font-size: .93rem; display: flex; gap: 8px; align-items: center; }
+.controls { margin-left: auto; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.seg { display: flex; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px); box-shadow: var(--shadow); overflow: hidden; background: var(--background); }
+.seg button { height: 32px; padding: 0 11px; color: var(--muted-foreground); font-weight: 500; font-size: .93rem; white-space: nowrap; }
+.seg button + button { border-left: 1px solid var(--input); }
+.seg button:hover { background: var(--accent); }
+.seg button[aria-pressed="true"] { background: var(--selected); color: var(--foreground); }
+.dates { display: flex; gap: 6px; align-items: center; color: var(--muted-foreground); font-size: .93rem; }
+.dates[hidden] { display: none; }
+.dates input { height: 32px; padding: 0 8px; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px); background: var(--background); }
+
+/* Etiquetas de estado */
+.tag { display: inline-flex; align-items: center; height: 24px; padding: 0 9px; border-radius: calc(var(--radius) - 2px);
+  background: var(--selected); color: var(--foreground); font-size: .86rem; font-weight: 500; white-space: nowrap; }
+.tag.warn { background: var(--wait); color: var(--wait-fg); }
+.tag.err { background: transparent; border: 1px dashed var(--muted-foreground); }
+
+main { max-width: 1280px; margin: 0 auto; padding: 16px 16px 40px; display: grid; gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: calc(var(--radius) + 2px); box-shadow: var(--shadow); min-width: 0; }
+.card > header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; flex-wrap: wrap; }
+.card > header h2 { font-size: 1rem; font-weight: 600; letter-spacing: -.01em; }
+.card > header .aside { margin-left: auto; color: var(--muted-foreground); font-size: .88rem; }
+.card .body { padding: 0 16px 16px; }
+
+/* Contas */
+.accounts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }
+.account.err { border-style: dashed; border-color: var(--muted-foreground); }
+.account header .plan { color: var(--muted-foreground); font-size: .93rem; }
+.account header .tag { margin-left: auto; }
+.windows { display: grid; gap: 20px; padding: 4px 16px 18px; }
+.win-top { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.win-top .label { font-weight: 500; }
+.win-top .tag { align-self: center; }
+.win-top .pct { margin-left: auto; font-size: 1.7rem; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+.win-top .pct small { font-size: .9rem; font-weight: 500; color: var(--muted-foreground); margin-left: 1px; }
+.meter { position: relative; height: 10px; border-radius: 3px; background: var(--track); overflow: hidden; }
+.meter .ghost { position: absolute; inset: 0 auto 0 0; background: repeating-linear-gradient(-45deg, var(--ghost) 0 3px, transparent 3px 6px); }
+.meter .fill { position: absolute; inset: 0 auto 0 0; background: var(--fill); }
+.meter.warn .fill { background: var(--wait-fill); }
+.meter .tick { position: absolute; top: 0; bottom: 0; left: 80%; width: 2px; background: var(--card); }
+.win-lines { margin-top: 8px; display: grid; gap: 3px; font-size: .93rem; color: var(--muted-foreground); }
+.win-lines .warn-text { color: var(--wait-fg); background: var(--wait); border-radius: calc(var(--radius) - 2px); padding: 1px 7px; justify-self: start; font-weight: 500; }
+.account .error { padding: 4px 16px 18px; color: var(--muted-foreground); }
+.account .error b { color: var(--foreground); font-weight: 500; }
+
+/* Gráficos */
+.charts { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); }
+.chart { position: relative; height: 280px; }
+.chart .none { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted-foreground); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 0 16px 8px; font-size: .88rem; color: var(--muted-foreground); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend b { color: var(--foreground); font-weight: 500; }
+.legend svg { flex: none; }
+
+/* Mapa de calor */
+.heat-wrap { overflow-x: auto; padding: 0 16px 16px; }
+.heat { display: grid; grid-template-columns: 34px repeat(24, minmax(16px, 1fr)); gap: 3px; min-width: 560px; }
+.heat .h { font-size: .78rem; color: var(--muted-foreground); line-height: 1.6; }
+.heat .d { font-size: .86rem; color: var(--muted-foreground); align-self: center; }
+.heat .c { aspect-ratio: 1.4; border-radius: 3px; background: var(--heat-0); }
+.heat .c:hover { outline: 2px solid var(--foreground); outline-offset: 1px; position: relative; z-index: 1; }
+.heat-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; margin-top: 12px; font-size: .88rem; color: var(--muted-foreground); }
+.scale { display: inline-flex; align-items: center; gap: 4px; }
+.scale i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+#heat-tip { color: var(--foreground); }
+
+.empty { padding: 28px 16px; text-align: center; color: var(--muted-foreground); }
+.banner { padding: 10px 14px; border-radius: calc(var(--radius) + 2px); border: 1px dashed var(--muted-foreground); background: var(--card); }
+.banner[hidden] { display: none; }
+@media (max-width: 760px) { .controls { margin-left: 0; } }
+</style>
+</head>
+<body>
+<div class="bar">
+  <span class="brand">Uso das assinaturas</span>
+  <span class="status" id="status" aria-live="polite"></span>
+  <div class="controls">
+    <div class="seg" id="accounts" role="group" aria-label="Contas"></div>
+    <div class="seg" id="period" role="group" aria-label="Período">
+      <button data-p="1d">24h</button><button data-p="7d">7 dias</button><button data-p="30d">30 dias</button><button data-p="custom">Datas</button>
+    </div>
+    <div class="dates" id="dates" hidden>
+      <input type="date" id="from" aria-label="Data de início"> até <input type="date" id="to" aria-label="Data de fim">
+    </div>
+    <div class="seg" id="theme" role="group" aria-label="Tema">
+      <button data-t="auto">Auto</button><button data-t="light">Claro</button><button data-t="dark">Escuro</button>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="banner" id="banner" role="alert" hidden></div>
+  <section class="accounts" id="cards" aria-label="Uso agora, por conta"></section>
+
+  <section class="charts">
+    <article class="card">
+      <header><h2>Sessão de 5h</h2><span class="aside" id="aside-5h"></span></header>
+      <div class="legend" id="legend-5h"></div>
+      <div class="body"><div class="chart"><canvas id="chart-5h" aria-label="% usado da sessão de 5h ao longo do tempo"></canvas></div></div>
+    </article>
+    <article class="card">
+      <header><h2>Semana</h2><span class="aside" id="aside-week"></span></header>
+      <div class="legend" id="legend-week"></div>
+      <div class="body"><div class="chart"><canvas id="chart-week" aria-label="% usado da semana ao longo do tempo"></canvas></div></div>
+    </article>
+  </section>
+
+  <article class="card">
+    <header><h2>Quando você mais consome</h2><span class="aside">sessão de 5h, contas selecionadas, no período</span></header>
+    <div class="heat-wrap">
+      <div class="heat" id="heat"></div>
+      <div class="heat-foot">
+        <span class="scale">menos <i data-s="0"></i><i data-s="1"></i><i data-s="2"></i><i data-s="3"></i><i data-s="4"></i> mais</span>
+        <span id="heat-tip" aria-live="polite"></span>
+      </div>
+    </div>
+  </article>
+</main>
+
+<script>
+const H = 3600e3, D = 24 * H;
+const WEEK = ['seg', 'ter', 'qua', 'qui', 'sex', 'sáb', 'dom'];
+// Séries se distinguem por traço e marcador (o dono é daltônico); a cor é só tinta ou cinza.
+const STYLES = [
+  { dash: [], point: 'circle' }, { dash: [7, 4], point: 'triangle' }, { dash: [2, 3], point: 'rect' },
+  { dash: [10, 3, 2, 3], point: 'rectRot' }, { dash: [4, 4], point: 'crossRot' },
+];
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const isoDay = (t) => new Date(t).toLocaleDateString('sv-SE');
+const hhmm = (t) => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+const dayLabel = (t) => { const d = new Date(t); return `${WEEK[(d.getDay() + 6) % 7]} ${d.getDate()}`; };
+const whenText = (t) => isoDay(t) === isoDay(Date.now()) ? `hoje ${hhmm(t)}`
+  : isoDay(t) === isoDay(Date.now() + D) ? `amanhã ${hhmm(t)}` : `${dayLabel(t)}, ${hhmm(t)}`;
+function dur(ms) {
+  const m = Math.max(0, Math.round(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h${String(m % 60).padStart(2, '0')}` : `${m} min`;
+}
+const kind = (w) => w?.endsWith('Sessão (5h)') ? '5h' : w?.endsWith('Semana') ? 'week' : null;
+const prefix = (w) => w.replace(/( · )?(Sessão \(5h\)|Semana)$/, '');
+// Mesma janela = mesmo horário de reset, com folga: a API devolve o reset com ±1 s de variação entre coletas
+// (15:59:59.7 numa, 16:00:00.2 na outra), então comparar o texto quebraria a linha a cada ponto.
+const resetMs = (r) => r.resets_at ? new Date(r.resets_at).getTime() : null;
+const sameWindow = (a, b) => resetMs(a) == null || resetMs(b) == null || Math.abs(resetMs(a) - resetMs(b)) < 5 * 60e3;
+const SEP = '\u0000';
+
+// --- estado na URL -----------------------------------------------------------
+const state = { accounts: null, period: '7d', from: '', to: '' };
+let meta = { accounts: [], windows: [] };
+function readUrl() {
+  const q = new URLSearchParams(location.search);
+  if (q.has('contas')) state.accounts = q.get('contas').split(',').filter(Boolean);
+  if (['1d', '7d', '30d', 'custom'].includes(q.get('periodo'))) state.period = q.get('periodo');
+  state.from = q.get('de') || ''; state.to = q.get('ate') || '';
+}
+function writeUrl() {
+  const q = new URLSearchParams();
+  if (state.accounts.length !== meta.accounts.length) q.set('contas', state.accounts.join(','));
+  if (state.period !== '7d') q.set('periodo', state.period);
+  if (state.period === 'custom') { q.set('de', state.from); q.set('ate', state.to); }
+  history.replaceState(null, '', q.toString() ? '?' + q : location.pathname);
+}
+function range() {  // [início, fim] como YYYY-MM-DD
+  if (state.period === 'custom' && state.from && state.to) return [state.from, state.to];
+  const days = { '1d': 1, '7d': 7, '30d': 30 }[state.period] || 7;
+  return [isoDay(Date.now() - (days === 1 ? D : (days - 1) * D)), isoDay(Date.now())];
+}
+function bounds() {  // [início, fim] em ms para o eixo x
+  const [f, t] = range();
+  const min = state.period === '1d' ? Date.now() - D : new Date(f + 'T00:00').getTime();
+  return [min, Math.min(Date.now(), new Date(t + 'T00:00').getTime() + D)];
+}
+
+// --- tema --------------------------------------------------------------------
+function applyTheme(t) {
+  if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  document.querySelectorAll('#theme button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === t));
+  try { localStorage.setItem('tema', t); } catch {}
+}
+
+// --- dados -------------------------------------------------------------------
+async function getJSON(url) {
+  const r = await fetch(url);
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;
+}
+function samplesUrl(from, to) {
+  const q = new URLSearchParams();
+  for (const a of state.accounts) q.append('account', a);
+  if (!state.accounts.length) q.append('account', '__nenhuma__');
+  q.set('from', from); q.set('to', to);
+  return '/api/samples?' + q;
+}
+function series(rows) {  // Map "conta␀janela" -> linhas em ordem de tempo
+  const m = new Map();
+  for (const r of rows) {
+    if (r.error || !r.window || r.window === 'extra_usage') continue;
+    const k = r.account + SEP + r.window;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(r);
+  }
+  return m;
+}
+
+// --- previsão ----------------------------------------------------------------
+// Ritmo = inclinação dentro da janela atual (mesmo horário de reset), na última hora (5h) ou no último dia (semana).
+function forecast(list, k) {
+  const last = list[list.length - 1], now = Date.now();
+  const resetAt = last.resets_at ? new Date(last.resets_at).getTime() : null;
+  const lookback = (k === '5h' ? H : D) / 1000;
+  const cur = list.filter((r) => sameWindow(r, last) && r.ts >= last.ts - lookback);
+  const first = cur[0], span = (last.ts - first.ts) * 1000;
+  if (cur.length < 2 || span < 10 * 60e3) return { resetAt, text: 'previsão: poucas coletas nesta janela ainda' };
+  const rate = (last.used - first.used) / span;  // pontos % por ms
+  if (rate <= 0) return { resetAt, projected: last.used, text: `sem consumo na última ${k === '5h' ? 'hora' : '24h'}` };
+  const perH = rate * H, pace = `${perH < 1 ? perH.toFixed(1) : Math.round(perH)}%/h`;
+  const emptyAt = now + (100 - last.used) / rate;
+  const projected = resetAt ? last.used + rate * Math.max(0, resetAt - now) : null;
+  if (last.used < 100 && resetAt && emptyAt < resetAt) {
+    return { warn: true, resetAt, projected: 100,
+      text: `no ritmo atual (${pace}) esgota ${whenText(emptyAt)}, ${dur(resetAt - emptyAt)} antes do reset` };
+  }
+  return { resetAt, projected, text: `no ritmo atual (${pace}) chega a ~${Math.round(Math.min(100, projected ?? last.used))}% no reset` };
+}
+
+// --- cards por conta ---------------------------------------------------------
+function renderCards(rows) {
+  const box = $('#cards');
+  if (!meta.accounts.length) { box.innerHTML = `<div class="card empty">Nenhuma coleta ainda. O serviço coleta a cada ${meta.interval_seconds || 300} s; volte em instantes.</div>`; return; }
+  if (!state.accounts.length) { box.innerHTML = '<div class="card empty">Nenhuma conta selecionada. Escolha uma na barra do topo.</div>'; return; }
+  const byAcc = new Map(state.accounts.map((a) => [a, []]));
+  for (const r of rows) byAcc.get(r.account)?.push(r);
+  box.innerHTML = [...byAcc].map(([acc, list]) => {
+    if (!list.length) return `<article class="card account"><header><h2>${esc(acc)}</h2><span class="tag">sem dados</span></header>
+      <p class="error">Nenhuma coleta desta conta nos últimos 8 dias.</p></article>`;
+    const lastTs = Math.max(...list.map((r) => r.ts));
+    const now = list.filter((r) => r.ts === lastTs);
+    if (now[0].error) return `<article class="card account err"><header><h2>${esc(acc)}</h2><span class="tag err">erro</span></header>
+      <p class="error"><b>A última coleta falhou</b> (${whenText(lastTs * 1000)}): ${esc(now[0].error)}</p></article>`;
+    const s = series(list);
+    const wins = now.filter((r) => r.window !== 'extra_usage').map((r) => {
+      const k = kind(r.window);
+      const f = k ? forecast(s.get(acc + SEP + r.window), k) : { resetAt: r.resets_at ? new Date(r.resets_at).getTime() : null };
+      return { r, f, high: r.used >= 80 };
+    });
+    const worst = wins.some((w) => w.r.used >= 100) ? 'esgotado' : wins.some((w) => w.high || w.f.warn) ? 'atenção' : 'ok';
+    return `<article class="card account">
+      <header><h2>${esc(acc)}</h2><span class="plan">${esc(now[0].plan || '')}</span>
+        <span class="tag ${worst === 'ok' ? '' : 'warn'}">${worst}</span></header>
+      <div class="windows">${wins.map(({ r, f, high }) => {
+        const used = Math.min(100, r.used), ghost = Math.min(100, Math.max(used, f.projected ?? used));
+        const reset = f.resetAt ? `reseta em ${dur(f.resetAt - Date.now())} · ${whenText(f.resetAt)}` : 'sem horário de reset';
+        return `<div>
+          <div class="win-top"><span class="label">${esc(r.window)}</span>
+            ${high ? `<span class="tag warn">${r.used >= 100 ? 'esgotado' : 'alto'}</span>` : ''}
+            <span class="pct num">${Math.round(r.used)}<small>%</small></span></div>
+          <div class="meter ${high ? 'warn' : ''}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(r.used)}"
+            aria-label="${esc(r.window)}: ${Math.round(r.used)}% usado"><span class="ghost" style="width:${ghost}%"></span><span class="fill" style="width:${used}%"></span><span class="tick"></span></div>
+          <div class="win-lines"><span class="num">${reset}</span>
+            ${f.text ? `<span class="${f.warn ? 'warn-text' : ''}">${esc(f.text)}</span>` : ''}</div>
+        </div>`;
+      }).join('')}</div>
+    </article>`;
+  }).join('');
+}
+
+// --- gráficos por janela -----------------------------------------------------
+function timeTicks(min, max) {
+  const step = [H, 2 * H, 3 * H, 6 * H, 12 * H, D, 2 * D, 7 * D].find((s) => (max - min) / s <= 7) || 7 * D;
+  const d = new Date(min);
+  if (step < D) {
+    const sh = step / H; d.setMinutes(0, 0, 0);
+    d.setHours(Math.ceil((d.getHours() + (d.getTime() < min ? 1 : 0)) / sh) * sh);
+  } else {
+    d.setHours(0, 0, 0, 0); if (d.getTime() < min) d.setDate(d.getDate() + 1);
+  }
+  const ticks = [];
+  for (let t = d.getTime(); t <= max; t += step) ticks.push(t);
+  return { ticks, step };
+}
+const resetLines = {  // tracejado vertical em cada reset (se couber sem poluir) e linha de alerta em 80%
+  id: 'resetLines',
+  afterDatasetsDraw(chart) {
+    const { ctx, chartArea: a, scales: { x } } = chart;
+    const { y } = chart.scales, at = chart.options.plugins.resetLines.at;
+    ctx.save(); ctx.strokeStyle = css('--muted-foreground'); ctx.lineWidth = 1;
+    ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(a.left, y.getPixelForValue(80)); ctx.lineTo(a.right, y.getPixelForValue(80)); ctx.stroke();
+    ctx.setLineDash([3, 4]);
+    for (const t of at.length <= 12 ? at : []) {
+      const px = x.getPixelForValue(t); if (px < a.left || px > a.right) continue;
+      ctx.beginPath(); ctx.moveTo(px, a.top); ctx.lineTo(px, a.bottom); ctx.stroke();
+    }
+    ctx.restore();
+  },
+};
+const charts = {};
+const lineSvg = (color, dash, w = 2) => `<svg width="28" height="10" aria-hidden="true"><line x1="1" y1="5" x2="27" y2="5" stroke="${color}" stroke-width="${w}" stroke-dasharray="${dash.join(' ')}"/></svg>`;
+function renderChart(k, rows, gapMs) {
+  // Estilo fixo por conta (posição no config), para a mesma conta ter o mesmo traço nos dois gráficos e com qualquer filtro.
+  const order = ([key]) => meta.accounts.indexOf(key.split(SEP)[0]) * 100 + key.length;
+  const list = [...series(rows)].filter(([key]) => kind(key.split(SEP)[1]) === k).sort((a, b) => order(a) - order(b));
+  const fg = css('--foreground'), quiet = css('--muted-foreground'), grid = css('--border');
+  const resets = new Set(), datasets = [];
+  list.forEach(([key, rs], n) => {
+    const [acc, win] = key.split(SEP), data = [], i = meta.accounts.indexOf(acc) + n - list.findIndex(([kk]) => kk.startsWith(acc + SEP));
+    rs.forEach((r, j) => {
+      const prev = rs[j - 1];
+      // Quebra a linha (ponto nulo) em vez de ligar dois pontos sem relação: coleta parada (PC desligado,
+      // serviço fora) ou reset da janela, quando o % despenca.
+      const reset = prev && (!sameWindow(prev, r) || r.used < prev.used);
+      if (prev && (reset || (r.ts - prev.ts) * 1000 > gapMs)) data.push({ x: prev.ts * 1000 + 1, y: null });
+      if (reset && !sameWindow(prev, r)) resets.add(resetMs(prev));
+      data.push({ x: r.ts * 1000, y: r.used });
+    });
+    const color = css(`--c${k === '5h' ? '5h' : 'week'}${i % 2 ? '-2' : ''}`), st = STYLES[i % STYLES.length];
+    datasets.push({ label: prefix(win) ? `${acc} · ${prefix(win)}` : acc, data, borderColor: color, backgroundColor: color,
+      borderDash: st.dash, pointStyle: st.point, borderWidth: 2, spanGaps: false,
+      pointRadius: 0, pointHoverRadius: 4, tension: 0 });
+  });
+  const latest = (d) => [...d.data].reverse().find((p) => p.y != null)?.y;
+  $(k === '5h' ? '#legend-5h' : '#legend-week').innerHTML = datasets.map((d) =>
+    `<span>${lineSvg(d.borderColor, d.borderDash)}${esc(d.label)} <b class="num">${Math.round(latest(d) ?? 0)}%</b></span>`).join('')
+    + (datasets.length ? `<span>${lineSvg(quiet, [1, 3], 1)}alerta em 80%</span>` : '');
+  $(k === '5h' ? '#aside-5h' : '#aside-week').textContent = !resets.size ? '' : resets.size <= 12
+    ? `${resets.size} ${resets.size > 1 ? 'resets' : 'reset'} no período (tracejado vertical)` : `${resets.size} resets no período`;
+  const [min, max] = bounds(), { ticks, step } = timeTicks(min, max);
+  const canvas = $(k === '5h' ? '#chart-5h' : '#chart-week');
+  canvas.parentElement.querySelector('.none')?.remove();
+  if (!datasets.length) canvas.insertAdjacentHTML('afterend', '<p class="none">Sem dados desta janela no período.</p>');
+  const font = { family: 'IBM Plex Sans', size: 12 };
+  charts[k]?.destroy();
+  charts[k] = new Chart(canvas, {
+    type: 'line', data: { datasets }, plugins: [resetLines],
+    options: {
+      maintainAspectRatio: false, animation: false, parsing: false, normalized: true,
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      layout: { padding: { top: 6, right: 8 } },
+      scales: {
+        x: { type: 'linear', min, max, grid: { color: grid, drawTicks: false }, border: { display: false },
+          afterBuildTicks: (ax) => { ax.ticks = ticks.map((value) => ({ value })); },
+          ticks: { color: quiet, padding: 8, maxRotation: 0, autoSkip: false, font,
+            callback: (v) => step >= D || new Date(v).getHours() === 0 ? dayLabel(v) : hhmm(v) } },
+        y: { min: 0, max: 100, border: { display: false }, grid: { color: grid, drawTicks: false },
+          ticks: { stepSize: 20, color: quiet, padding: 8, font, callback: (v) => v + '%' } },
+      },
+      plugins: {
+        legend: { display: false },
+        resetLines: { at: [...resets] },
+        tooltip: { backgroundColor: css('--card'), titleColor: fg, bodyColor: fg, borderColor: css('--input'), borderWidth: 1,
+          padding: 10, usePointStyle: true, boxPadding: 4, titleFont: { ...font, weight: 600 }, bodyFont: font,
+          callbacks: { title: (it) => whenText(it[0].parsed.x), label: (it) => ` ${it.dataset.label}: ${Math.round(it.parsed.y)}%` } },
+      },
+    },
+  });
+}
+
+// --- mapa de calor -----------------------------------------------------------
+// Consumo = soma dos aumentos do % da sessão de 5h (depois de um reset, conta o valor novo inteiro), por dia × hora.
+const heatBg = (l) => l ? `color-mix(in oklch, var(--heat-max) ${[0, 20, 42, 68, 100][l]}%, var(--heat-0))` : 'var(--heat-0)';
+function renderHeat(rows) {
+  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const [key, rs] of series(rows)) {
+    if (kind(key.split(SEP)[1]) !== '5h') continue;
+    rs.forEach((r, j) => {
+      const prev = rs[j - 1]; if (!prev) return;
+      const delta = !sameWindow(prev, r) || r.used < prev.used ? r.used : r.used - prev.used;
+      if (delta <= 0) return;
+      const d = new Date(r.ts * 1000);
+      grid[(d.getDay() + 6) % 7][d.getHours()] += delta;
+    });
+  }
+  const max = Math.max(...grid.flat());
+  const level = (v) => v <= 0 ? 0 : Math.min(4, Math.ceil((v / max) * 4));
+  let html = '<span></span>' + Array.from({ length: 24 }, (_, h) => `<span class="h">${h % 3 ? '' : h + 'h'}</span>`).join('');
+  grid.forEach((row, d) => {
+    html += `<span class="d">${WEEK[d]}</span>` + row.map((v, h) =>
+      `<span class="c" style="background:${heatBg(level(v))}" data-v="${Math.round(v)}" data-d="${d}" data-h="${h}"
+        title="${WEEK[d]}, ${h}h–${h + 1}h: ${v > 0 ? Math.round(v) + ' pontos %' : 'nada'}"></span>`).join('');
+  });
+  $('#heat').innerHTML = html;
+  let top = null;
+  grid.forEach((row, d) => row.forEach((v, h) => { if (v > 0 && (!top || v > top.v)) top = { v, d, h }; }));
+  heatSummary = top ? `pico: ${WEEK[top.d]}, das ${top.h}h às ${top.h + 1}h (${Math.round(top.v)} pontos % consumidos)` : 'sem consumo registrado no período';
+  $('#heat-tip').textContent = heatSummary;
+}
+let heatSummary = '';
+document.querySelectorAll('.scale i').forEach((i) => { i.style.background = heatBg(+i.dataset.s); });
+$('#heat').addEventListener('mouseover', (e) => {
+  const c = e.target.closest('.c'); if (!c) return;
+  $('#heat-tip').textContent = `${WEEK[c.dataset.d]}, das ${c.dataset.h}h às ${+c.dataset.h + 1}h: ` +
+    (+c.dataset.v ? `${c.dataset.v} pontos % consumidos` : 'nada consumido');
+});
+$('#heat').addEventListener('mouseleave', () => { $('#heat-tip').textContent = heatSummary; });
+
+// --- ciclo -------------------------------------------------------------------
+function renderControls() {
+  $('#accounts').innerHTML = meta.accounts.map((a) =>
+    `<button data-a="${esc(a)}" aria-pressed="${state.accounts.includes(a)}">${esc(a)}</button>`).join('');
+  document.querySelectorAll('#period button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.p === state.period));
+  $('#dates').hidden = state.period !== 'custom';
+  [$('#from').value, $('#to').value] = range();
+}
+function renderStatus(rows) {
+  const last = Math.max(0, ...rows.map((r) => r.ts)) * 1000;
+  if (!last) { $('#status').innerHTML = '<span class="tag">sem coletas</span>'; return; }
+  const late = Date.now() - last > 3 * (meta.interval_seconds || 300) * 1000;
+  $('#status').innerHTML = `<span class="tag ${late ? 'warn' : ''}">${late ? 'coleta parada' : 'coletando'}</span>
+    <span class="num">última há ${dur(Date.now() - last)}</span>`;
+}
+function fail(e) {
+  $('#banner').hidden = false;
+  $('#banner').textContent = `Não consegui ler os dados (${e.message}). O serviço está rodando? systemctl --user status ai-usage-monitor`;
+}
+async function refresh() {
+  try {
+    const [now, period] = await Promise.all([
+      getJSON(samplesUrl(isoDay(Date.now() - 8 * D), isoDay(Date.now()))),
+      getJSON(samplesUrl(...range())),
+    ]);
+    $('#banner').hidden = true;
+    const gap = Math.max(10 * 60e3, 3 * (meta.interval_seconds || 300) * 1000);  // mais que isso sem coleta = buraco
+    renderStatus(now); renderCards(now);
+    renderChart('5h', period, gap); renderChart('week', period, gap); renderHeat(period);
+  } catch (e) { fail(e); }
+}
+
+$('#accounts').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const a = b.dataset.a;
+  state.accounts = state.accounts.includes(a) ? state.accounts.filter((x) => x !== a) : [...state.accounts, a].sort();
+  writeUrl(); renderControls(); refresh();
+});
+$('#period').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.p === 'custom' && state.period !== 'custom') [state.from, state.to] = range();
+  state.period = b.dataset.p; writeUrl(); renderControls(); refresh();
+});
+$('#dates').addEventListener('change', () => {
+  state.from = $('#from').value; state.to = $('#to').value;
+  if (state.from && state.to && state.from > state.to) [state.from, state.to] = [state.to, state.from];
+  writeUrl(); renderControls(); refresh();
+});
+$('#theme').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { applyTheme(b.dataset.t); refresh(); } });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', refresh);
+
+(async () => {
+  let t = 'auto'; try { t = localStorage.getItem('tema') || 'auto'; } catch {}
+  applyTheme(t);
+  readUrl();
+  try { meta = await getJSON('/api/meta'); } catch (e) { fail(e); return; }
+  state.accounts = (state.accounts || meta.accounts).filter((a) => meta.accounts.includes(a));
+  renderControls();
+  await document.fonts.ready;
+  await refresh();
+  setInterval(refresh, 60e3);
+})();
+</script>
+</body>
+</html>

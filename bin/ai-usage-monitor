@@ -1,0 +1,4 @@
+#!/bin/sh
+# ai-usage-monitor: coleta o uso dos harness em SQLite e serve o histórico na web. Doc: docs/usage.md
+dir=$(dirname "$(readlink -f "$0")")
+exec python3 "$dir/../usage/monitor.py" "$@"
